@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rimworld-learning-environment"
+version = "0.1.0"
+description = "Multi-agent benchmark where Felix Agent SDK agents play RimWorld"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = [
+    "felix-agent-sdk>=0.1.0",
+    "httpx>=0.24",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+anthropic = ["felix-agent-sdk[anthropic]"]
+openai = ["felix-agent-sdk[openai]"]
+local = ["felix-agent-sdk[local]"]
+all = ["felix-agent-sdk[all]"]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
