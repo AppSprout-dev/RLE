@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
+import json
+from unittest.mock import MagicMock
+
 import pytest
+from felix_agent_sdk.core import HelixConfig, HelixGeometry
+from felix_agent_sdk.providers.base import BaseProvider
+from felix_agent_sdk.providers.types import CompletionResult
 from rle.config import RLEConfig
 from rle.rimapi.schemas import (
     ColonistData,
@@ -247,3 +253,46 @@ def sample_game_state(
         weather=sample_weather,
         timestamp=1700000000.0,
     )
+
+
+# ------------------------------------------------------------------
+# Agent fixtures
+# ------------------------------------------------------------------
+
+SAMPLE_ACTION_PLAN_JSON = json.dumps(
+    {
+        "actions": [
+            {
+                "action_type": "set_work_priority",
+                "target_colonist_id": "col_01",
+                "parameters": {"skill": "growing", "priority": 1},
+                "priority": 2,
+                "reason": "Food days below 3, need immediate growing focus",
+            },
+        ],
+        "summary": "Prioritizing food production due to low food_days.",
+        "confidence": 0.75,
+    }
+)
+
+
+@pytest.fixture
+def sample_action_plan_json() -> str:
+    return SAMPLE_ACTION_PLAN_JSON
+
+
+@pytest.fixture
+def helix() -> HelixGeometry:
+    return HelixConfig.default().to_geometry()
+
+
+@pytest.fixture
+def mock_provider() -> MagicMock:
+    """Provider mock that returns a valid JSON action plan."""
+    provider = MagicMock(spec=BaseProvider)
+    provider.complete.return_value = CompletionResult(
+        content=SAMPLE_ACTION_PLAN_JSON,
+        model="mock-model",
+        usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+    )
+    return provider
