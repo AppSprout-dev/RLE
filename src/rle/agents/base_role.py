@@ -8,6 +8,7 @@ from abc import abstractmethod
 from typing import Any, ClassVar, Tuple
 
 from felix_agent_sdk import LLMAgent, LLMResult, LLMTask
+from felix_agent_sdk.communication import Spoke
 from felix_agent_sdk.core import HelixGeometry
 from felix_agent_sdk.providers.base import BaseProvider
 from felix_agent_sdk.providers.types import ChatMessage, CompletionResult, MessageRole
@@ -73,6 +74,7 @@ class RimWorldRoleAgent(LLMAgent):
         self._last_action_plan: ActionPlan | None = None
         self._provider_kwargs: dict[str, Any] = {}
         self._no_think: bool = False
+        self._spoke: Spoke | None = None
 
     def set_provider_kwargs(self, **kwargs: Any) -> None:
         """Set extra kwargs passed to provider.complete() (e.g. extra_body)."""
@@ -81,6 +83,25 @@ class RimWorldRoleAgent(LLMAgent):
     def set_no_think(self, enabled: bool = True) -> None:
         """Enable no-think mode: skips reasoning via </think> assistant prefix."""
         self._no_think = enabled
+
+    def attach_spoke(self, spoke: Spoke) -> None:
+        """Attach this agent's CentralPost spoke for inter-agent messaging."""
+        self._spoke = spoke
+
+    def _get_spoke_context(self) -> list[dict[str, Any]]:
+        """Read pending spoke messages and format as context for deliberation."""
+        if not self._spoke or not self._spoke.has_pending_messages():
+            return []
+        messages = self._spoke.get_pending_messages()
+        context = []
+        for msg in messages:
+            context.append({
+                "agent_id": msg.sender_id,
+                "message_type": msg.message_type.value,
+                "content": msg.content.get("summary", str(msg.content)),
+                "confidence": msg.content.get("confidence", 0.0),
+            })
+        return context
 
     def _call_provider(
         self,
@@ -288,7 +309,10 @@ class RimWorldRoleAgent(LLMAgent):
             self.spawn(current_time)
         self.update_position(current_time)
 
-        task = self.build_task(state, context_history)
+        # Spoke messages take priority; fall back to passed context_history
+        spoke_context = self._get_spoke_context()
+        effective_context = spoke_context if spoke_context else (context_history or [])
+        task = self.build_task(state, effective_context)
         result = self.process_task(task)
 
         try:

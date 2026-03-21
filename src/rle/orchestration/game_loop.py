@@ -76,15 +76,16 @@ class RLEGameLoop:
         self._log_dir: Path | None = None
         self._deliberation_log: list[dict] = []
         self._parallel = parallel
-        self._prev_tick_context: list[dict] = []
+        self._last_phase: str = ""
 
         self._visualizer = visualizer
 
-        # Hub-spoke communication
+        # Hub-spoke communication — agents read messages from their spokes
         self._hub = CentralPost(max_agents=len(agents))
         self._spoke_manager = SpokeManager(self._hub)
         for agent in agents:
-            self._spoke_manager.create_spoke(agent.agent_id, agent=agent)
+            spoke = self._spoke_manager.create_spoke(agent.agent_id, agent=agent)
+            agent.attach_spoke(spoke)
 
     def _update_visualizer_agent(
         self, agent: RimWorldRoleAgent, plan: ActionPlan, macro_time: float,
@@ -118,11 +119,10 @@ class RLEGameLoop:
         self, state: object, current_time: float, tick_num: int,
     ) -> list[tuple[RimWorldRoleAgent, ActionPlan | None]]:
         """Run all agents concurrently via asyncio.to_thread."""
-        context = self._prev_tick_context or None
 
         async def _run(agent: RimWorldRoleAgent) -> tuple[RimWorldRoleAgent, ActionPlan | None]:
             return await asyncio.to_thread(
-                self._deliberate_agent, agent, state, current_time, tick_num, context,
+                self._deliberate_agent, agent, state, current_time, tick_num,
             )
 
         return list(await asyncio.gather(*[_run(a) for a in self._agents]))
@@ -130,30 +130,25 @@ class RLEGameLoop:
     def _deliberate_sequential(
         self, state: object, current_time: float, tick_num: int,
     ) -> list[tuple[RimWorldRoleAgent, ActionPlan | None]]:
-        """Run agents one at a time, building context history inline."""
+        """Run agents one at a time. Agents read context from their spokes."""
         results: list[tuple[RimWorldRoleAgent, ActionPlan | None]] = []
-        context_history: list[dict] = []
         for agent in self._agents:
             agent_result, plan = self._deliberate_agent(
-                agent, state, current_time, tick_num, context_history,
+                agent, state, current_time, tick_num,
             )
             results.append((agent_result, plan))
-            if plan is not None:
-                context_history.append({
-                    "agent_id": plan.role,
-                    "content": plan.summary,
-                    "confidence": plan.confidence,
-                })
         return results
 
     def _deliberate_agent(
         self, agent: RimWorldRoleAgent, state: object,
         current_time: float, tick_num: int,
-        context_history: list[dict] | None = None,
     ) -> tuple[RimWorldRoleAgent, ActionPlan | None]:
-        """Run one agent's deliberation. Thread-safe for parallel execution."""
+        """Run one agent's deliberation. Thread-safe for parallel execution.
+
+        Agents read inter-agent context from their CentralPost spoke internally.
+        """
         try:
-            plan = agent.deliberate(state, current_time, context_history)  # type: ignore[arg-type]
+            plan = agent.deliberate(state, current_time)  # type: ignore[arg-type]
         except ActionPlanParseError as e:
             logger.warning(
                 "Agent %s parse failure (tick %d): %s",
@@ -189,6 +184,22 @@ class RLEGameLoop:
             if threat.threat_id not in seen_ids:
                 self._metric_context.threats_seen.append(threat)
 
+    def _broadcast_phase_if_changed(self, current_time: float) -> None:
+        """Broadcast PHASE_ANNOUNCE when macro_time crosses a phase boundary."""
+        if current_time < 0.4:
+            phase = "exploration"
+        elif current_time < 0.7:
+            phase = "analysis"
+        else:
+            phase = "synthesis"
+        if phase != self._last_phase:
+            self._spoke_manager.broadcast_message(
+                MessageType.PHASE_ANNOUNCE,
+                {"phase": phase, "depth_ratio": current_time},
+                sender_id="hub",
+            )
+            self._last_phase = phase
+
     async def run_tick(self) -> TickResult:
         """Execute one turn."""
         # 1. Pause
@@ -198,13 +209,18 @@ class RLEGameLoop:
         state = await self._state_manager.refresh()
         current_time = self._state_manager.macro_time
 
-        # 3. Multi-agent deliberation
+        # 3. Route previous tick's messages to agent spokes + broadcast phase changes
+        self._spoke_manager.process_all_messages()
+        self._broadcast_phase_if_changed(current_time)
+
+        # 4. Multi-agent deliberation (agents read spoke messages internally)
         tick_num = len(self._tick_results)
         if self._parallel:
             results = await self._deliberate_parallel(state, current_time, tick_num)
         else:
             results = self._deliberate_sequential(state, current_time, tick_num)
 
+        # 5. Collect plans, update visualizer, send results via CentralPost
         plans: list[ActionPlan] = []
         for agent, plan in results:
             if plan is None:
@@ -215,33 +231,45 @@ class RLEGameLoop:
             if spoke and spoke.is_connected:
                 spoke.send_message(
                     MessageType.TASK_COMPLETE,
-                    {"role": plan.role, "summary": plan.summary},
+                    {
+                        "role": plan.role,
+                        "summary": plan.summary,
+                        "confidence": plan.confidence,
+                        "num_actions": len(plan.actions),
+                        "action_types": [a.action_type.value for a in plan.actions],
+                    },
                 )
 
-        # Build context for next tick (shared via CentralPost, not inline peeking)
-        self._prev_tick_context = [
-            {"agent_id": p.role, "content": p.summary, "confidence": p.confidence}
-            for p in plans
-        ]
-        self._spoke_manager.process_all_messages()
-
-        # 4. Resolve conflicts across all agent plans
+        # 6. Resolve conflicts across all agent plans
         resolved = self._resolver.resolve(plans, state)
 
-        # 5. Execute merged plan
+        # 7. Execute merged plan
         exec_result = await self._executor.execute(resolved)
 
-        # 6. Score this tick
+        # 8. Score this tick
         snapshot: ScoreSnapshot | None = None
         if self._scorer:
             snapshot = self._scorer.score(state, self._metric_context)
             if self._recorder:
                 self._recorder.record(snapshot)
 
-        # 7. Render visualization
+        # 9. Broadcast score to all agents via CentralPost
+        if snapshot:
+            self._spoke_manager.broadcast_message(
+                MessageType.STATUS_UPDATE,
+                {
+                    "tick": state.colony.tick,
+                    "day": state.colony.day,
+                    "composite_score": snapshot.composite,
+                    "metrics": snapshot.metrics,
+                },
+                sender_id="hub",
+            )
+
+        # 10. Render visualization
         self._render_visualizer(state.colony.tick, state.colony.day, exec_result, snapshot)
 
-        # 8. Unpause
+        # 11. Unpause
         await self._client.unpause_game()
 
         result = TickResult(

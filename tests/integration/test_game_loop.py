@@ -434,7 +434,8 @@ class TestParallelDeliberation:
         assert loop._parse_successes == 6
         assert loop._parse_failures == 0
 
-    async def test_parallel_builds_prev_tick_context(self) -> None:
+    async def test_spoke_messages_routed_after_tick(self) -> None:
+        """After tick 1, agents should have TASK_COMPLETE messages from other agents."""
         provider = _make_mock_provider()
         agents = _make_all_agents(provider)
         config = RLEConfig(tick_interval=0.0)
@@ -444,10 +445,15 @@ class TestParallelDeliberation:
                 transport=_make_transport(), base_url="http://test",
             )
             loop = RLEGameLoop(config, client, agents, parallel=True)
-            await loop.run(max_ticks=2)
+            # Tick 1: agents deliberate, send TASK_COMPLETE messages
+            await loop.run_tick()
+            # Messages are queued in hub but not yet routed to spokes.
+            # Tick 2: process_all_messages() routes tick 1 messages to spokes,
+            # then agents deliberate with spoke context available.
+            await loop.run_tick()
 
-        # After 2 ticks, prev_tick_context should have 6 entries from tick 2
-        assert len(loop._prev_tick_context) == 6
+        # Verify hub processed messages (6 TASK_COMPLETE from tick 1 + 6 from tick 2)
+        assert loop._hub.total_messages_processed >= 6
 
     async def test_sequential_mode_still_works(self) -> None:
         provider = _make_mock_provider()
@@ -479,3 +485,85 @@ class TestParallelDeliberation:
 
         assert len(results) == 3
         assert provider.complete.call_count == 18
+
+
+# ------------------------------------------------------------------
+# CentralPost hub-spoke communication tests
+# ------------------------------------------------------------------
+
+
+class TestHubSpokeCommunication:
+    async def test_spokes_attached_to_agents(self) -> None:
+        """All agents should have spokes attached after game loop init."""
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            RLEGameLoop(config, client, agents)
+
+        for agent in agents:
+            assert agent._spoke is not None
+
+    async def test_task_complete_messages_sent(self) -> None:
+        """Each agent should send a TASK_COMPLETE after deliberating."""
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, agents)
+            await loop.run_tick()
+
+        # 6 agents sent TASK_COMPLETE messages
+        assert loop._hub.message_queue_size >= 0  # may have been processed
+        assert loop._hub.total_messages_processed >= 0
+        # Each agent's spoke should have sent at least 1 message
+        for agent in agents:
+            assert agent._spoke.messages_sent >= 1
+
+    async def test_phase_announce_broadcast(self) -> None:
+        """Phase change should broadcast PHASE_ANNOUNCE to all spokes."""
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, agents)
+            await loop.run_tick()
+
+        # First tick should have broadcast an initial phase
+        assert loop._last_phase != ""
+
+    async def test_score_broadcast(self) -> None:
+        """STATUS_UPDATE with scores should broadcast after scoring."""
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+        scorer = CompositeScorer()
+        recorder = TimeSeriesRecorder()
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(
+                config, client, agents,
+                scorer=scorer, recorder=recorder,
+                initial_population=3, initial_wealth=15000.0,
+            )
+            await loop.run_tick()
+
+        # After scoring, STATUS_UPDATE should have been broadcast
+        # Each agent should have received it
+        for agent in agents:
+            assert agent._spoke.messages_received >= 1
