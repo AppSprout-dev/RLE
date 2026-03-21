@@ -10,12 +10,28 @@ from typing import Any, ClassVar, Tuple
 from felix_agent_sdk import LLMAgent, LLMResult, LLMTask
 from felix_agent_sdk.core import HelixGeometry
 from felix_agent_sdk.providers.base import BaseProvider
+from felix_agent_sdk.providers.types import ChatMessage, CompletionResult, MessageRole
 from felix_agent_sdk.tokens.budget import TokenBudget
 
 from rle.agents.actions import Action, ActionPlan, ActionPlanParseError, ActionType
+from rle.agents.json_repair import repair_json
 from rle.rimapi.schemas import GameState
 
 logger = logging.getLogger(__name__)
+
+# Shared prefix for all 6 role agents. Placed first in the system prompt so
+# LM Studio / llama.cpp can reuse the KV cache across agents within a tick.
+_SHARED_SYSTEM_PREFIX = (
+    "You are one of 6 specialized role agents collaborating to manage a RimWorld colony. "
+    "The agents are: ResourceManager, DefenseCommander, ResearchDirector, SocialOverseer, "
+    "ConstructionPlanner, and MedicalOfficer. Each agent proposes actions for its domain; "
+    "a central resolver merges plans and handles conflicts.\n\n"
+    "You MUST respond with a JSON object matching this schema:\n"
+    '{"actions": [{"action_type": "<type>", "target_colonist_id": "<id or null>", '
+    '"parameters": {}, "priority": <1-10>, "reason": "<why>"}], '
+    '"summary": "<brief summary>", "confidence": <0.0-1.0>}\n\n'
+    "Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.\n\n"
+)
 
 
 class RimWorldRoleAgent(LLMAgent):
@@ -55,6 +71,30 @@ class RimWorldRoleAgent(LLMAgent):
             token_budget=token_budget,
         )
         self._last_action_plan: ActionPlan | None = None
+        self._provider_kwargs: dict[str, Any] = {}
+
+    def set_provider_kwargs(self, **kwargs: Any) -> None:
+        """Set extra kwargs passed to provider.complete() (e.g. extra_body)."""
+        self._provider_kwargs = kwargs
+
+    def _call_provider(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> CompletionResult:
+        """Override to pass extra provider kwargs (e.g. no-think for Qwen3.5)."""
+        messages = [
+            ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
+            ChatMessage(role=MessageRole.USER, content=user_prompt),
+        ]
+        return self.provider.complete(
+            messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **self._provider_kwargs,
+        )
 
     # ------------------------------------------------------------------
     # Abstract methods — subclasses must implement
@@ -104,7 +144,14 @@ class RimWorldRoleAgent(LLMAgent):
     # ------------------------------------------------------------------
 
     def create_position_aware_prompt(self, task: LLMTask) -> Tuple[str, str]:
-        """Build role-specific system and user prompts with helix phase adaptation."""
+        """Build role-specific system and user prompts with helix phase adaptation.
+
+        Prompt structure (optimized for KV cache sharing across agents):
+          1. _SHARED_SYSTEM_PREFIX — identical for all 6 agents (multi-agent intro,
+             JSON schema, "respond only with JSON")
+          2. Phase block — shared within same tick (progress + directive)
+          3. Role block — unique per agent (identity, description, allowed actions)
+        """
         phase = self.position.phase
         progress_pct = int(self._progress * 100)
 
@@ -127,21 +174,21 @@ class RimWorldRoleAgent(LLMAgent):
                 "Be concise and confident."
             )
 
+        phase_block = (
+            f"Progress: {progress_pct}% ({phase} phase).\n"
+            f"{phase_directive}\n\n"
+        )
+
         allowed = task.metadata.get("allowed_actions", [])
         allowed_str = ", ".join(allowed) if allowed else "any"
 
-        system_prompt = (
-            f"You are the {self.ROLE_NAME} for a RimWorld colony. "
+        role_block = (
+            f"You are the {self.ROLE_NAME} for this colony. "
             f"{self._get_role_description()}\n\n"
-            f"Progress: {progress_pct}% ({phase} phase).\n"
-            f"{phase_directive}\n\n"
-            f"ALLOWED ACTIONS: {allowed_str}\n\n"
-            f"You MUST respond with a JSON object matching this schema:\n"
-            f'{{"actions": [{{"action_type": "<type>", "target_colonist_id": "<id or null>", '
-            f'"parameters": {{}}, "priority": <1-10>, "reason": "<why>"}}], '
-            f'"summary": "<brief summary>", "confidence": <0.0-1.0>}}\n\n'
-            f"Respond ONLY with valid JSON. No markdown, no explanation outside the JSON."
+            f"ALLOWED ACTIONS: {allowed_str}"
         )
+
+        system_prompt = _SHARED_SYSTEM_PREFIX + phase_block + role_block
 
         parts = []
         # Disable thinking for local models (e.g. Qwen3.5 thinking mode)
@@ -166,18 +213,12 @@ class RimWorldRoleAgent(LLMAgent):
 
     def parse_action_plan(self, result: LLMResult, tick: int) -> ActionPlan:
         """Parse LLMResult.content into a validated ActionPlan."""
-        raw = result.content.strip()
-
-        # Strip markdown code fences if present
-        if raw.startswith("```"):
-            lines = raw.split("\n")
-            lines = [line for line in lines[1:] if not line.strip().startswith("```")]
-            raw = "\n".join(lines)
+        raw = repair_json(result.content.strip())
 
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
-            raise ActionPlanParseError(result.content, f"Invalid JSON: {e}") from e
+            raise ActionPlanParseError(result.content, f"Invalid JSON after repair: {e}") from e
 
         actions: list[Action] = []
         for raw_action in data.get("actions", []):
@@ -193,15 +234,19 @@ class RimWorldRoleAgent(LLMAgent):
                     self.ROLE_NAME,
                 )
                 continue
-            actions.append(
-                Action(
-                    action_type=action_type,
-                    target_colonist_id=raw_action.get("target_colonist_id"),
-                    parameters=raw_action.get("parameters", {}),
-                    priority=raw_action.get("priority", 5),
-                    reason=raw_action.get("reason", ""),
+            try:
+                actions.append(
+                    Action(
+                        action_type=action_type,
+                        target_colonist_id=raw_action.get("target_colonist_id"),
+                        parameters=raw_action.get("parameters", {}),
+                        priority=raw_action.get("priority", 5),
+                        reason=raw_action.get("reason", ""),
+                    )
                 )
-            )
+            except (ValueError, TypeError, Exception) as e:
+                logger.warning("Skipping action with validation error: %s", e)
+                continue
 
         return ActionPlan(
             role=self.ROLE_NAME,
@@ -236,6 +281,43 @@ class RimWorldRoleAgent(LLMAgent):
 
         task = self.build_task(state, context_history)
         result = self.process_task(task)
-        plan = self.parse_action_plan(result, state.colony.tick)
+
+        try:
+            plan = self.parse_action_plan(result, state.colony.tick)
+        except ActionPlanParseError as first_error:
+            logger.warning(
+                "%s: parse failed, retrying with correction prompt: %s",
+                self.ROLE_NAME, first_error.reason,
+            )
+            retry_result = self._retry_with_correction(result.content, first_error.reason)
+            plan = self.parse_action_plan(retry_result, state.colony.tick)
+
         self._last_action_plan = plan
         return plan
+
+    def _retry_with_correction(self, bad_output: str, error: str) -> LLMResult:
+        """Retry with a short correction prompt asking the LLM to fix its JSON."""
+        system_prompt = (
+            "You previously produced invalid JSON. Fix the error and return ONLY "
+            "valid JSON matching the required schema. No explanation, no markdown."
+        )
+        user_prompt = (
+            f"Your previous output had this error: {error}\n\n"
+            f"Original output (fix this):\n{bad_output[:2000]}\n\n"
+            "Return ONLY the corrected JSON object."
+        )
+        completion = self._call_provider(
+            system_prompt, user_prompt, temperature=0.1, max_tokens=self.max_tokens,
+        )
+        self.total_tokens_used += completion.total_tokens
+        return LLMResult(
+            agent_id=self.agent_id,
+            task_id="retry",
+            content=completion.content,
+            position_info=self.get_position_info(),
+            completion_result=completion,
+            processing_time=0.0,
+            confidence=0.0,
+            temperature_used=0.1,
+            token_budget_used=completion.total_tokens,
+        )

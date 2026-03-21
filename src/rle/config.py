@@ -32,6 +32,7 @@ class RLEConfig(BaseSettings):
     rimapi_url: str = "http://localhost:8765"
     provider: str = "anthropic"
     model: str = "claude-sonnet-4-5"
+    provider_base_url: str | None = None
     tick_interval: float = 1.0
     helix_preset: str = "default"
     max_agents: int = 6
@@ -55,4 +56,7 @@ class RLEConfig(BaseSettings):
                 f"Unknown provider {self.provider!r}. "
                 f"Choose from: {list(_PROVIDER_CLASSES)}"
             )
-        return cls(model=self.model)
+        kwargs: dict[str, str] = {"model": self.model}
+        if self.provider_base_url:
+            kwargs["base_url"] = self.provider_base_url
+        return cls(**kwargs)

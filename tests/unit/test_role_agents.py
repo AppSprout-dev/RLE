@@ -8,6 +8,7 @@ from felix_agent_sdk import AgentFactory
 from felix_agent_sdk.core import HelixConfig, HelixGeometry
 from rle.agents import register_rle_agents
 from rle.agents.actions import ActionPlan, ActionType
+from rle.agents.base_role import _SHARED_SYSTEM_PREFIX
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
 from rle.agents.medical_officer import MedicalOfficer
@@ -373,3 +374,84 @@ class TestRegistration:
         finally:
             for role_name, _ in roles:
                 AgentFactory._agent_types.pop(role_name, None)
+
+
+# ==================================================================
+# Shared system prompt prefix (KV cache optimization)
+# ==================================================================
+
+
+class TestSharedSystemPrefix:
+    """All 6 agents must share _SHARED_SYSTEM_PREFIX at the start of their
+    system prompt, with role-specific content at the end."""
+
+    ALL_AGENT_CLASSES = [
+        ("rm", ResourceManager),
+        ("dc", DefenseCommander),
+        ("rd", ResearchDirector),
+        ("so", SocialOverseer),
+        ("cp", ConstructionPlanner),
+        ("mo", MedicalOfficer),
+    ]
+
+    def _make_agent_and_prompt(
+        self, agent_id: str, cls: type, mock_provider: MagicMock,
+        helix: HelixGeometry, sample_game_state: GameState,
+    ) -> str:
+        agent = cls(agent_id, mock_provider, helix, spawn_time=0.0)
+        agent.spawn(0.0)
+        agent.update_position(0.2)
+        task = agent.build_task(sample_game_state)
+        system_prompt, _ = agent.create_position_aware_prompt(task)
+        return system_prompt
+
+    def test_all_agents_share_common_prefix(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        prompts = []
+        for agent_id, cls in self.ALL_AGENT_CLASSES:
+            prompts.append(
+                self._make_agent_and_prompt(
+                    agent_id, cls, mock_provider, helix, sample_game_state,
+                )
+            )
+
+        # All prompts must start with the exact shared prefix
+        for prompt in prompts:
+            assert prompt.startswith(_SHARED_SYSTEM_PREFIX), (
+                f"Prompt does not start with _SHARED_SYSTEM_PREFIX:\n{prompt[:200]}"
+            )
+
+        # The shared prefix must be non-trivial (at least 100 chars)
+        assert len(_SHARED_SYSTEM_PREFIX) > 100
+
+    def test_role_specific_content_at_end(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        role_suffixes: dict[str, str] = {}
+        for agent_id, cls in self.ALL_AGENT_CLASSES:
+            prompt = self._make_agent_and_prompt(
+                agent_id, cls, mock_provider, helix, sample_game_state,
+            )
+            # Strip shared prefix to get the role-specific tail
+            suffix = prompt[len(_SHARED_SYSTEM_PREFIX):]
+            role_suffixes[cls.ROLE_NAME] = suffix
+
+        # Each agent's suffix must contain its role name
+        for role_name, suffix in role_suffixes.items():
+            assert role_name in suffix, (
+                f"Role-specific suffix for {role_name} doesn't contain role name"
+            )
+
+        # All 6 suffixes must be distinct (role block differs)
+        unique_suffixes = set(role_suffixes.values())
+        assert len(unique_suffixes) == 6, (
+            "Expected 6 distinct role-specific suffixes"
+        )
+
+    def test_shared_prefix_contains_json_schema(self) -> None:
+        assert '"action_type"' in _SHARED_SYSTEM_PREFIX
+        assert '"confidence"' in _SHARED_SYSTEM_PREFIX
+        assert "Respond ONLY with valid JSON" in _SHARED_SYSTEM_PREFIX

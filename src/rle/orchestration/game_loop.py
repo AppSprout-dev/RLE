@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+from pathlib import Path
 
 from felix_agent_sdk.communication import CentralPost, MessageType, SpokeManager
 from pydantic import BaseModel, ConfigDict
 
-from rle.agents.actions import ActionPlan
+from rle.agents.actions import ActionPlan, ActionPlanParseError
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.config import RLEConfig
 from rle.orchestration.action_executor import ActionExecutor, ExecutionResult
@@ -67,6 +69,10 @@ class RLEGameLoop:
             initial_population=initial_population,
             initial_wealth=initial_wealth,
         )
+        self._parse_successes = 0
+        self._parse_failures = 0
+        self._log_dir: Path | None = None
+        self._deliberation_log: list[dict] = []
 
         # Hub-spoke communication
         self._hub = CentralPost(max_agents=len(agents))
@@ -86,9 +92,35 @@ class RLEGameLoop:
         # 3. Multi-agent deliberation
         plans: list[ActionPlan] = []
         context_history: list[dict] = []
+        tick_num = len(self._tick_results)
         for agent in self._agents:
-            plan = agent.deliberate(state, current_time, context_history)
+            try:
+                plan = agent.deliberate(state, current_time, context_history)
+            except ActionPlanParseError as e:
+                logger.warning(
+                    "Agent %s parse failure (tick %d): %s",
+                    agent.ROLE_NAME, tick_num, e.reason,
+                )
+                self._parse_failures += 1
+                self._deliberation_log.append({
+                    "tick": tick_num, "agent": agent.ROLE_NAME,
+                    "status": "parse_failure", "reason": e.reason,
+                    "raw": e.raw_content[:500] if e.raw_content else None,
+                })
+                continue
             plans.append(plan)
+            self._parse_successes += 1
+            self._deliberation_log.append({
+                "tick": tick_num, "agent": plan.role,
+                "status": "success", "confidence": plan.confidence,
+                "num_actions": len(plan.actions),
+                "actions": [
+                    {"type": a.action_type.value, "target": a.target_colonist_id,
+                     "priority": a.priority, "reason": a.reason[:200]}
+                    for a in plan.actions
+                ],
+                "summary": plan.summary[:300],
+            })
             context_history.append({
                 "agent_id": plan.role,
                 "content": plan.summary,
