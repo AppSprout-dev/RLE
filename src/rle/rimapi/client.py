@@ -228,11 +228,51 @@ class RimAPIClient:
         )
 
     # ------------------------------------------------------------------
-    # Write endpoints — stubs (pending upstream PRs)
+    # Write endpoints — RLE fork (AppSprout-dev/RIMAPI:rle-testing)
     # ------------------------------------------------------------------
 
-    async def set_colonist_job(self, colonist_id: str, job: str) -> dict:
-        raise NotImplementedError("Needs upstream PR: generic job assignment")
-
     async def set_research_target(self, project: str) -> dict:
-        raise NotImplementedError("Needs upstream PR: research target write endpoint")
+        return await self._post(f"/api/v1/research/target?name={project}")
+
+    async def set_colonist_job(
+        self,
+        colonist_id: str,
+        job: str,
+        target_thing_id: int | None = None,
+        target_position: tuple[int, int] | None = None,
+    ) -> dict:
+        body: dict = {"PawnId": colonist_id, "JobDef": job}
+        if target_thing_id is not None:
+            body["TargetThingId"] = target_thing_id
+        if target_position is not None:
+            body["TargetPosition"] = {"X": target_position[0], "Z": target_position[1]}
+        return await self._post("/api/v1/pawn/job", json=body)
+
+    async def toggle_power(self, building_id: int, power_on: bool) -> dict:
+        return await self._post(
+            f"/api/v1/map/building/power?buildingId={building_id}&powerOn={str(power_on).lower()}",
+        )
+
+    async def create_growing_zone(
+        self, map_id: int, plant_def: str, cells: list[dict],
+    ) -> dict:
+        return await self._post(
+            "/api/v1/map/zone/growing",
+            json={"MapId": map_id, "PlantDef": plant_def, "Cells": cells},
+        )
+
+    async def assign_bed_rest(
+        self, patient_id: str, bed_building_id: int | None = None,
+    ) -> dict:
+        body: dict = {"PatientPawnId": patient_id}
+        if bed_building_id is not None:
+            body["BedBuildingId"] = bed_building_id
+        return await self._post("/api/v1/pawn/medical/bed-rest", json=body)
+
+    async def administer_medicine(
+        self, patient_id: str, doctor_id: str | None = None,
+    ) -> dict:
+        body: dict = {"PatientPawnId": patient_id}
+        if doctor_id is not None:
+            body["DoctorPawnId"] = doctor_id
+        return await self._post("/api/v1/pawn/medical/tend", json=body)

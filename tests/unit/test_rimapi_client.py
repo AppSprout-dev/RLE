@@ -37,6 +37,12 @@ _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/builder/blueprint": {"success": True},
     "/api/v1/colonist/time-assignment": {"success": True},
     "/api/v1/order/designate/area": {"success": True},
+    "/api/v1/research/target?name=Electricity": {"success": True},
+    "/api/v1/pawn/job": {"success": True},
+    "/api/v1/map/building/power?buildingId=999&powerOn=false": {"success": True},
+    "/api/v1/map/zone/growing": {"success": True},
+    "/api/v1/pawn/medical/bed-rest": {"success": True},
+    "/api/v1/pawn/medical/tend": {"success": True},
 }
 
 
@@ -228,13 +234,35 @@ class TestWriteEndpoints:
         assert result["success"] is True
 
 
-class TestWriteEndpointStubs:
-    async def test_set_colonist_job_raises(self) -> None:
-        async with RimAPIClient() as client:
-            with pytest.raises(NotImplementedError, match="generic job"):
-                await client.set_colonist_job("12345", "mining")
+class TestForkEndpoints:
+    async def test_set_research_target(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.set_research_target("Electricity")
+        assert result["success"] is True
 
-    async def test_set_research_target_raises(self) -> None:
-        async with RimAPIClient() as client:
-            with pytest.raises(NotImplementedError, match="research target"):
-                await client.set_research_target("electricity")
+    async def test_set_colonist_job(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.set_colonist_job("12345", "Haul")
+        assert result["success"] is True
+
+    async def test_set_colonist_job_with_target(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.set_colonist_job(
+            "12345", "Haul", target_thing_id=456,
+        )
+        assert result["success"] is True
+
+    async def test_toggle_power(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.toggle_power(999, False)
+        assert result["success"] is True
+
+    async def test_create_growing_zone(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.create_growing_zone(
+            0, "PlantPotato", [{"X": 10, "Z": 20}],
+        )
+        assert result["success"] is True
+
+    async def test_assign_bed_rest(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.assign_bed_rest("12345")
+        assert result["success"] is True
+
+    async def test_administer_medicine(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.administer_medicine("12345")
+        assert result["success"] is True

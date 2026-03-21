@@ -12,15 +12,10 @@ from rle.rimapi.client import RimAPIClient
 
 logger = logging.getLogger(__name__)
 
-# Action types that have no upstream RIMAPI endpoint yet.
+# Action types with no RIMAPI endpoint yet (even on our fork).
 _PENDING_UPSTREAM: frozenset[ActionType] = frozenset({
-    ActionType.HAUL_RESOURCE,
-    ActionType.SET_GROWING_ZONE,
-    ActionType.TOGGLE_POWER,
     ActionType.ASSIGN_SOCIAL_ACTIVITY,
     ActionType.CANCEL_BLUEPRINT,
-    ActionType.ASSIGN_BED_REST,
-    ActionType.ADMINISTER_MEDICINE,
 })
 
 
@@ -123,6 +118,33 @@ class ActionExecutor:
         for hour in params.get("hours", []):
             await self._client.set_time_assignment(cid, hour, assignment)
 
+    async def _do_haul(self, cid: str, params: dict[str, Any]) -> None:
+        target_id = params.get("target_thing_id")
+        await self._client.set_colonist_job(cid, "HaulToCell", target_thing_id=target_id)
+
+    async def _do_set_growing_zone(self, cid: str, params: dict[str, Any]) -> None:
+        await self._client.create_growing_zone(
+            map_id=params.get("map_id", 0),
+            plant_def=params.get("plant_def", "PlantPotato"),
+            cells=params.get("cells", []),
+        )
+
+    async def _do_toggle_power(self, cid: str, params: dict[str, Any]) -> None:
+        await self._client.toggle_power(
+            building_id=params.get("building_id", 0),
+            power_on=params.get("power_on", True),
+        )
+
+    async def _do_bed_rest(self, cid: str, params: dict[str, Any]) -> None:
+        await self._client.assign_bed_rest(
+            cid, bed_building_id=params.get("bed_building_id"),
+        )
+
+    async def _do_administer_medicine(self, cid: str, params: dict[str, Any]) -> None:
+        await self._client.administer_medicine(
+            cid, doctor_id=params.get("doctor_id"),
+        )
+
     _handlers: dict[ActionType, Any] = {
         ActionType.SET_WORK_PRIORITY: _do_set_work_priority,
         ActionType.DRAFT_COLONIST: _do_draft,
@@ -132,4 +154,9 @@ class ActionExecutor:
         ActionType.MOVE_COLONIST: _do_move,
         ActionType.ASSIGN_RESEARCHER: _do_assign_researcher,
         ActionType.SET_RECREATION_POLICY: _do_recreation_policy,
+        ActionType.HAUL_RESOURCE: _do_haul,
+        ActionType.SET_GROWING_ZONE: _do_set_growing_zone,
+        ActionType.TOGGLE_POWER: _do_toggle_power,
+        ActionType.ASSIGN_BED_REST: _do_bed_rest,
+        ActionType.ADMINISTER_MEDICINE: _do_administer_medicine,
     }
