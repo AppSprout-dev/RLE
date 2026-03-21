@@ -51,6 +51,9 @@ class ResourceManager(RimWorldRoleAgent):
             },
             "season": state.map.season,
             "active_threats": len(state.threats),
+            "recent_events": self._format_events(
+                "colonist_ate", "colonist_crafted", "plant_harvested",
+            ),
         }
 
     def _get_task_description(self) -> str:

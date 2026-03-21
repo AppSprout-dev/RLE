@@ -49,6 +49,9 @@ class MedicalOfficer(RimWorldRoleAgent):
             "disease_active": any(
                 t.threat_type == "disease" for t in state.threats
             ),
+            "recent_events": self._format_events(
+                "colonist_died", "colonist_mental_break",
+            ),
         }
 
     def _get_task_description(self) -> str:

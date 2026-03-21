@@ -60,6 +60,9 @@ class ConstructionPlanner(RimWorldRoleAgent):
                 for s in state.map.structures
                 if s.hit_points < s.max_hit_points * 0.5
             ),
+            "recent_events": self._format_events(
+                "letter_received", "pawn_killed",
+            ),
         }
 
     def _get_task_description(self) -> str:

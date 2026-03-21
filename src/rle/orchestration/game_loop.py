@@ -213,7 +213,12 @@ class RLEGameLoop:
         self._spoke_manager.process_all_messages()
         self._broadcast_phase_if_changed(current_time)
 
-        # 4. Multi-agent deliberation (agents read spoke messages internally)
+        # 4. Inject SSE events into agents for this tick
+        pending_events = self._state_manager.pending_events
+        for agent in self._agents:
+            agent.set_pending_events(pending_events)
+
+        # 5. Multi-agent deliberation (agents read spoke messages internally)
         tick_num = len(self._tick_results)
         if self._parallel:
             results = await self._deliberate_parallel(state, current_time, tick_num)

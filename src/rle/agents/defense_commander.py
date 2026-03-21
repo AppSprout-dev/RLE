@@ -58,6 +58,9 @@ class DefenseCommander(RimWorldRoleAgent):
             "highest_threat_level": max(
                 (t.threat_level for t in state.threats), default=0.0,
             ),
+            "recent_events": self._format_events(
+                "letter_received", "message_received", "pawn_entered_map", "pawn_killed",
+            ),
         }
 
     def _get_task_description(self) -> str:

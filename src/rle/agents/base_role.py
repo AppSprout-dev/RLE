@@ -17,6 +17,7 @@ from felix_agent_sdk.tokens.budget import TokenBudget
 from rle.agents.actions import Action, ActionPlan, ActionPlanParseError, ActionType
 from rle.agents.json_repair import repair_json
 from rle.rimapi.schemas import GameState
+from rle.rimapi.sse_client import RimAPIEvent
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,7 @@ class RimWorldRoleAgent(LLMAgent):
         self._provider_kwargs: dict[str, Any] = {}
         self._no_think: bool = False
         self._spoke: Spoke | None = None
+        self._pending_events: list[RimAPIEvent] = []
 
     def set_provider_kwargs(self, **kwargs: Any) -> None:
         """Set extra kwargs passed to provider.complete() (e.g. extra_body)."""
@@ -87,6 +89,18 @@ class RimWorldRoleAgent(LLMAgent):
     def attach_spoke(self, spoke: Spoke) -> None:
         """Attach this agent's CentralPost spoke for inter-agent messaging."""
         self._spoke = spoke
+
+    def set_pending_events(self, events: list[RimAPIEvent]) -> None:
+        """Inject SSE events for this tick. Called by game loop before deliberation."""
+        self._pending_events = events
+
+    def _format_events(self, *event_types: str) -> list[dict[str, Any]]:
+        """Filter and format pending SSE events by type for inclusion in game state."""
+        return [
+            {"event_type": e.event_type, "data": e.data}
+            for e in self._pending_events
+            if e.event_type in event_types
+        ]
 
     def _get_spoke_context(self) -> list[dict[str, Any]]:
         """Read pending spoke messages and format as context for deliberation."""

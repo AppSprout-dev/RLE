@@ -45,6 +45,9 @@ class ResearchDirector(RimWorldRoleAgent):
                 }
                 for c in state.colonists
             ],
+            "recent_events": self._format_events(
+                "colonist_crafted", "colonist_bill_work",
+            ),
         }
 
     def _get_task_description(self) -> str:

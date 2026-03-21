@@ -45,6 +45,9 @@ class SocialOverseer(RimWorldRoleAgent):
                 c.colonist_id for c in state.colonists if c.mood < 0.4
             ],
             "season": state.map.season,
+            "recent_events": self._format_events(
+                "colonist_mental_break", "colonist_died",
+            ),
         }
 
     def _get_task_description(self) -> str:
