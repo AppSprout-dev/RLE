@@ -143,7 +143,11 @@ class RimWorldRoleAgent(LLMAgent):
             f"Respond ONLY with valid JSON. No markdown, no explanation outside the JSON."
         )
 
-        parts = [task.description]
+        parts = []
+        # Disable thinking for local models (e.g. Qwen3.5 thinking mode)
+        if self.provider.provider_name == "local":
+            parts.append("/no_think")
+        parts.append(task.description)
         if task.context:
             parts.append(f"\nCurrent colony state:\n{task.context}")
         if task.context_history:

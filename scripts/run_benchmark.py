@@ -41,7 +41,7 @@ _MOCK_ACTION_PLAN = json.dumps({
 })
 
 _MOCK_ROUTES: dict[str, dict | list] = {
-    "/api/colonists": [
+    "/api/v1/colonists": [
         {
             "colonist_id": "col_01", "name": "Tynan", "health": 0.95,
             "mood": 0.72, "skills": {"shooting": 8, "construction": 5,
@@ -67,35 +67,59 @@ _MOCK_ROUTES: dict[str, dict | list] = {
             "injuries": [], "position": [50, 10],
         },
     ],
-    "/api/resources": {
+    "/api/v1/resources": {
         "food": 85.0, "medicine": 5, "steel": 200, "wood": 350,
         "components": 8, "silver": 800, "power_net": 150.0, "items": {},
     },
-    "/api/map": {
+    "/api/v1/map": {
         "size": [250, 250], "biome": "temperate_forest", "season": "summer",
         "temperature": 22.0, "structures": [
             {"structure_id": "s_01", "def_name": "Wall", "position": [10, 10],
              "hit_points": 300.0, "max_hit_points": 300.0},
         ],
     },
-    "/api/research": {
+    "/api/v1/research/summary": {
         "current_project": "electricity", "progress": 0.45,
         "completed": ["stonecutting"], "available": ["electricity", "battery", "smithing"],
     },
-    "/api/threats": [],
-    "/api/colony": {
+    "/api/v1/threats": [],
+    "/api/v1/game/state": {
         "name": "New Hope", "wealth": 8000.0, "day": 5, "tick": 300000,
         "population": 3, "mood_average": 0.65, "food_days": 7.0,
     },
-    "/api/weather": {
+    "/api/v1/map/weather": {
         "condition": "clear", "temperature": 22.0, "outdoor_severity": 0.0,
     },
 }
 
 
+_MOCK_POST_ROUTES: set[str] = {
+    "/api/v1/game/speed",
+    "/api/v1/pawn/edit/status",
+    "/api/v1/pawn/edit/priority",
+    "/api/v1/pawn/move",
+    "/api/v1/colony/blueprint",
+    "/api/v1/colony/haul",
+    "/api/v1/colony/growing",
+    "/api/v1/colony/power",
+    "/api/v1/colony/recreation",
+    "/api/v1/colony/medicine",
+    "/api/v1/colony/bed",
+    "/api/v1/pawn/job",
+    "/api/v1/colony/research",
+}
+
+
 def _make_mock_transport() -> httpx.MockTransport:
+    _POST_OK = httpx.Response(
+        200, content=b'{"ok": true}',
+        headers={"content-type": "application/json"},
+    )
+
     def handler(request: httpx.Request) -> httpx.Response:
-        path = request.url.raw_path.decode()
+        path = request.url.raw_path.decode().split("?")[0]
+        if request.method == "POST" and path in _MOCK_POST_ROUTES:
+            return _POST_OK
         if path in _MOCK_ROUTES:
             return httpx.Response(
                 200, content=json.dumps(_MOCK_ROUTES[path]).encode(),
@@ -205,6 +229,29 @@ def _print_leaderboard(results: list[dict]) -> None:
     print("=" * 72)
 
 
+def _build_provider(args: argparse.Namespace) -> tuple[BaseProvider, RLEConfig]:
+    """Build LLM provider from CLI args. Returns (provider, config)."""
+    if args.dry_run and not args.provider:
+        return _make_mock_provider(), RLEConfig(tick_interval=0.0)
+
+    overrides: dict[str, str] = {}
+    if args.provider:
+        overrides["provider"] = args.provider
+    if args.model:
+        overrides["model"] = args.model
+    config = RLEConfig(**overrides) if overrides else RLEConfig()
+    return config.get_provider(), config
+
+
+def _resolve_ticks(args: argparse.Namespace, use_mock_rimapi: bool) -> int | None:
+    """Determine tick cap from CLI args."""
+    if args.ticks:
+        return args.ticks
+    if use_mock_rimapi:
+        return 10
+    return None
+
+
 async def main(args: argparse.Namespace) -> None:
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper(), logging.INFO),
@@ -213,26 +260,18 @@ async def main(args: argparse.Namespace) -> None:
 
     helix = HelixConfig.default().to_geometry()
     scenarios = list_scenarios()
-    config = RLEConfig(tick_interval=0.0)
-
-    # Dry-run uses mock provider + mock RIMAPI transport
-    if args.dry_run:
-        provider = _make_mock_provider()
-    else:
-        config = RLEConfig()
-        provider = config.get_provider()
+    provider, config = _build_provider(args)
+    use_mock_rimapi = args.dry_run
+    ticks_override = _resolve_ticks(args, use_mock_rimapi)
 
     output_dir = None
     if args.output:
         output_dir = Path(args.output)
         output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Cap ticks in dry-run to keep it fast
-    ticks_override = args.ticks if args.ticks else (10 if args.dry_run else None)
-
     results = []
     async with RimAPIClient(config.rimapi_url) as client:
-        if args.dry_run:
+        if use_mock_rimapi:
             client._client = httpx.AsyncClient(
                 transport=_make_mock_transport(), base_url="http://mock",
             )
@@ -258,7 +297,9 @@ async def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run all RLE benchmark scenarios")
     parser.add_argument("--output", help="Output directory for CSV results")
-    parser.add_argument("--dry-run", action="store_true", help="Use mock provider and RIMAPI")
+    parser.add_argument("--dry-run", action="store_true", help="Use mock RIMAPI (combine with --provider for real LLM + fake game)")
+    parser.add_argument("--provider", choices=["anthropic", "openai", "local"], help="LLM provider (default: from config)")
+    parser.add_argument("--model", help="Model name (e.g. qwen/qwen3.5-9b)")
     parser.add_argument("--ticks", type=int, help="Override max ticks per scenario")
     parser.add_argument("--log-level", default="WARNING", help="Logging level")
     asyncio.run(main(parser.parse_args()))
