@@ -20,6 +20,10 @@ from rle.agents.social_overseer import SocialOverseer
 from rle.config import RLEConfig
 from rle.orchestration.game_loop import RLEGameLoop, TickResult
 from rle.rimapi.client import RimAPIClient
+from rle.scenarios.evaluator import ScenarioEvaluator
+from rle.scenarios.schema import FailureCondition, ScenarioConfig
+from rle.scoring.composite import CompositeScorer
+from rle.scoring.recorder import TimeSeriesRecorder
 
 # ------------------------------------------------------------------
 # Test data
@@ -283,3 +287,109 @@ class TestMultiAgent:
         assert len(results) == 3
         # 6 agents * 3 ticks = 18 provider calls
         assert provider.complete.call_count == 18
+
+
+# ------------------------------------------------------------------
+# Scored game loop tests (Phase 6)
+# ------------------------------------------------------------------
+
+
+class TestScoredLoop:
+    async def test_tick_result_has_score(self) -> None:
+        provider = _make_mock_provider()
+        helix = HelixConfig.default().to_geometry()
+        agent = ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0)
+        config = RLEConfig(tick_interval=0.0)
+        scorer = CompositeScorer()
+        recorder = TimeSeriesRecorder()
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(
+                config, client, [agent],
+                scorer=scorer, recorder=recorder,
+                initial_population=3, initial_wealth=15000.0,
+            )
+            result = await loop.run_tick()
+
+        assert result.score is not None
+        assert 0.0 <= result.score.composite <= 1.0
+        assert "survival" in result.score.metrics
+        assert len(recorder.snapshots) == 1
+
+    async def test_scored_5_ticks(self) -> None:
+        provider = _make_mock_provider()
+        helix = HelixConfig.default().to_geometry()
+        agent = ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0)
+        config = RLEConfig(tick_interval=0.0)
+        scorer = CompositeScorer()
+        recorder = TimeSeriesRecorder()
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(
+                config, client, [agent],
+                scorer=scorer, recorder=recorder,
+                initial_population=3,
+            )
+            await loop.run(max_ticks=5)
+
+        assert len(recorder.snapshots) == 5
+        final = scorer.final_score(recorder.snapshots)
+        assert 0.0 <= final.composite <= 1.0
+
+    async def test_evaluator_stops_loop(self) -> None:
+        provider = _make_mock_provider()
+        helix = HelixConfig.default().to_geometry()
+        agent = ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0)
+        config = RLEConfig(tick_interval=0.0)
+
+        scenario = ScenarioConfig(
+            name="Quick Test",
+            description="Fail immediately",
+            difficulty="easy",
+            expected_duration_days=30,
+            initial_population=10,
+            victory_conditions=[],
+            failure_conditions=[
+                FailureCondition(metric="survival_rate", operator="<", value=0.5),
+            ],
+        )
+        evaluator = ScenarioEvaluator(scenario)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(
+                config, client, [agent],
+                evaluator=evaluator,
+                initial_population=scenario.initial_population,
+            )
+            results = await loop.run(max_ticks=100)
+
+        # population=3, initial=10 → survival=0.3 < 0.5 → defeat on first tick
+        assert len(results) == 1
+        assert loop.evaluation_result is not None
+        assert loop.evaluation_result.outcome == "defeat"
+
+    async def test_no_scorer_still_works(self) -> None:
+        """Game loop without scorer/evaluator works as before."""
+        provider = _make_mock_provider()
+        helix = HelixConfig.default().to_geometry()
+        agent = ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, [agent])
+            result = await loop.run_tick()
+
+        assert result.score is None
+        assert loop.evaluation_result is None

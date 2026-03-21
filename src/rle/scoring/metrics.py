@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from rle.orchestration.game_loop import TickResult
 from rle.rimapi.schemas import GameState, ThreatData
+
+if TYPE_CHECKING:
+    from rle.orchestration.game_loop import TickResult
 
 
 @dataclass

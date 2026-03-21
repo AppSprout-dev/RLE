@@ -32,6 +32,9 @@ htmlcov/
 # ruff
 .ruff_cache/
 
+# Results output
+results/
+
 # Original Plan
 logical-swinging-popcorn.md
 
