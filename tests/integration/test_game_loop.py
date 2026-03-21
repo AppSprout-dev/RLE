@@ -409,3 +409,73 @@ class TestScoredLoop:
 
         assert result.score is None
         assert loop.evaluation_result is None
+
+
+# ------------------------------------------------------------------
+# Parallel / Sequential deliberation tests
+# ------------------------------------------------------------------
+
+
+class TestParallelDeliberation:
+    async def test_parallel_all_agents_produce_plans(self) -> None:
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, agents, parallel=True)
+            result = await loop.run_tick()
+
+        assert provider.complete.call_count == 6
+        assert result.plan.role == "orchestrator"
+        assert loop._parse_successes == 6
+        assert loop._parse_failures == 0
+
+    async def test_parallel_builds_prev_tick_context(self) -> None:
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, agents, parallel=True)
+            await loop.run(max_ticks=2)
+
+        # After 2 ticks, prev_tick_context should have 6 entries from tick 2
+        assert len(loop._prev_tick_context) == 6
+
+    async def test_sequential_mode_still_works(self) -> None:
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, agents, parallel=False)
+            result = await loop.run_tick()
+
+        assert provider.complete.call_count == 6
+        assert result.plan.role == "orchestrator"
+        assert loop._parse_successes == 6
+
+    async def test_sequential_3_ticks(self) -> None:
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, agents, parallel=False)
+            results = await loop.run(max_ticks=3)
+
+        assert len(results) == 3
+        assert provider.complete.call_count == 18

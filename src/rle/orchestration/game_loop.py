@@ -53,6 +53,7 @@ class RLEGameLoop:
         initial_population: int = 3,
         initial_wealth: float = 0.0,
         visualizer: HelixVisualizer | None = None,
+        parallel: bool = True,
     ) -> None:
         self._config = config
         self._client = client
@@ -74,6 +75,8 @@ class RLEGameLoop:
         self._parse_failures = 0
         self._log_dir: Path | None = None
         self._deliberation_log: list[dict] = []
+        self._parallel = parallel
+        self._prev_tick_context: list[dict] = []
 
         self._visualizer = visualizer
 
@@ -111,6 +114,72 @@ class RLEGameLoop:
             extra["score"] = f"{snapshot.composite:.3f}"
         self._visualizer.render(tick=tick, day=day, extra_info=extra)
 
+    async def _deliberate_parallel(
+        self, state: object, current_time: float, tick_num: int,
+    ) -> list[tuple[RimWorldRoleAgent, ActionPlan | None]]:
+        """Run all agents concurrently via asyncio.to_thread."""
+        context = self._prev_tick_context or None
+
+        async def _run(agent: RimWorldRoleAgent) -> tuple[RimWorldRoleAgent, ActionPlan | None]:
+            return await asyncio.to_thread(
+                self._deliberate_agent, agent, state, current_time, tick_num, context,
+            )
+
+        return list(await asyncio.gather(*[_run(a) for a in self._agents]))
+
+    def _deliberate_sequential(
+        self, state: object, current_time: float, tick_num: int,
+    ) -> list[tuple[RimWorldRoleAgent, ActionPlan | None]]:
+        """Run agents one at a time, building context history inline."""
+        results: list[tuple[RimWorldRoleAgent, ActionPlan | None]] = []
+        context_history: list[dict] = []
+        for agent in self._agents:
+            agent_result, plan = self._deliberate_agent(
+                agent, state, current_time, tick_num, context_history,
+            )
+            results.append((agent_result, plan))
+            if plan is not None:
+                context_history.append({
+                    "agent_id": plan.role,
+                    "content": plan.summary,
+                    "confidence": plan.confidence,
+                })
+        return results
+
+    def _deliberate_agent(
+        self, agent: RimWorldRoleAgent, state: object,
+        current_time: float, tick_num: int,
+        context_history: list[dict] | None = None,
+    ) -> tuple[RimWorldRoleAgent, ActionPlan | None]:
+        """Run one agent's deliberation. Thread-safe for parallel execution."""
+        try:
+            plan = agent.deliberate(state, current_time, context_history)  # type: ignore[arg-type]
+        except ActionPlanParseError as e:
+            logger.warning(
+                "Agent %s parse failure (tick %d): %s",
+                agent.ROLE_NAME, tick_num, e.reason,
+            )
+            self._parse_failures += 1
+            self._deliberation_log.append({
+                "tick": tick_num, "agent": agent.ROLE_NAME,
+                "status": "parse_failure", "reason": e.reason,
+                "raw": e.raw_content[:500] if e.raw_content else None,
+            })
+            return agent, None
+        self._parse_successes += 1
+        self._deliberation_log.append({
+            "tick": tick_num, "agent": plan.role,
+            "status": "success", "confidence": plan.confidence,
+            "num_actions": len(plan.actions),
+            "actions": [
+                {"type": a.action_type.value, "target": a.target_colonist_id,
+                 "priority": a.priority, "reason": a.reason[:200]}
+                for a in plan.actions
+            ],
+            "summary": plan.summary[:300],
+        })
+        return agent, plan
+
     def _update_metric_context(self, result: TickResult, state: object) -> None:
         """Append tick data to metric context for scoring history."""
         self._metric_context.tick_results.append(result)
@@ -130,44 +199,18 @@ class RLEGameLoop:
         current_time = self._state_manager.macro_time
 
         # 3. Multi-agent deliberation
-        plans: list[ActionPlan] = []
-        context_history: list[dict] = []
         tick_num = len(self._tick_results)
-        for agent in self._agents:
-            try:
-                plan = agent.deliberate(state, current_time, context_history)
-            except ActionPlanParseError as e:
-                logger.warning(
-                    "Agent %s parse failure (tick %d): %s",
-                    agent.ROLE_NAME, tick_num, e.reason,
-                )
-                self._parse_failures += 1
-                self._deliberation_log.append({
-                    "tick": tick_num, "agent": agent.ROLE_NAME,
-                    "status": "parse_failure", "reason": e.reason,
-                    "raw": e.raw_content[:500] if e.raw_content else None,
-                })
+        if self._parallel:
+            results = await self._deliberate_parallel(state, current_time, tick_num)
+        else:
+            results = self._deliberate_sequential(state, current_time, tick_num)
+
+        plans: list[ActionPlan] = []
+        for agent, plan in results:
+            if plan is None:
                 continue
             plans.append(plan)
-            self._parse_successes += 1
-            self._deliberation_log.append({
-                "tick": tick_num, "agent": plan.role,
-                "status": "success", "confidence": plan.confidence,
-                "num_actions": len(plan.actions),
-                "actions": [
-                    {"type": a.action_type.value, "target": a.target_colonist_id,
-                     "priority": a.priority, "reason": a.reason[:200]}
-                    for a in plan.actions
-                ],
-                "summary": plan.summary[:300],
-            })
-            context_history.append({
-                "agent_id": plan.role,
-                "content": plan.summary,
-                "confidence": plan.confidence,
-            })
             self._update_visualizer_agent(agent, plan, current_time)
-
             spoke = self._spoke_manager.get_spoke(agent.agent_id)
             if spoke and spoke.is_connected:
                 spoke.send_message(
@@ -175,6 +218,11 @@ class RLEGameLoop:
                     {"role": plan.role, "summary": plan.summary},
                 )
 
+        # Build context for next tick (shared via CentralPost, not inline peeking)
+        self._prev_tick_context = [
+            {"agent_id": p.role, "content": p.summary, "confidence": p.confidence}
+            for p in plans
+        ]
         self._spoke_manager.process_all_messages()
 
         # 4. Resolve conflicts across all agent plans

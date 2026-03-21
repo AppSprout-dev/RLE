@@ -125,6 +125,7 @@ async def main(args: argparse.Namespace) -> None:
             evaluator=evaluator,
             initial_population=scenario.initial_population,
             visualizer=visualizer,
+            parallel=not args.sequential,
         )
         if visualizer:
             with visualizer.live():
@@ -150,5 +151,9 @@ if __name__ == "__main__":
     parser.add_argument("--ticks", type=int, help="Override max ticks")
     parser.add_argument("--output", help="Output directory for CSV results")
     parser.add_argument("--visualize", action="store_true", help="Show live helix visualization")
+    parser.add_argument(
+        "--sequential", action="store_true",
+        help="Run agents sequentially (default: parallel)",
+    )
     parser.add_argument("--log-level", default="INFO", help="Logging level")
     asyncio.run(main(parser.parse_args()))

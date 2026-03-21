@@ -189,6 +189,7 @@ async def _run_scenario(
     provider_kwargs: dict | None = None,
     visualize: bool = False,
     no_think: bool = False,
+    parallel: bool = True,
 ) -> dict:
     agents = _create_agents(provider, helix, provider_kwargs=provider_kwargs, no_think=no_think)
     scorer = CompositeScorer(scenario.scoring_weights or None)
@@ -205,6 +206,7 @@ async def _run_scenario(
         initial_population=scenario.initial_population,
         initial_wealth=8000.0,
         visualizer=visualizer,
+        parallel=parallel,
     )
     max_ticks = max_ticks_override or scenario.max_ticks
     t0 = time.monotonic()
@@ -351,6 +353,7 @@ async def main(args: argparse.Namespace) -> None:
                 provider_kwargs=provider_kwargs or None,
                 visualize=args.visualize,
                 no_think=args.no_think,
+                parallel=not args.sequential,
             )
             results.append(result)
             print(
@@ -392,5 +395,9 @@ if __name__ == "__main__":
     parser.add_argument("--ticks", type=int, help="Override max ticks per scenario")
     parser.add_argument("--no-think", action="store_true", help="Disable thinking mode (Qwen3.5)")
     parser.add_argument("--visualize", action="store_true", help="Show live helix visualization")
+    parser.add_argument(
+        "--sequential", action="store_true",
+        help="Run agents sequentially (default: parallel)",
+    )
     parser.add_argument("--log-level", default="WARNING", help="Logging level")
     asyncio.run(main(parser.parse_args()))
