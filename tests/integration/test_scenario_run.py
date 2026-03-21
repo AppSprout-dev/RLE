@@ -41,9 +41,20 @@ ACTION_PLAN_JSON = json.dumps({
 })
 
 
+_WRITE_ROUTES: dict[str, dict] = {
+    "/api/v1/game/speed?speed=0": {"success": True},
+    "/api/v1/game/speed?speed=1": {"success": True},
+    "/api/v1/pawn/edit/status": {"success": True},
+    "/api/v1/pawn/edit/position": {"success": True},
+    "/api/v1/colonists/work-priority": {"success": True},
+    "/api/v1/builder/blueprint": {"success": True},
+    "/api/v1/colonist/time-assignment": {"success": True},
+}
+
+
 def _make_transport(day: int = 12) -> httpx.MockTransport:
     routes: dict[str, dict | list] = {
-        "/api/colonists": [
+        "/api/v1/colonists": [
             {
                 "colonist_id": "col_01", "name": "Tynan", "health": 0.95,
                 "mood": 0.72, "skills": {"shooting": 8, "construction": 5,
@@ -67,32 +78,37 @@ def _make_transport(day: int = 12) -> httpx.MockTransport:
                 "injuries": [], "position": [50, 10],
             },
         ],
-        "/api/resources": {
+        "/api/v1/resources": {
             "food": 120.5, "medicine": 8, "steel": 300, "wood": 450,
             "components": 12, "silver": 1500, "power_net": 200.0, "items": {},
         },
-        "/api/map": {
+        "/api/v1/map": {
             "size": [250, 250], "biome": "temperate_forest", "season": "summer",
             "temperature": 22.0, "structures": [],
         },
-        "/api/research": {
+        "/api/v1/research/summary": {
             "current_project": "electricity", "progress": 0.45,
             "completed": ["stonecutting"],
             "available": ["electricity", "battery"],
         },
-        "/api/threats": [],
-        "/api/colony": {
+        "/api/v1/threats": [],
+        "/api/v1/game/state": {
             "name": "New Hope", "wealth": 15000.0, "day": day,
             "tick": day * 60000, "population": 3, "mood_average": 0.65,
             "food_days": 8.5,
         },
-        "/api/weather": {
+        "/api/v1/map/weather": {
             "condition": "clear", "temperature": 22.0, "outdoor_severity": 0.0,
         },
     }
 
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.raw_path.decode()
+        if request.method == "POST" and path in _WRITE_ROUTES:
+            return httpx.Response(
+                200, content=json.dumps(_WRITE_ROUTES[path]).encode(),
+                headers={"content-type": "application/json"},
+            )
         if path in routes:
             return httpx.Response(
                 200, content=json.dumps(routes[path]).encode(),

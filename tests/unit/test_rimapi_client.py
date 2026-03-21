@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
@@ -26,6 +27,18 @@ from rle.rimapi.schemas import (
 # Transport helpers
 # ------------------------------------------------------------------
 
+_WRITE_ROUTES: dict[str, dict] = {
+    "/api/v1/game/speed?speed=0": {"success": True},
+    "/api/v1/game/speed?speed=1": {"success": True},
+    "/api/v1/pawn/edit/status": {"success": True},
+    "/api/v1/pawn/edit/position": {"success": True},
+    "/api/v1/colonists/work-priority": {"success": True},
+    "/api/v1/colonist/work-priority": {"success": True},
+    "/api/v1/builder/blueprint": {"success": True},
+    "/api/v1/colonist/time-assignment": {"success": True},
+    "/api/v1/order/designate/area": {"success": True},
+}
+
 
 def _json_response(data: dict | list, status: int = 200) -> httpx.Response:
     return httpx.Response(
@@ -35,11 +48,17 @@ def _json_response(data: dict | list, status: int = 200) -> httpx.Response:
     )
 
 
-def _make_transport(routes: dict[str, dict | list]) -> httpx.MockTransport:
+def _make_transport(
+    routes: dict[str, dict | list],
+    write_routes: dict[str, dict | list] | None = None,
+) -> httpx.MockTransport:
     """Create a mock transport that maps URL paths to JSON responses."""
+    _write = write_routes or {}
 
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.raw_path.decode()
+        if request.method == "POST" and path in _write:
+            return _json_response(_write[path])
         if path in routes:
             return _json_response(routes[path])
         return httpx.Response(status_code=404, content=b"Not found")
@@ -68,15 +87,24 @@ def all_routes(
     sample_weather_dict: dict,
 ) -> dict[str, dict | list]:
     return {
-        "/api/colonists": [sample_colonist_dict],
-        "/api/colonists/col_01": sample_colonist_dict,
-        "/api/resources": sample_resources_dict,
-        "/api/map": sample_map_dict,
-        "/api/research": sample_research_dict,
-        "/api/threats": [sample_threat_dict],
-        "/api/colony": sample_colony_dict,
-        "/api/weather": sample_weather_dict,
+        "/api/v1/colonists": [sample_colonist_dict],
+        "/api/v1/colonist?id=col_01": sample_colonist_dict,
+        "/api/v1/resources": sample_resources_dict,
+        "/api/v1/map": sample_map_dict,
+        "/api/v1/research/summary": sample_research_dict,
+        "/api/v1/threats": [sample_threat_dict],
+        "/api/v1/game/state": sample_colony_dict,
+        "/api/v1/map/weather": sample_weather_dict,
     }
+
+
+@pytest.fixture
+async def mock_client(all_routes: dict) -> AsyncGenerator[RimAPIClient, None]:
+    """RimAPIClient wired to mock transport with read + write routes."""
+    transport = _make_transport(all_routes, _WRITE_ROUTES)
+    async with RimAPIClient("http://test") as client:
+        client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
+        yield client
 
 
 # ------------------------------------------------------------------
@@ -99,78 +127,47 @@ class TestContextManager:
 
 
 class TestReadEndpoints:
-    async def test_get_colonists(
-        self, all_routes: dict, sample_colonist_dict: dict,
-    ) -> None:
-        transport = _make_transport(all_routes)
-        async with RimAPIClient("http://test") as client:
-            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
-            result = await client.get_colonists()
+    async def test_get_colonists(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_colonists()
         assert len(result) == 1
         assert isinstance(result[0], ColonistData)
         assert result[0].name == "Tynan"
 
-    async def test_get_colonist(
-        self, all_routes: dict, sample_colonist_dict: dict,
-    ) -> None:
-        transport = _make_transport(all_routes)
-        async with RimAPIClient("http://test") as client:
-            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
-            result = await client.get_colonist("col_01")
+    async def test_get_colonist(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_colonist("col_01")
         assert isinstance(result, ColonistData)
         assert result.colonist_id == "col_01"
 
-    async def test_get_resources(self, all_routes: dict) -> None:
-        transport = _make_transport(all_routes)
-        async with RimAPIClient("http://test") as client:
-            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
-            result = await client.get_resources()
+    async def test_get_resources(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_resources()
         assert isinstance(result, ResourceData)
         assert result.food == 120.5
 
-    async def test_get_map(self, all_routes: dict) -> None:
-        transport = _make_transport(all_routes)
-        async with RimAPIClient("http://test") as client:
-            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
-            result = await client.get_map()
+    async def test_get_map(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_map()
         assert isinstance(result, MapData)
         assert result.biome == "temperate_forest"
 
-    async def test_get_research(self, all_routes: dict) -> None:
-        transport = _make_transport(all_routes)
-        async with RimAPIClient("http://test") as client:
-            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
-            result = await client.get_research()
+    async def test_get_research(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_research()
         assert isinstance(result, ResearchData)
 
-    async def test_get_threats(self, all_routes: dict) -> None:
-        transport = _make_transport(all_routes)
-        async with RimAPIClient("http://test") as client:
-            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
-            result = await client.get_threats()
+    async def test_get_threats(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_threats()
         assert len(result) == 1
         assert isinstance(result[0], ThreatData)
 
-    async def test_get_colony(self, all_routes: dict) -> None:
-        transport = _make_transport(all_routes)
-        async with RimAPIClient("http://test") as client:
-            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
-            result = await client.get_colony()
+    async def test_get_colony(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_colony()
         assert isinstance(result, ColonyData)
         assert result.name == "New Hope"
 
-    async def test_get_weather(self, all_routes: dict) -> None:
-        transport = _make_transport(all_routes)
-        async with RimAPIClient("http://test") as client:
-            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
-            result = await client.get_weather()
+    async def test_get_weather(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_weather()
         assert isinstance(result, WeatherData)
 
-    async def test_get_game_state(self, all_routes: dict) -> None:
-        transport = _make_transport(all_routes)
-        async with RimAPIClient("http://test") as client:
-            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
-            result = await client.get_game_state()
+    async def test_get_game_state(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_game_state()
         assert isinstance(result, GameState)
         assert result.colony.name == "New Hope"
         assert len(result.colonists) == 1
@@ -179,7 +176,7 @@ class TestReadEndpoints:
 
 class TestErrorHandling:
     async def test_404_raises_response_error(self) -> None:
-        transport = _make_transport({})  # no routes → 404
+        transport = _make_transport({})
         async with RimAPIClient("http://test") as client:
             client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
             with pytest.raises(RimAPIResponseError) as exc_info:
@@ -197,20 +194,47 @@ class TestErrorHandling:
                 await client.get_colonists()
 
 
+class TestWriteEndpoints:
+    async def test_pause_game(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.pause_game()
+        assert result["success"] is True
+
+    async def test_unpause_game(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.unpause_game()
+        assert result["success"] is True
+
+    async def test_draft_colonist(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.draft_colonist("12345", True)
+        assert result["success"] is True
+
+    async def test_set_work_priorities(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.set_work_priorities("12345", {"Growing": 1})
+        assert result["success"] is True
+
+    async def test_place_blueprint(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.place_blueprint({"MapId": 0})
+        assert result["success"] is True
+
+    async def test_move_colonist(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.move_colonist("12345", 10, 20)
+        assert result["success"] is True
+
+    async def test_set_time_assignment(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.set_time_assignment("12345", 18, "Joy")
+        assert result["success"] is True
+
+    async def test_designate_area(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.designate_area(0, "Mine", 10, 10, 20, 20)
+        assert result["success"] is True
+
+
 class TestWriteEndpointStubs:
-    async def test_write_endpoints_raise_not_implemented(self) -> None:
+    async def test_set_colonist_job_raises(self) -> None:
         async with RimAPIClient() as client:
-            with pytest.raises(NotImplementedError):
-                await client.set_colonist_job("col_01", "mining")
-            with pytest.raises(NotImplementedError):
-                await client.draft_colonist("col_01", True)
-            with pytest.raises(NotImplementedError):
-                await client.set_work_priorities("col_01", {})
-            with pytest.raises(NotImplementedError):
-                await client.place_blueprint({})
-            with pytest.raises(NotImplementedError):
+            with pytest.raises(NotImplementedError, match="generic job"):
+                await client.set_colonist_job("12345", "mining")
+
+    async def test_set_research_target_raises(self) -> None:
+        async with RimAPIClient() as client:
+            with pytest.raises(NotImplementedError, match="research target"):
                 await client.set_research_target("electricity")
-            with pytest.raises(NotImplementedError):
-                await client.pause_game()
-            with pytest.raises(NotImplementedError):
-                await client.unpause_game()

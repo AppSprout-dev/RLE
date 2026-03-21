@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
@@ -10,6 +11,17 @@ from rle.agents.actions import Action, ActionPlan, ActionType
 from rle.rimapi.client import RimAPIClient
 
 logger = logging.getLogger(__name__)
+
+# Action types that have no upstream RIMAPI endpoint yet.
+_PENDING_UPSTREAM: frozenset[ActionType] = frozenset({
+    ActionType.HAUL_RESOURCE,
+    ActionType.SET_GROWING_ZONE,
+    ActionType.TOGGLE_POWER,
+    ActionType.ASSIGN_SOCIAL_ACTIVITY,
+    ActionType.CANCEL_BLUEPRINT,
+    ActionType.ASSIGN_BED_REST,
+    ActionType.ADMINISTER_MEDICINE,
+})
 
 
 class ExecutionResult(BaseModel):
@@ -56,38 +68,68 @@ class ActionExecutor:
     async def _dispatch(self, action: Action) -> None:
         """Route action to appropriate RIMAPI call."""
         at = action.action_type
-        if at == ActionType.SET_WORK_PRIORITY:
-            await self._client.set_work_priorities(
-                action.target_colonist_id or "", action.parameters,
-            )
-        elif at == ActionType.DRAFT_COLONIST:
-            await self._client.draft_colonist(
-                action.target_colonist_id or "", True,
-            )
-        elif at == ActionType.UNDRAFT_COLONIST:
-            await self._client.draft_colonist(
-                action.target_colonist_id or "", False,
-            )
-        elif at == ActionType.SET_RESEARCH_TARGET:
-            await self._client.set_research_target(
-                action.parameters.get("project", ""),
-            )
-        elif at == ActionType.PLACE_BLUEPRINT:
-            await self._client.place_blueprint(action.parameters)
-        elif at == ActionType.NO_ACTION:
-            pass
-        elif at in (
-            ActionType.HAUL_RESOURCE,
-            ActionType.SET_GROWING_ZONE,
-            ActionType.TOGGLE_POWER,
-            ActionType.MOVE_COLONIST,
-            ActionType.ASSIGN_RESEARCHER,
-            ActionType.SET_RECREATION_POLICY,
-            ActionType.ASSIGN_SOCIAL_ACTIVITY,
-            ActionType.CANCEL_BLUEPRINT,
-            ActionType.ASSIGN_BED_REST,
-            ActionType.ADMINISTER_MEDICINE,
-        ):
-            logger.debug("No RIMAPI endpoint for %s yet", at.value)
-        else:
+        cid = action.target_colonist_id or ""
+        params = action.parameters
+
+        if at == ActionType.NO_ACTION:
+            return
+
+        if at in _PENDING_UPSTREAM:
+            logger.debug("No RIMAPI endpoint for %s yet (needs upstream PR)", at.value)
+            return
+
+        handler = self._handlers.get(at)
+        if handler is None:
             logger.debug("No executor mapping for %s", at.value)
+            return
+
+        await handler(self, cid, params)
+
+    # -- Individual handlers --------------------------------------------------
+
+    async def _do_set_work_priority(
+        self, cid: str, params: dict[str, Any],
+    ) -> None:
+        await self._client.set_work_priorities(cid, params)
+
+    async def _do_draft(self, cid: str, params: dict[str, Any]) -> None:
+        await self._client.draft_colonist(cid, True)
+
+    async def _do_undraft(self, cid: str, params: dict[str, Any]) -> None:
+        await self._client.draft_colonist(cid, False)
+
+    async def _do_set_research(self, cid: str, params: dict[str, Any]) -> None:
+        await self._client.set_research_target(params.get("project", ""))
+
+    async def _do_place_blueprint(
+        self, cid: str, params: dict[str, Any],
+    ) -> None:
+        await self._client.place_blueprint(params)
+
+    async def _do_move(self, cid: str, params: dict[str, Any]) -> None:
+        await self._client.move_colonist(cid, params.get("x", 0), params.get("z", 0))
+
+    async def _do_assign_researcher(
+        self, cid: str, params: dict[str, Any],
+    ) -> None:
+        await self._client.set_work_priorities(
+            cid, {"Research": params.get("priority", 1)},
+        )
+
+    async def _do_recreation_policy(
+        self, cid: str, params: dict[str, Any],
+    ) -> None:
+        assignment = params.get("assignment", "Joy")
+        for hour in params.get("hours", []):
+            await self._client.set_time_assignment(cid, hour, assignment)
+
+    _handlers: dict[ActionType, Any] = {
+        ActionType.SET_WORK_PRIORITY: _do_set_work_priority,
+        ActionType.DRAFT_COLONIST: _do_draft,
+        ActionType.UNDRAFT_COLONIST: _do_undraft,
+        ActionType.SET_RESEARCH_TARGET: _do_set_research,
+        ActionType.PLACE_BLUEPRINT: _do_place_blueprint,
+        ActionType.MOVE_COLONIST: _do_move,
+        ActionType.ASSIGN_RESEARCHER: _do_assign_researcher,
+        ActionType.SET_RECREATION_POLICY: _do_recreation_policy,
+    }

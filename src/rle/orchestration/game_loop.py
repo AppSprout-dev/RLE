@@ -77,10 +77,7 @@ class RLEGameLoop:
     async def run_tick(self) -> TickResult:
         """Execute one turn."""
         # 1. Pause
-        try:
-            await self._client.pause_game()
-        except NotImplementedError:
-            pass
+        await self._client.pause_game()
 
         # 2. Read state
         state = await self._state_manager.refresh()
@@ -121,10 +118,7 @@ class RLEGameLoop:
                 self._recorder.record(snapshot)
 
         # 7. Unpause
-        try:
-            await self._client.unpause_game()
-        except NotImplementedError:
-            pass
+        await self._client.unpause_game()
 
         result = TickResult(
             tick=state.colony.tick,

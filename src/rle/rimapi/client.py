@@ -103,38 +103,41 @@ class RimAPIClient:
 
     # ------------------------------------------------------------------
     # Read endpoints
+    # Paths use upstream RIMAPI /api/v1/ convention.
+    # NOTE: Upstream response shapes differ from our Pydantic models;
+    # adapters will be needed when connecting to the live game.
     # ------------------------------------------------------------------
 
     async def get_colonists(self) -> list[ColonistData]:
-        data = await self._get("/api/colonists")
+        data = await self._get("/api/v1/colonists")
         return [ColonistData.model_validate(c) for c in data]
 
     async def get_colonist(self, colonist_id: str) -> ColonistData:
-        data = await self._get(f"/api/colonists/{colonist_id}")
+        data = await self._get(f"/api/v1/colonist?id={colonist_id}")
         return ColonistData.model_validate(data)
 
     async def get_resources(self) -> ResourceData:
-        data = await self._get("/api/resources")
+        data = await self._get("/api/v1/resources")
         return ResourceData.model_validate(data)
 
     async def get_map(self) -> MapData:
-        data = await self._get("/api/map")
+        data = await self._get("/api/v1/map")
         return MapData.model_validate(data)
 
     async def get_research(self) -> ResearchData:
-        data = await self._get("/api/research")
+        data = await self._get("/api/v1/research/summary")
         return ResearchData.model_validate(data)
 
     async def get_threats(self) -> list[ThreatData]:
-        data = await self._get("/api/threats")
+        data = await self._get("/api/v1/threats")
         return [ThreatData.model_validate(t) for t in data]
 
     async def get_colony(self) -> ColonyData:
-        data = await self._get("/api/colony")
+        data = await self._get("/api/v1/game/state")
         return ColonyData.model_validate(data)
 
     async def get_weather(self) -> WeatherData:
-        data = await self._get("/api/weather")
+        data = await self._get("/api/v1/map/weather")
         return WeatherData.model_validate(data)
 
     async def get_game_state(self) -> GameState:
@@ -158,28 +161,78 @@ class RimAPIClient:
         )
 
     # ------------------------------------------------------------------
-    # Write endpoints (stubs — require RIMAPI fork with write support)
+    # Write endpoints — upstream RIMAPI v1.8.2+
+    # ------------------------------------------------------------------
+
+    async def pause_game(self) -> dict:
+        return await self._post("/api/v1/game/speed?speed=0")
+
+    async def unpause_game(self) -> dict:
+        return await self._post("/api/v1/game/speed?speed=1")
+
+    async def draft_colonist(self, colonist_id: str, draft: bool) -> dict:
+        return await self._post(
+            "/api/v1/pawn/edit/status",
+            json={"PawnId": colonist_id, "IsDrafted": draft},
+        )
+
+    async def set_work_priorities(
+        self, colonist_id: str, priorities: dict[str, int],
+    ) -> dict:
+        entries = [
+            {"id": colonist_id, "work": work, "priority": pri}
+            for work, pri in priorities.items()
+        ]
+        return await self._post(
+            "/api/v1/colonists/work-priority",
+            json={"Priorities": entries},
+        )
+
+    async def place_blueprint(self, blueprint: dict) -> dict:
+        return await self._post("/api/v1/builder/blueprint", json=blueprint)
+
+    async def move_colonist(self, colonist_id: str, x: int, z: int) -> dict:
+        return await self._post(
+            "/api/v1/pawn/edit/position",
+            json={
+                "PawnId": colonist_id,
+                "Position": {"X": x, "Y": 0, "Z": z},
+            },
+        )
+
+    async def set_time_assignment(
+        self, colonist_id: str, hour: int, assignment: str,
+    ) -> dict:
+        return await self._post(
+            "/api/v1/colonist/time-assignment",
+            json={"PawnId": colonist_id, "Hour": hour, "Assignment": assignment},
+        )
+
+    async def designate_area(
+        self,
+        map_id: int,
+        designation_type: str,
+        x1: int,
+        z1: int,
+        x2: int,
+        z2: int,
+    ) -> dict:
+        return await self._post(
+            "/api/v1/order/designate/area",
+            json={
+                "MapId": map_id,
+                "Type": designation_type,
+                "PointA": {"X": x1, "Y": 0, "Z": z1},
+                "PointB": {"X": x2, "Y": 0, "Z": z2},
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # Write endpoints — stubs (pending upstream PRs)
     # ------------------------------------------------------------------
 
     async def set_colonist_job(self, colonist_id: str, job: str) -> dict:
-        raise NotImplementedError("Write endpoints require RIMAPI fork")
-
-    async def draft_colonist(self, colonist_id: str, draft: bool) -> dict:
-        raise NotImplementedError("Write endpoints require RIMAPI fork")
-
-    async def set_work_priorities(
-        self, colonist_id: str, priorities: dict[str, int]
-    ) -> dict:
-        raise NotImplementedError("Write endpoints require RIMAPI fork")
-
-    async def place_blueprint(self, blueprint: dict) -> dict:
-        raise NotImplementedError("Write endpoints require RIMAPI fork")
+        raise NotImplementedError("Needs upstream PR: generic job assignment")
 
     async def set_research_target(self, project: str) -> dict:
-        raise NotImplementedError("Write endpoints require RIMAPI fork")
-
-    async def pause_game(self) -> dict:
-        raise NotImplementedError("Write endpoints require RIMAPI fork")
-
-    async def unpause_game(self) -> dict:
-        raise NotImplementedError("Write endpoints require RIMAPI fork")
+        raise NotImplementedError("Needs upstream PR: research target write endpoint")

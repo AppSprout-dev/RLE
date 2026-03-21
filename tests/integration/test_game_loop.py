@@ -82,21 +82,37 @@ def _colony_dict(day: int = 12, tick: int = 720000) -> dict:
     }
 
 
+_WRITE_ROUTES: dict[str, dict] = {
+    "/api/v1/game/speed?speed=0": {"success": True},
+    "/api/v1/game/speed?speed=1": {"success": True},
+    "/api/v1/pawn/edit/status": {"success": True},
+    "/api/v1/pawn/edit/position": {"success": True},
+    "/api/v1/colonists/work-priority": {"success": True},
+    "/api/v1/builder/blueprint": {"success": True},
+    "/api/v1/colonist/time-assignment": {"success": True},
+}
+
+
 def _make_transport(day: int = 12, tick: int = 720000) -> httpx.MockTransport:
-    """Mock transport returning consistent game state."""
+    """Mock transport returning consistent game state with write support."""
     colony = _colony_dict(day, tick)
     routes: dict[str, dict | list] = {
-        "/api/colonists": [COLONIST],
-        "/api/resources": RESOURCES,
-        "/api/map": MAP_DATA,
-        "/api/research": RESEARCH,
-        "/api/threats": [],
-        "/api/colony": colony,
-        "/api/weather": WEATHER,
+        "/api/v1/colonists": [COLONIST],
+        "/api/v1/resources": RESOURCES,
+        "/api/v1/map": MAP_DATA,
+        "/api/v1/research/summary": RESEARCH,
+        "/api/v1/threats": [],
+        "/api/v1/game/state": colony,
+        "/api/v1/map/weather": WEATHER,
     }
 
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.raw_path.decode()
+        if request.method == "POST" and path in _WRITE_ROUTES:
+            return httpx.Response(
+                200, content=json.dumps(_WRITE_ROUTES[path]).encode(),
+                headers={"content-type": "application/json"},
+            )
         if path in routes:
             return httpx.Response(
                 200, content=json.dumps(routes[path]).encode(),
@@ -142,7 +158,7 @@ class TestSingleTick:
         assert result.plan.role == "orchestrator"
         assert len(result.plan.actions) == 1
 
-    async def test_execution_handles_not_implemented(self) -> None:
+    async def test_execution_succeeds_with_write_endpoints(self) -> None:
         provider = _make_mock_provider()
         helix = HelixConfig.default().to_geometry()
         agent = ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0)
@@ -155,9 +171,9 @@ class TestSingleTick:
             loop = RLEGameLoop(config, client, [agent])
             result = await loop.run_tick()
 
-        # set_work_priority action triggers client.set_work_priorities
-        # which raises NotImplementedError
-        assert result.execution.failed == 1
+        # set_work_priority action now succeeds via upstream endpoint
+        assert result.execution.executed == 1
+        assert result.execution.failed == 0
         assert result.execution.total == 1
 
 
