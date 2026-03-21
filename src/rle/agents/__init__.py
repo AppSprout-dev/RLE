@@ -11,6 +11,15 @@ from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
 from rle.agents.social_overseer import SocialOverseer
 
+AGENT_DISPLAY: dict[str, dict[str, str]] = {
+    "resource_manager":     {"label": "RM", "color": "green"},
+    "defense_commander":    {"label": "DC", "color": "red"},
+    "research_director":    {"label": "RD", "color": "cyan"},
+    "social_overseer":      {"label": "SO", "color": "yellow"},
+    "construction_planner": {"label": "CP", "color": "white"},
+    "medical_officer":      {"label": "MO", "color": "magenta"},
+}
+
 _ROLE_AGENTS: dict[str, type[RimWorldRoleAgent]] = {
     "resource_manager": ResourceManager,
     "defense_commander": DefenseCommander,
@@ -28,6 +37,7 @@ def register_rle_agents() -> None:
 
 
 __all__ = [
+    "AGENT_DISPLAY",
     "Action",
     "ActionPlan",
     "ActionPlanParseError",

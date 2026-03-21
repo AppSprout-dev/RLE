@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from pathlib import Path
 
 from felix_agent_sdk.communication import CentralPost, MessageType, SpokeManager
+from felix_agent_sdk.visualization import HelixVisualizer
 from pydantic import BaseModel, ConfigDict
 
 from rle.agents.actions import ActionPlan, ActionPlanParseError
@@ -52,6 +52,7 @@ class RLEGameLoop:
         evaluator: ScenarioEvaluator | None = None,
         initial_population: int = 3,
         initial_wealth: float = 0.0,
+        visualizer: HelixVisualizer | None = None,
     ) -> None:
         self._config = config
         self._client = client
@@ -74,11 +75,50 @@ class RLEGameLoop:
         self._log_dir: Path | None = None
         self._deliberation_log: list[dict] = []
 
+        self._visualizer = visualizer
+
         # Hub-spoke communication
         self._hub = CentralPost(max_agents=len(agents))
         self._spoke_manager = SpokeManager(self._hub)
         for agent in agents:
             self._spoke_manager.create_spoke(agent.agent_id, agent=agent)
+
+    def _update_visualizer_agent(
+        self, agent: RimWorldRoleAgent, plan: ActionPlan, macro_time: float,
+    ) -> None:
+        """Push one agent's post-deliberation state to the visualizer."""
+        if not self._visualizer:
+            return
+        self._visualizer.update(
+            agent.agent_id,
+            progress=macro_time,
+            confidence=plan.confidence,
+            phase=agent.position.phase,
+            status=f"{len(plan.actions)} actions",
+        )
+
+    def _render_visualizer(
+        self, tick: int, day: int, exec_result: ExecutionResult,
+        snapshot: ScoreSnapshot | None,
+    ) -> None:
+        """Render the helix visualization for this tick."""
+        if not self._visualizer:
+            return
+        extra: dict[str, str] = {
+            "actions": f"{exec_result.executed}/{exec_result.total}",
+        }
+        if snapshot:
+            extra["score"] = f"{snapshot.composite:.3f}"
+        self._visualizer.render(tick=tick, day=day, extra_info=extra)
+
+    def _update_metric_context(self, result: TickResult, state: object) -> None:
+        """Append tick data to metric context for scoring history."""
+        self._metric_context.tick_results.append(result)
+        self._metric_context.state_history.append(state)
+        for threat in state.threats:  # type: ignore[attr-defined]
+            seen_ids = {t.threat_id for t in self._metric_context.threats_seen}
+            if threat.threat_id not in seen_ids:
+                self._metric_context.threats_seen.append(threat)
 
     async def run_tick(self) -> TickResult:
         """Execute one turn."""
@@ -126,6 +166,7 @@ class RLEGameLoop:
                 "content": plan.summary,
                 "confidence": plan.confidence,
             })
+            self._update_visualizer_agent(agent, plan, current_time)
 
             spoke = self._spoke_manager.get_spoke(agent.agent_id)
             if spoke and spoke.is_connected:
@@ -149,7 +190,10 @@ class RLEGameLoop:
             if self._recorder:
                 self._recorder.record(snapshot)
 
-        # 7. Unpause
+        # 7. Render visualization
+        self._render_visualizer(state.colony.tick, state.colony.day, exec_result, snapshot)
+
+        # 8. Unpause
         await self._client.unpause_game()
 
         result = TickResult(
@@ -162,15 +206,8 @@ class RLEGameLoop:
         )
         self._tick_results.append(result)
 
-        # Update metric context for next tick
-        self._metric_context.tick_results.append(result)
-        self._metric_context.state_history.append(state)
-        for threat in state.threats:
-            seen_ids = {t.threat_id for t in self._metric_context.threats_seen}
-            if threat.threat_id not in seen_ids:
-                self._metric_context.threats_seen.append(threat)
-
-        # 8. Evaluate scenario conditions
+        # 9. Update metric context and evaluate scenario
+        self._update_metric_context(result, state)
         if self._evaluator:
             eval_result = self._evaluator.evaluate(
                 state, self._metric_context, tick_count=len(self._tick_results),

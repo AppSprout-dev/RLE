@@ -9,6 +9,8 @@ import sys
 from pathlib import Path
 
 from felix_agent_sdk.core import HelixConfig
+from felix_agent_sdk.visualization import HelixVisualizer
+from rle.agents import AGENT_DISPLAY
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
 from rle.agents.medical_officer import MedicalOfficer
@@ -103,6 +105,15 @@ async def main(args: argparse.Namespace) -> None:
     recorder = TimeSeriesRecorder()
     evaluator = ScenarioEvaluator(scenario)
 
+    visualizer = None
+    if args.visualize:
+        visualizer = HelixVisualizer(helix, title="R L E")
+        for agent in agents:
+            display = AGENT_DISPLAY[agent.agent_id]
+            visualizer.register_agent(
+                agent.agent_id, label=display["label"], color=display["color"],
+            )
+
     max_ticks = args.ticks or scenario.max_ticks
 
     async with RimAPIClient(config.rimapi_url) as client:
@@ -113,8 +124,13 @@ async def main(args: argparse.Namespace) -> None:
             recorder=recorder,
             evaluator=evaluator,
             initial_population=scenario.initial_population,
+            visualizer=visualizer,
         )
-        await loop.run(max_ticks=max_ticks)
+        if visualizer:
+            with visualizer.live():
+                await loop.run(max_ticks=max_ticks)
+        else:
+            await loop.run(max_ticks=max_ticks)
 
     # Output
     _print_results(loop, recorder)
@@ -133,5 +149,6 @@ if __name__ == "__main__":
     parser.add_argument("--list", action="store_true", help="List available scenarios")
     parser.add_argument("--ticks", type=int, help="Override max ticks")
     parser.add_argument("--output", help="Output directory for CSV results")
+    parser.add_argument("--visualize", action="store_true", help="Show live helix visualization")
     parser.add_argument("--log-level", default="INFO", help="Logging level")
     asyncio.run(main(parser.parse_args()))

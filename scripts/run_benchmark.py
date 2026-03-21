@@ -15,6 +15,8 @@ import httpx
 from felix_agent_sdk.core import HelixConfig
 from felix_agent_sdk.providers.base import BaseProvider
 from felix_agent_sdk.providers.types import CompletionResult
+from felix_agent_sdk.visualization import HelixVisualizer
+from rle.agents import AGENT_DISPLAY
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
 from rle.agents.medical_officer import MedicalOfficer
@@ -162,6 +164,17 @@ def _create_agents(provider, helix, *, provider_kwargs=None):  # type: ignore[no
     return agents
 
 
+def _create_visualizer(helix, agents) -> HelixVisualizer:  # type: ignore[no-untyped-def]
+    """Create a HelixVisualizer with all agents registered."""
+    visualizer = HelixVisualizer(helix, title="R L E")
+    for agent in agents:
+        display = AGENT_DISPLAY[agent.agent_id]
+        visualizer.register_agent(
+            agent.agent_id, label=display["label"], color=display["color"],
+        )
+    return visualizer
+
+
 async def _run_scenario(
     scenario: ScenarioConfig,
     config: RLEConfig,
@@ -171,11 +184,13 @@ async def _run_scenario(
     output_dir: Path | None,
     max_ticks_override: int | None = None,
     provider_kwargs: dict | None = None,
+    visualize: bool = False,
 ) -> dict:
     agents = _create_agents(provider, helix, provider_kwargs=provider_kwargs)
     scorer = CompositeScorer(scenario.scoring_weights or None)
     recorder = TimeSeriesRecorder()
     evaluator = ScenarioEvaluator(scenario)
+    visualizer = _create_visualizer(helix, agents) if visualize else None
 
     loop = RLEGameLoop(
         config, client, agents,
@@ -185,10 +200,15 @@ async def _run_scenario(
         evaluator=evaluator,
         initial_population=scenario.initial_population,
         initial_wealth=8000.0,
+        visualizer=visualizer,
     )
     max_ticks = max_ticks_override or scenario.max_ticks
     t0 = time.monotonic()
-    await loop.run(max_ticks=max_ticks)
+    if visualizer:
+        with visualizer.live():
+            await loop.run(max_ticks=max_ticks)
+    else:
+        await loop.run(max_ticks=max_ticks)
     elapsed = time.monotonic() - t0
 
     final_score = 0.0
@@ -325,6 +345,7 @@ async def main(args: argparse.Namespace) -> None:
                 scenario, config, client, provider, helix, output_dir,
                 max_ticks_override=ticks_override,
                 provider_kwargs=provider_kwargs or None,
+                visualize=args.visualize,
             )
             results.append(result)
             print(
@@ -353,11 +374,18 @@ async def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run all RLE benchmark scenarios")
     parser.add_argument("--output", help="Output directory for CSV results")
-    parser.add_argument("--dry-run", action="store_true", help="Use mock RIMAPI (combine with --provider for real LLM + fake game)")
-    parser.add_argument("--provider", choices=["anthropic", "openai", "local"], help="LLM provider (default: from config)")
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Use mock RIMAPI (combine with --provider for real LLM + fake game)",
+    )
+    parser.add_argument(
+        "--provider", choices=["anthropic", "openai", "local"],
+        help="LLM provider (default: from config)",
+    )
     parser.add_argument("--model", help="Model name (e.g. qwen/qwen3.5-9b)")
     parser.add_argument("--base-url", help="Provider API base URL (e.g. http://localhost:1234/v1)")
     parser.add_argument("--ticks", type=int, help="Override max ticks per scenario")
     parser.add_argument("--no-think", action="store_true", help="Disable thinking mode (Qwen3.5)")
+    parser.add_argument("--visualize", action="store_true", help="Show live helix visualization")
     parser.add_argument("--log-level", default="WARNING", help="Logging level")
     asyncio.run(main(parser.parse_args()))

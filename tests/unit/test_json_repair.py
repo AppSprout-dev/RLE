@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 
-import pytest
-
 from rle.agents.json_repair import repair_json, try_parse_json
 
 
