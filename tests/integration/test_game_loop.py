@@ -11,7 +11,12 @@ import pytest
 from felix_agent_sdk.core import HelixConfig
 from felix_agent_sdk.providers.base import BaseProvider
 from felix_agent_sdk.providers.types import CompletionResult
+from rle.agents.construction_planner import ConstructionPlanner
+from rle.agents.defense_commander import DefenseCommander
+from rle.agents.medical_officer import MedicalOfficer
+from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
+from rle.agents.social_overseer import SocialOverseer
 from rle.config import RLEConfig
 from rle.orchestration.game_loop import RLEGameLoop, TickResult
 from rle.rimapi.client import RimAPIClient
@@ -130,7 +135,7 @@ class TestSingleTick:
         assert isinstance(result, TickResult)
         assert result.day == 12
         assert result.tick == 720000
-        assert result.plan.role == "resource_manager"
+        assert result.plan.role == "orchestrator"
         assert len(result.plan.actions) == 1
 
     async def test_execution_handles_not_implemented(self) -> None:
@@ -226,3 +231,55 @@ class TestStop:
         # Should have stopped well before 100 ticks
         assert len(results) < 100
         assert len(results) >= 1
+
+
+# ------------------------------------------------------------------
+# Multi-agent tests (Phase 4)
+# ------------------------------------------------------------------
+
+
+def _make_all_agents(provider: MagicMock) -> list:
+    helix = HelixConfig.default().to_geometry()
+    return [
+        ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0),
+        DefenseCommander("dc-01", provider, helix, spawn_time=0.0, velocity=1.0),
+        ResearchDirector("rd-01", provider, helix, spawn_time=0.0, velocity=1.0),
+        SocialOverseer("so-01", provider, helix, spawn_time=0.0, velocity=1.0),
+        ConstructionPlanner("cp-01", provider, helix, spawn_time=0.0, velocity=1.0),
+        MedicalOfficer("mo-01", provider, helix, spawn_time=0.0, velocity=1.0),
+    ]
+
+
+class TestMultiAgent:
+    async def test_all_agents_deliberate(self) -> None:
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, agents)
+            result = await loop.run_tick()
+
+        # Provider called once per agent
+        assert provider.complete.call_count == 6
+        # Result is merged plan from orchestrator
+        assert result.plan.role == "orchestrator"
+
+    async def test_multi_agent_10_ticks(self) -> None:
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, agents)
+            results = await loop.run(max_ticks=3)
+
+        assert len(results) == 3
+        # 6 agents * 3 ticks = 18 provider calls
+        assert provider.complete.call_count == 18

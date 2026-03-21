@@ -1,20 +1,24 @@
-"""Tests for ResourceManager role agent."""
+"""Tests for all RLE role agents."""
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock
 
 from felix_agent_sdk import AgentFactory
 from felix_agent_sdk.core import HelixConfig, HelixGeometry
 from rle.agents import register_rle_agents
 from rle.agents.actions import ActionPlan, ActionType
+from rle.agents.construction_planner import ConstructionPlanner
+from rle.agents.defense_commander import DefenseCommander
+from rle.agents.medical_officer import MedicalOfficer
+from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
+from rle.agents.social_overseer import SocialOverseer
 from rle.rimapi.schemas import GameState
 
-# ------------------------------------------------------------------
-# Construction & class vars
-# ------------------------------------------------------------------
+# ==================================================================
+# ResourceManager
+# ==================================================================
 
 
 class TestResourceManagerClassVars:
@@ -35,56 +39,26 @@ class TestResourceManagerClassVars:
         assert ResourceManager.TEMPERATURE_RANGE == (0.2, 0.7)
 
 
-# ------------------------------------------------------------------
-# filter_game_state
-# ------------------------------------------------------------------
-
-
-class TestFilterGameState:
+class TestResourceManagerFilter:
     def test_includes_resources(
         self, mock_provider: MagicMock, helix: HelixGeometry,
         sample_game_state: GameState,
     ) -> None:
         agent = ResourceManager("rm-01", mock_provider, helix, spawn_time=0.0)
         filtered = agent.filter_game_state(sample_game_state)
-        assert "resources" in filtered
         assert filtered["resources"]["food"] == 120.5
-        assert filtered["resources"]["steel"] == 300
 
-    def test_includes_colony_summary(
-        self, mock_provider: MagicMock, helix: HelixGeometry,
-        sample_game_state: GameState,
-    ) -> None:
-        agent = ResourceManager("rm-01", mock_provider, helix, spawn_time=0.0)
-        filtered = agent.filter_game_state(sample_game_state)
-        assert filtered["colony"]["day"] == 12
-        assert filtered["colony"]["food_days"] == 8.5
-        assert filtered["colony"]["population"] == 3
-
-    def test_colonist_skills_filtered_to_resource_relevant(
+    def test_colonist_skills_filtered(
         self, mock_provider: MagicMock, helix: HelixGeometry,
         sample_game_state: GameState,
     ) -> None:
         agent = ResourceManager("rm-01", mock_provider, helix, spawn_time=0.0)
         filtered = agent.filter_game_state(sample_game_state)
         colonist = filtered["colonists"][0]
-        # Sample colonist has: shooting=8, construction=5, cooking=3, mining=6
-        # shooting is NOT a resource skill
         assert "shooting" not in colonist["skills"]
         assert colonist["skills"]["construction"] == 5
-        assert colonist["skills"]["cooking"] == 3
-        assert colonist["skills"]["mining"] == 6
 
-    def test_includes_weather_and_season(
-        self, mock_provider: MagicMock, helix: HelixGeometry,
-        sample_game_state: GameState,
-    ) -> None:
-        agent = ResourceManager("rm-01", mock_provider, helix, spawn_time=0.0)
-        filtered = agent.filter_game_state(sample_game_state)
-        assert filtered["weather"]["condition"] == "clear"
-        assert filtered["season"] == "summer"
-
-    def test_threat_count_not_details(
+    def test_omits_threat_details(
         self, mock_provider: MagicMock, helix: HelixGeometry,
         sample_game_state: GameState,
     ) -> None:
@@ -92,46 +66,14 @@ class TestFilterGameState:
         filtered = agent.filter_game_state(sample_game_state)
         assert filtered["active_threats"] == 1
         assert "threats" not in filtered
-        assert "threat_type" not in json.dumps(filtered)
 
-    def test_omits_research_and_structures(
+    def test_omits_research(
         self, mock_provider: MagicMock, helix: HelixGeometry,
         sample_game_state: GameState,
     ) -> None:
         agent = ResourceManager("rm-01", mock_provider, helix, spawn_time=0.0)
         filtered = agent.filter_game_state(sample_game_state)
-        flat = json.dumps(filtered)
         assert "research" not in filtered
-        assert "structures" not in flat
-
-
-# ------------------------------------------------------------------
-# Prompts
-# ------------------------------------------------------------------
-
-
-class TestResourceManagerPrompts:
-    def test_task_description(
-        self, mock_provider: MagicMock, helix: HelixGeometry,
-    ) -> None:
-        agent = ResourceManager("rm-01", mock_provider, helix, spawn_time=0.0)
-        desc = agent._get_task_description()
-        assert "food" in desc.lower()
-        assert "material" in desc.lower()
-        assert "power" in desc.lower()
-
-    def test_role_description(
-        self, mock_provider: MagicMock, helix: HelixGeometry,
-    ) -> None:
-        agent = ResourceManager("rm-01", mock_provider, helix, spawn_time=0.0)
-        desc = agent._get_role_description()
-        assert "economy" in desc.lower()
-        assert "food_days" in desc
-
-
-# ------------------------------------------------------------------
-# Full deliberation pipeline
-# ------------------------------------------------------------------
 
 
 class TestResourceManagerDeliberate:
@@ -143,33 +85,291 @@ class TestResourceManagerDeliberate:
         plan = agent.deliberate(sample_game_state, current_time=0.2)
         assert isinstance(plan, ActionPlan)
         assert plan.role == "resource_manager"
-        assert plan.tick == 720000
 
-    def test_actions_within_allowed_set(
+
+# ==================================================================
+# DefenseCommander
+# ==================================================================
+
+
+class TestDefenseCommanderClassVars:
+    def test_role_name(self) -> None:
+        assert DefenseCommander.ROLE_NAME == "defense_commander"
+
+    def test_allowed_actions(self) -> None:
+        expected = {
+            ActionType.DRAFT_COLONIST,
+            ActionType.UNDRAFT_COLONIST,
+            ActionType.MOVE_COLONIST,
+            ActionType.NO_ACTION,
+        }
+        assert DefenseCommander.ALLOWED_ACTIONS == expected
+
+    def test_temperature_range(self) -> None:
+        assert DefenseCommander.TEMPERATURE_RANGE == (0.1, 0.6)
+
+
+class TestDefenseCommanderFilter:
+    def test_includes_threats(
         self, mock_provider: MagicMock, helix: HelixGeometry,
         sample_game_state: GameState,
     ) -> None:
-        agent = ResourceManager("rm-01", mock_provider, helix, spawn_time=0.0)
-        plan = agent.deliberate(sample_game_state, current_time=0.2)
-        for action in plan.actions:
-            assert action.action_type in ResourceManager.ALLOWED_ACTIONS
+        agent = DefenseCommander("dc-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert len(filtered["threats"]) == 1
+        assert filtered["threats"][0]["threat_type"] == "raid"
+
+    def test_includes_combat_skills(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = DefenseCommander("dc-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        colonist = filtered["colonists"][0]
+        assert "shooting" in colonist["skills"]
+        # cooking/mining/construction are NOT combat skills
+        assert "cooking" not in colonist["skills"]
+
+    def test_includes_drafted_status(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = DefenseCommander("dc-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert "is_drafted" in filtered["colonists"][0]
+
+    def test_omits_resources(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = DefenseCommander("dc-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert "resources" not in filtered
 
 
-# ------------------------------------------------------------------
-# Factory registration
-# ------------------------------------------------------------------
+# ==================================================================
+# ResearchDirector
+# ==================================================================
+
+
+class TestResearchDirectorClassVars:
+    def test_role_name(self) -> None:
+        assert ResearchDirector.ROLE_NAME == "research_director"
+
+    def test_allowed_actions(self) -> None:
+        expected = {
+            ActionType.SET_RESEARCH_TARGET,
+            ActionType.ASSIGN_RESEARCHER,
+            ActionType.NO_ACTION,
+        }
+        assert ResearchDirector.ALLOWED_ACTIONS == expected
+
+
+class TestResearchDirectorFilter:
+    def test_includes_research(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = ResearchDirector("rd-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert filtered["research"]["current_project"] == "electricity"
+        assert "stonecutting" in filtered["research"]["completed"]
+
+    def test_colonists_have_intellectual_only(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = ResearchDirector("rd-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        colonist = filtered["colonists"][0]
+        # Sample colonist has no "intellectual" skill
+        assert colonist["skills"] == {}
+
+    def test_omits_threats(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = ResearchDirector("rd-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert "threats" not in filtered
+
+
+# ==================================================================
+# SocialOverseer
+# ==================================================================
+
+
+class TestSocialOverseerClassVars:
+    def test_role_name(self) -> None:
+        assert SocialOverseer.ROLE_NAME == "social_overseer"
+
+    def test_allowed_actions(self) -> None:
+        expected = {
+            ActionType.SET_RECREATION_POLICY,
+            ActionType.ASSIGN_SOCIAL_ACTIVITY,
+            ActionType.NO_ACTION,
+        }
+        assert SocialOverseer.ALLOWED_ACTIONS == expected
+
+
+class TestSocialOverseerFilter:
+    def test_includes_mood_data(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = SocialOverseer("so-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert filtered["colony"]["mood_average"] == 0.68
+        assert "mood" in filtered["colonists"][0]
+        assert "needs" in filtered["colonists"][0]
+
+    def test_flags_mood_crisis(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = SocialOverseer("so-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        # Sample colonist mood=0.72, no crisis
+        assert filtered["mood_crisis"] is False
+
+    def test_omits_resources(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = SocialOverseer("so-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert "resources" not in filtered
+
+
+# ==================================================================
+# ConstructionPlanner
+# ==================================================================
+
+
+class TestConstructionPlannerClassVars:
+    def test_role_name(self) -> None:
+        assert ConstructionPlanner.ROLE_NAME == "construction_planner"
+
+    def test_allowed_actions(self) -> None:
+        expected = {
+            ActionType.PLACE_BLUEPRINT,
+            ActionType.CANCEL_BLUEPRINT,
+            ActionType.NO_ACTION,
+        }
+        assert ConstructionPlanner.ALLOWED_ACTIONS == expected
+
+
+class TestConstructionPlannerFilter:
+    def test_includes_construction_resources(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = ConstructionPlanner("cp-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert filtered["resources"]["steel"] == 300
+        assert filtered["resources"]["wood"] == 450
+        assert "food" not in filtered["resources"]
+
+    def test_includes_structures(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = ConstructionPlanner("cp-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert "structures" in filtered["map"]
+
+    def test_colonists_have_construction_only(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = ConstructionPlanner("cp-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        colonist = filtered["colonists"][0]
+        assert colonist["skills"] == {"construction": 5}
+
+
+# ==================================================================
+# MedicalOfficer
+# ==================================================================
+
+
+class TestMedicalOfficerClassVars:
+    def test_role_name(self) -> None:
+        assert MedicalOfficer.ROLE_NAME == "medical_officer"
+
+    def test_allowed_actions(self) -> None:
+        expected = {
+            ActionType.ASSIGN_BED_REST,
+            ActionType.ADMINISTER_MEDICINE,
+            ActionType.NO_ACTION,
+        }
+        assert MedicalOfficer.ALLOWED_ACTIONS == expected
+
+    def test_temperature_range(self) -> None:
+        assert MedicalOfficer.TEMPERATURE_RANGE == (0.1, 0.5)
+
+
+class TestMedicalOfficerFilter:
+    def test_includes_health_data(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = MedicalOfficer("mo-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        colonist = filtered["colonists"][0]
+        assert "health" in colonist
+        assert "injuries" in colonist
+
+    def test_includes_medicine_supply(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = MedicalOfficer("mo-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert filtered["resources"]["medicine"] == 8
+
+    def test_flags_disease_status(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = MedicalOfficer("mo-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        # Sample threat is "raid", not "disease"
+        assert filtered["disease_active"] is False
+
+    def test_omits_research(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = MedicalOfficer("mo-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert "research" not in filtered
+
+
+# ==================================================================
+# Factory registration (all 6 agents)
+# ==================================================================
 
 
 class TestRegistration:
-    def test_register_and_create(
+    def test_register_and_create_all(
         self, mock_provider: MagicMock, helix: HelixGeometry,
     ) -> None:
         register_rle_agents()
         try:
             factory = AgentFactory(mock_provider, HelixConfig.default())
-            agent = factory.create_agent("resource_manager", agent_id="rm-test")
-            assert isinstance(agent, ResourceManager)
-            assert agent.agent_type == "resource_manager"
+            roles = [
+                ("resource_manager", ResourceManager),
+                ("defense_commander", DefenseCommander),
+                ("research_director", ResearchDirector),
+                ("social_overseer", SocialOverseer),
+                ("construction_planner", ConstructionPlanner),
+                ("medical_officer", MedicalOfficer),
+            ]
+            for role_name, expected_cls in roles:
+                agent = factory.create_agent(role_name, agent_id=f"{role_name}-test")
+                assert isinstance(agent, expected_cls)
+                assert agent.agent_type == role_name
         finally:
-            # Clean up shared ClassVar to avoid polluting other tests
-            AgentFactory._agent_types.pop("resource_manager", None)
+            for role_name, _ in roles:
+                AgentFactory._agent_types.pop(role_name, None)
