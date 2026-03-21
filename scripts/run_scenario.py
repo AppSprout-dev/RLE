@@ -20,6 +20,7 @@ from rle.agents.social_overseer import SocialOverseer
 from rle.config import RLEConfig
 from rle.orchestration.game_loop import RLEGameLoop
 from rle.rimapi.client import RimAPIClient
+from rle.rimapi.sse_client import RimAPISSEClient
 from rle.scenarios.evaluator import ScenarioEvaluator
 from rle.scenarios.loader import list_scenarios, load_scenario
 from rle.scoring.composite import CompositeScorer
@@ -116,6 +117,10 @@ async def main(args: argparse.Namespace) -> None:
 
     max_ticks = args.ticks or scenario.max_ticks
 
+    # SSE listener for real-time events (optional, only when RIMAPI is live)
+    sse = RimAPISSEClient(config.rimapi_url)
+    sse_task = asyncio.create_task(sse.listen())
+
     async with RimAPIClient(config.rimapi_url) as client:
         loop = RLEGameLoop(
             config, client, agents,
@@ -126,12 +131,17 @@ async def main(args: argparse.Namespace) -> None:
             initial_population=scenario.initial_population,
             visualizer=visualizer,
             parallel=not args.sequential,
+            sse_client=sse,
         )
-        if visualizer:
-            with visualizer.live():
+        try:
+            if visualizer:
+                with visualizer.live():
+                    await loop.run(max_ticks=max_ticks)
+            else:
                 await loop.run(max_ticks=max_ticks)
-        else:
-            await loop.run(max_ticks=max_ticks)
+        finally:
+            sse.stop()
+            sse_task.cancel()
 
     # Output
     _print_results(loop, recorder)

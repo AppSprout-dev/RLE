@@ -17,6 +17,7 @@ from rle.orchestration.action_executor import ActionExecutor, ExecutionResult
 from rle.orchestration.action_resolver import ActionResolver
 from rle.orchestration.state_manager import GameStateManager
 from rle.rimapi.client import RimAPIClient
+from rle.rimapi.sse_client import RimAPISSEClient
 from rle.scenarios.evaluator import EvaluationResult, ScenarioEvaluator
 from rle.scoring.composite import CompositeScorer, ScoreSnapshot
 from rle.scoring.metrics import MetricContext
@@ -54,11 +55,12 @@ class RLEGameLoop:
         initial_wealth: float = 0.0,
         visualizer: HelixVisualizer | None = None,
         parallel: bool = True,
+        sse_client: RimAPISSEClient | None = None,
     ) -> None:
         self._config = config
         self._client = client
         self._agents = agents
-        self._state_manager = GameStateManager(client, expected_duration_days)
+        self._state_manager = GameStateManager(client, expected_duration_days, sse_client)
         self._executor = ActionExecutor(client)
         self._resolver = ActionResolver()
         self._scorer = scorer
