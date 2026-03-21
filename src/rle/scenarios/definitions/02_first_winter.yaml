@@ -1,0 +1,32 @@
+name: First Winter
+description: Survive through the first winter with adequate food and shelter.
+difficulty: medium
+expected_duration_days: 60
+initial_population: 3
+max_ticks: 600
+
+victory_conditions:
+  - metric: days_survived
+    operator: ">="
+    value: 60
+  - metric: food_days
+    operator: ">="
+    value: 3
+
+failure_conditions:
+  - metric: all_colonists_dead
+    operator: "=="
+    value: 1
+  - metric: food_days
+    operator: "<="
+    value: 0
+
+scoring_weights:
+  survival: 0.25
+  food_security: 0.20
+  self_sufficiency: 0.15
+  mood: 0.10
+  wealth: 0.10
+  research: 0.05
+  threat_response: 0.10
+  efficiency: 0.05

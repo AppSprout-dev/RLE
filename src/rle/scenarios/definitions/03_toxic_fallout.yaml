@@ -1,0 +1,32 @@
+name: Toxic Fallout
+description: Survive a toxic fallout event. Keep colonists indoors and fed.
+difficulty: hard
+expected_duration_days: 20
+initial_population: 4
+max_ticks: 200
+
+victory_conditions:
+  - metric: days_survived
+    operator: ">="
+    value: 20
+  - metric: survival_rate
+    operator: ">="
+    value: 0.75
+
+failure_conditions:
+  - metric: all_colonists_dead
+    operator: "=="
+    value: 1
+  - metric: survival_rate
+    operator: "<"
+    value: 0.25
+
+scoring_weights:
+  survival: 0.35
+  food_security: 0.15
+  mood: 0.20
+  self_sufficiency: 0.10
+  wealth: 0.05
+  research: 0.05
+  threat_response: 0.05
+  efficiency: 0.05

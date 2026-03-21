@@ -1,0 +1,26 @@
+name: Ship Launch
+description: Research and build the ship to escape the planet.
+difficulty: extreme
+expected_duration_days: 120
+initial_population: 5
+max_ticks: 1200
+
+victory_conditions:
+  - metric: research_completed
+    operator: ">="
+    value: 10
+
+failure_conditions:
+  - metric: all_colonists_dead
+    operator: "=="
+    value: 1
+
+scoring_weights:
+  research: 0.25
+  survival: 0.20
+  wealth: 0.15
+  self_sufficiency: 0.15
+  food_security: 0.05
+  mood: 0.10
+  threat_response: 0.05
+  efficiency: 0.05

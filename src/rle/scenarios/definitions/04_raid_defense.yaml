@@ -1,0 +1,32 @@
+name: Raid Defense
+description: Defend against multiple raids over 15 days. Combat readiness is key.
+difficulty: hard
+expected_duration_days: 15
+initial_population: 5
+max_ticks: 150
+
+victory_conditions:
+  - metric: days_survived
+    operator: ">="
+    value: 15
+  - metric: survival_rate
+    operator: ">="
+    value: 0.6
+
+failure_conditions:
+  - metric: all_colonists_dead
+    operator: "=="
+    value: 1
+  - metric: survival_rate
+    operator: "<"
+    value: 0.2
+
+scoring_weights:
+  survival: 0.25
+  threat_response: 0.30
+  mood: 0.10
+  food_security: 0.05
+  wealth: 0.05
+  research: 0.05
+  self_sufficiency: 0.10
+  efficiency: 0.10

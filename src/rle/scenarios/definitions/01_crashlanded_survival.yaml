@@ -1,0 +1,29 @@
+name: Crashlanded Survival
+description: Three colonists crash-land with minimal supplies. Survive 30 days.
+difficulty: easy
+expected_duration_days: 30
+initial_population: 3
+max_ticks: 300
+
+victory_conditions:
+  - metric: days_survived
+    operator: ">="
+    value: 30
+  - metric: survival_rate
+    operator: ">="
+    value: 0.33
+
+failure_conditions:
+  - metric: all_colonists_dead
+    operator: "=="
+    value: 1
+
+scoring_weights:
+  survival: 0.30
+  food_security: 0.15
+  mood: 0.15
+  threat_response: 0.10
+  wealth: 0.05
+  research: 0.05
+  self_sufficiency: 0.15
+  efficiency: 0.05
