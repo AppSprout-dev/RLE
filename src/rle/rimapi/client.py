@@ -173,7 +173,7 @@ class RimAPIClient:
     async def draft_colonist(self, colonist_id: str, draft: bool) -> dict:
         return await self._post(
             "/api/v1/pawn/edit/status",
-            json={"PawnId": colonist_id, "IsDrafted": draft},
+            json={"pawn_id": colonist_id, "is_drafted": draft},
         )
 
     async def set_work_priorities(
@@ -185,7 +185,7 @@ class RimAPIClient:
         ]
         return await self._post(
             "/api/v1/colonists/work-priority",
-            json={"Priorities": entries},
+            json={"priorities": entries},
         )
 
     async def place_blueprint(self, blueprint: dict) -> dict:
@@ -195,8 +195,8 @@ class RimAPIClient:
         return await self._post(
             "/api/v1/pawn/edit/position",
             json={
-                "PawnId": colonist_id,
-                "Position": {"X": x, "Y": 0, "Z": z},
+                "pawn_id": colonist_id,
+                "position": {"x": x, "y": 0, "z": z},
             },
         )
 
@@ -205,7 +205,7 @@ class RimAPIClient:
     ) -> dict:
         return await self._post(
             "/api/v1/colonist/time-assignment",
-            json={"PawnId": colonist_id, "Hour": hour, "Assignment": assignment},
+            json={"pawn_id": colonist_id, "hour": hour, "assignment": assignment},
         )
 
     async def designate_area(
@@ -220,10 +220,10 @@ class RimAPIClient:
         return await self._post(
             "/api/v1/order/designate/area",
             json={
-                "MapId": map_id,
-                "Type": designation_type,
-                "PointA": {"X": x1, "Y": 0, "Z": z1},
-                "PointB": {"X": x2, "Y": 0, "Z": z2},
+                "map_id": map_id,
+                "type": designation_type,
+                "point_a": {"x": x1, "y": 0, "z": z1},
+                "point_b": {"x": x2, "y": 0, "z": z2},
             },
         )
 
@@ -241,11 +241,11 @@ class RimAPIClient:
         target_thing_id: int | None = None,
         target_position: tuple[int, int] | None = None,
     ) -> dict:
-        body: dict = {"PawnId": colonist_id, "JobDef": job}
+        body: dict = {"pawn_id": colonist_id, "job_def": job}
         if target_thing_id is not None:
-            body["TargetThingId"] = target_thing_id
+            body["target_thing_id"] = target_thing_id
         if target_position is not None:
-            body["TargetPosition"] = {"X": target_position[0], "Z": target_position[1]}
+            body["target_position"] = {"x": target_position[0], "y": 0, "z": target_position[1]}
         return await self._post("/api/v1/pawn/job", json=body)
 
     async def toggle_power(self, building_id: int, power_on: bool) -> dict:
@@ -258,21 +258,21 @@ class RimAPIClient:
     ) -> dict:
         return await self._post(
             "/api/v1/map/zone/growing",
-            json={"MapId": map_id, "PlantDef": plant_def, "Cells": cells},
+            json={"map_id": map_id, "plant_def": plant_def, "cells": cells},
         )
 
     async def assign_bed_rest(
         self, patient_id: str, bed_building_id: int | None = None,
     ) -> dict:
-        body: dict = {"PatientPawnId": patient_id}
+        body: dict = {"patient_pawn_id": patient_id}
         if bed_building_id is not None:
-            body["BedBuildingId"] = bed_building_id
+            body["bed_building_id"] = bed_building_id
         return await self._post("/api/v1/pawn/medical/bed-rest", json=body)
 
     async def administer_medicine(
         self, patient_id: str, doctor_id: str | None = None,
     ) -> dict:
-        body: dict = {"PatientPawnId": patient_id}
+        body: dict = {"patient_pawn_id": patient_id}
         if doctor_id is not None:
-            body["DoctorPawnId"] = doctor_id
+            body["doctor_pawn_id"] = doctor_id
         return await self._post("/api/v1/pawn/medical/tend", json=body)
