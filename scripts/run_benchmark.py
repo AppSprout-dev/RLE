@@ -143,7 +143,7 @@ def _make_mock_provider() -> MagicMock:
     return provider
 
 
-def _create_agents(provider, helix, *, provider_kwargs=None):  # type: ignore[no-untyped-def]
+def _create_agents(provider, helix, *, provider_kwargs=None, no_think=False):  # type: ignore[no-untyped-def]
     agents = [
         ResourceManager("resource_manager", provider, helix, spawn_time=0.0, velocity=1.0),
         DefenseCommander(
@@ -161,6 +161,9 @@ def _create_agents(provider, helix, *, provider_kwargs=None):  # type: ignore[no
     if provider_kwargs:
         for agent in agents:
             agent.set_provider_kwargs(**provider_kwargs)
+    if no_think:
+        for agent in agents:
+            agent.set_no_think(True)
     return agents
 
 
@@ -185,8 +188,9 @@ async def _run_scenario(
     max_ticks_override: int | None = None,
     provider_kwargs: dict | None = None,
     visualize: bool = False,
+    no_think: bool = False,
 ) -> dict:
-    agents = _create_agents(provider, helix, provider_kwargs=provider_kwargs)
+    agents = _create_agents(provider, helix, provider_kwargs=provider_kwargs, no_think=no_think)
     scorer = CompositeScorer(scenario.scoring_weights or None)
     recorder = TimeSeriesRecorder()
     evaluator = ScenarioEvaluator(scenario)
@@ -346,6 +350,7 @@ async def main(args: argparse.Namespace) -> None:
                 max_ticks_override=ticks_override,
                 provider_kwargs=provider_kwargs or None,
                 visualize=args.visualize,
+                no_think=args.no_think,
             )
             results.append(result)
             print(

@@ -72,10 +72,15 @@ class RimWorldRoleAgent(LLMAgent):
         )
         self._last_action_plan: ActionPlan | None = None
         self._provider_kwargs: dict[str, Any] = {}
+        self._no_think: bool = False
 
     def set_provider_kwargs(self, **kwargs: Any) -> None:
         """Set extra kwargs passed to provider.complete() (e.g. extra_body)."""
         self._provider_kwargs = kwargs
+
+    def set_no_think(self, enabled: bool = True) -> None:
+        """Enable no-think mode: skips reasoning via </think> assistant prefix."""
+        self._no_think = enabled
 
     def _call_provider(
         self,
@@ -84,11 +89,15 @@ class RimWorldRoleAgent(LLMAgent):
         temperature: float,
         max_tokens: int,
     ) -> CompletionResult:
-        """Override to pass extra provider kwargs (e.g. no-think for Qwen3.5)."""
+        """Override to pass extra provider kwargs and no-think prefix."""
         messages = [
             ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
             ChatMessage(role=MessageRole.USER, content=user_prompt),
         ]
+        if self._no_think:
+            messages.append(
+                ChatMessage(role=MessageRole.ASSISTANT, content="</think>"),
+            )
         return self.provider.complete(
             messages,
             temperature=temperature,
