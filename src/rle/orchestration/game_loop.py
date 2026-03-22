@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from pathlib import Path
 
@@ -56,6 +57,7 @@ class RLEGameLoop:
         visualizer: HelixVisualizer | None = None,
         parallel: bool = True,
         sse_client: RimAPISSEClient | None = None,
+        dashboard_export_dir: Path | None = None,
     ) -> None:
         self._config = config
         self._client = client
@@ -79,6 +81,7 @@ class RLEGameLoop:
         self._deliberation_log: list[dict] = []
         self._parallel = parallel
         self._last_phase: str = ""
+        self._dashboard_export_dir = dashboard_export_dir
 
         self._visualizer = visualizer
 
@@ -176,6 +179,64 @@ class RLEGameLoop:
             "summary": plan.summary[:300],
         })
         return agent, plan
+
+    def _export_tick_json(
+        self, plans: list[ActionPlan], resolved: ActionPlan,
+        exec_result: ExecutionResult, snapshot: ScoreSnapshot | None,
+        tick: int, day: int, macro_time: float,
+    ) -> None:
+        """Write tick data as JSON for the rimapi-dashboard to consume."""
+        if not self._dashboard_export_dir:
+            return
+        self._dashboard_export_dir.mkdir(parents=True, exist_ok=True)
+        data = {
+            "tick": tick,
+            "day": day,
+            "macro_time": macro_time,
+            "phase": self._last_phase,
+            "agents": [
+                {
+                    "role": p.role,
+                    "summary": p.summary,
+                    "confidence": p.confidence,
+                    "num_actions": len(p.actions),
+                    "actions": [
+                        {
+                            "action_type": a.action_type.value,
+                            "target": a.target_colonist_id,
+                            "priority": a.priority,
+                            "reason": a.reason,
+                        }
+                        for a in p.actions
+                    ],
+                }
+                for p in plans
+            ],
+            "resolved": {
+                "role": resolved.role,
+                "num_actions": len(resolved.actions),
+                "actions": [
+                    {
+                        "action_type": a.action_type.value,
+                        "target": a.target_colonist_id,
+                        "priority": a.priority,
+                    }
+                    for a in resolved.actions
+                ],
+            },
+            "execution": {
+                "executed": exec_result.executed,
+                "failed": exec_result.failed,
+                "total": exec_result.total,
+            },
+            "score": {
+                "composite": snapshot.composite,
+                "metrics": snapshot.metrics,
+            } if snapshot else None,
+        }
+        (self._dashboard_export_dir / "latest_tick.json").write_text(
+            json.dumps(data, indent=2),
+        )
 
     def _update_metric_context(self, result: TickResult, state: object) -> None:
         """Append tick data to metric context for scoring history."""
@@ -276,7 +337,13 @@ class RLEGameLoop:
         # 10. Render visualization
         self._render_visualizer(state.colony.tick, state.colony.day, exec_result, snapshot)
 
-        # 11. Unpause
+        # 11. Export tick data for dashboard
+        self._export_tick_json(
+            plans, resolved, exec_result, snapshot,
+            state.colony.tick, state.colony.day, current_time,
+        )
+
+        # 12. Unpause
         await self._client.unpause_game()
 
         result = TickResult(
