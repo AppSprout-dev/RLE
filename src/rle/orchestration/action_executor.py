@@ -60,6 +60,19 @@ class ActionExecutor:
             total=len(plan.actions),
         )
 
+    # Actions that require a valid colonist/pawn ID to execute.
+    _NEEDS_PAWN: frozenset[ActionType] = frozenset({
+        ActionType.SET_WORK_PRIORITY,
+        ActionType.HAUL_RESOURCE,
+        ActionType.DRAFT_COLONIST,
+        ActionType.UNDRAFT_COLONIST,
+        ActionType.MOVE_COLONIST,
+        ActionType.ASSIGN_RESEARCHER,
+        ActionType.SET_RECREATION_POLICY,
+        ActionType.ASSIGN_BED_REST,
+        ActionType.ADMINISTER_MEDICINE,
+    })
+
     async def _dispatch(self, action: Action) -> None:
         """Route action to appropriate RIMAPI call."""
         at = action.action_type
@@ -71,6 +84,11 @@ class ActionExecutor:
 
         if at in _PENDING_UPSTREAM:
             logger.debug("No RIMAPI endpoint for %s yet (needs upstream PR)", at.value)
+            return
+
+        # Skip pawn-targeting actions with no valid colonist ID
+        if at in self._NEEDS_PAWN and (not cid or cid == "0"):
+            logger.info("Skipping %s: no valid colonist ID", at.value)
             return
 
         handler = self._handlers.get(at)
@@ -123,10 +141,14 @@ class ActionExecutor:
         await self._client.set_colonist_job(cid, "HaulToCell", target_thing_id=target_id)
 
     async def _do_set_growing_zone(self, cid: str, params: dict[str, Any]) -> None:
+        cells = params.get("cells", [])
+        if not cells:
+            logger.info("Skipping set_growing_zone: no cells specified")
+            return
         await self._client.create_growing_zone(
             map_id=params.get("map_id", 0),
             plant_def=params.get("plant_def", "PlantPotato"),
-            cells=params.get("cells", []),
+            cells=cells,
         )
 
     async def _do_toggle_power(self, cid: str, params: dict[str, Any]) -> None:
