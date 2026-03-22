@@ -78,27 +78,27 @@ def _make_transport(day: int = 12) -> httpx.MockTransport:
                 "injuries": [], "position": [50, 10],
             },
         ],
-        "/api/v1/resources": {
-            "food": 120.5, "medicine": 8, "steel": 300, "wood": 450,
-            "components": 12, "silver": 1500, "power_net": 200.0, "items": {},
+        "/api/v1/resources/summary?map_id=0": {
+            "total_items": 500, "total_market_value": 1500.0,
+            "critical_resources": {
+                "food_summary": {"food_total": 120},
+                "medicine_total": 8, "weapon_count": 3,
+            },
         },
-        "/api/v1/map": {
-            "size": [250, 250], "biome": "temperate_forest", "season": "summer",
-            "temperature": 22.0, "structures": [],
-        },
+        "/api/v1/map/buildings?map_id=0": [],
         "/api/v1/research/summary": {
             "current_project": "electricity", "progress": 0.45,
             "completed": ["stonecutting"],
             "available": ["electricity", "battery"],
         },
-        "/api/v1/threats": [],
+        "/api/v1/incidents?map_id=0": {"incidents": []},
         "/api/v1/game/state": {
             "name": "New Hope", "wealth": 15000.0, "day": day,
             "tick": day * 60000, "population": 3, "mood_average": 0.65,
             "food_days": 8.5,
         },
-        "/api/v1/map/weather": {
-            "condition": "clear", "temperature": 22.0, "outdoor_severity": 0.0,
+        "/api/v1/map/weather?map_id=0": {
+            "weather": "clear", "temperature": 22.0,
         },
     }
 

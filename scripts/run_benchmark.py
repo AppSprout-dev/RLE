@@ -71,28 +71,28 @@ _MOCK_ROUTES: dict[str, dict | list] = {
             "injuries": [], "position": [50, 10],
         },
     ],
-    "/api/v1/resources": {
-        "food": 85.0, "medicine": 5, "steel": 200, "wood": 350,
-        "components": 8, "silver": 800, "power_net": 150.0, "items": {},
+    "/api/v1/resources/summary?map_id=0": {
+        "total_items": 800, "total_market_value": 8000.0,
+        "critical_resources": {
+            "food_summary": {"food_total": 85},
+            "medicine_total": 5, "weapon_count": 2,
+        },
     },
-    "/api/v1/map": {
-        "size": [250, 250], "biome": "temperate_forest", "season": "summer",
-        "temperature": 22.0, "structures": [
-            {"structure_id": "s_01", "def_name": "Wall", "position": [10, 10],
-             "hit_points": 300.0, "max_hit_points": 300.0},
-        ],
-    },
+    "/api/v1/map/buildings?map_id=0": [
+        {"id": "s_01", "def_name": "Wall", "position": {"x": 10, "y": 0, "z": 10},
+         "hit_points": 300.0, "max_hit_points": 300.0},
+    ],
     "/api/v1/research/summary": {
         "current_project": "electricity", "progress": 0.45,
         "completed": ["stonecutting"], "available": ["electricity", "battery", "smithing"],
     },
-    "/api/v1/threats": [],
+    "/api/v1/incidents?map_id=0": {"incidents": []},
     "/api/v1/game/state": {
         "name": "New Hope", "wealth": 8000.0, "day": 5, "tick": 300000,
         "population": 3, "mood_average": 0.65, "food_days": 7.0,
     },
-    "/api/v1/map/weather": {
-        "condition": "clear", "temperature": 22.0, "outdoor_severity": 0.0,
+    "/api/v1/map/weather?map_id=0": {
+        "weather": "clear", "temperature": 22.0,
     },
 }
 

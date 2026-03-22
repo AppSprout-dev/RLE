@@ -181,8 +181,8 @@ def sample_threat() -> ThreatData:
 @pytest.fixture
 def sample_threat_dict() -> dict:
     return {
-        "threat_id": "t_01",
-        "threat_type": "raid",
+        "id": "t_01",
+        "def_name": "raid",
         "faction": "pirate",
         "enemy_count": 5,
         "threat_level": 0.4,

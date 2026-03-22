@@ -203,8 +203,19 @@ class RimAPIClient:
 
     async def get_resources(self) -> ResourceData:
         try:
-            data = await self._get("/api/v1/resources")
-            return ResourceData.model_validate(data)
+            data = await self._get("/api/v1/resources/summary?map_id=0")
+            crit = data.get("critical_resources", {})
+            food_summary = crit.get("food_summary", {})
+            return ResourceData(
+                food=float(food_summary.get("food_total", 0)),
+                medicine=int(crit.get("medicine_total", 0)),
+                steel=0,  # Not exposed by RIMAPI
+                wood=0,   # Not exposed by RIMAPI
+                components=0,  # Not exposed by RIMAPI
+                silver=round(data.get("total_market_value", 0.0)),
+                power_net=0.0,  # Not exposed by RIMAPI
+                items={"total": data.get("total_items", 0)},
+            )
         except (RimAPIResponseError, RimAPIConnectionError):
             return ResourceData(
                 food=50.0, medicine=5, steel=100, wood=200,
@@ -216,8 +227,13 @@ class RimAPIClient:
             buildings = await self._get("/api/v1/map/buildings?map_id=0")
         except (RimAPIResponseError, RimAPIConnectionError):
             buildings = []
+        try:
+            weather = await self._get("/api/v1/map/weather?map_id=0")
+            temperature = weather.get("temperature", 15.0)
+        except (RimAPIResponseError, RimAPIConnectionError):
+            temperature = 15.0
         structures = []
-        for b in buildings[:50]:  # Cap to avoid huge payloads
+        for b in buildings[:50]:
             structures.append(StructureData(
                 structure_id=str(b.get("id", b.get("thing_id", ""))),
                 def_name=b.get("def_name", b.get("label", "Unknown")),
@@ -229,7 +245,7 @@ class RimAPIClient:
             size=(250, 250),
             biome="temperate_forest",
             season="spring",
-            temperature=15.0,
+            temperature=temperature,
             structures=structures,
         )
 
@@ -239,8 +255,18 @@ class RimAPIClient:
 
     async def get_threats(self) -> list[ThreatData]:
         try:
-            data = await self._get("/api/v1/threats")
-            return [ThreatData.model_validate(t) for t in data]
+            data = await self._get("/api/v1/incidents?map_id=0")
+            incidents = data.get("incidents", []) if isinstance(data, dict) else data
+            return [
+                ThreatData(
+                    threat_id=str(inc.get("id", inc.get("def_name", i))),
+                    threat_type=inc.get("def_name", "unknown"),
+                    faction=inc.get("faction"),
+                    enemy_count=inc.get("enemy_count", 0),
+                    threat_level=inc.get("threat_level", inc.get("points", 0.0)),
+                )
+                for i, inc in enumerate(incidents)
+            ]
         except (RimAPIResponseError, RimAPIConnectionError):
             return []
 
@@ -268,6 +294,17 @@ class RimAPIClient:
         research = await self.get_research()
         threats = await self.get_threats()
         weather = await self.get_weather()
+
+        # Compute dynamic colony metrics from real data
+        if colonists:
+            avg_mood = sum(c.mood for c in colonists) / len(colonists)
+            colony = ColonyData(
+                name=colony.name, wealth=colony.wealth, day=colony.day,
+                tick=colony.tick, population=colony.population,
+                mood_average=round(avg_mood, 3),
+                food_days=round(resources.food / max(len(colonists) * 2, 1), 1),
+            )
+
         return GameState(
             colony=colony,
             colonists=colonists,

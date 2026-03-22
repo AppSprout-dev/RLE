@@ -38,6 +38,9 @@ _SHARED_SYSTEM_PREFIX = (
     "colony state. Never use 0 or null for pawn-targeting actions.\n\n"
     "For place_blueprint, include x, z coordinates and def_name in parameters.\n"
     "For toggle_power, include a valid building_id from the structures list.\n\n"
+    "Note: Colonist skills, traits, and current job may not be available. "
+    "Make decisions based on available data: health, mood, hunger, position, "
+    "and colony resources (food count, medicine, market value).\n\n"
     "Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.\n\n"
 )
 

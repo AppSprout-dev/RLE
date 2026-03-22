@@ -57,9 +57,12 @@ COLONIST = {
     "position": [42, 18],
 }
 
-RESOURCES = {
-    "food": 120.5, "medicine": 8, "steel": 300, "wood": 450,
-    "components": 12, "silver": 1500, "power_net": 200.0, "items": {},
+RESOURCES_SUMMARY = {
+    "total_items": 500, "total_market_value": 1500.0,
+    "critical_resources": {
+        "food_summary": {"food_total": 120},
+        "medicine_total": 8, "weapon_count": 3,
+    },
 }
 
 MAP_DATA = {
@@ -98,12 +101,12 @@ def _make_transport(day: int = 12, tick: int = 720000) -> httpx.MockTransport:
     colony = _colony_dict(day, tick)
     routes: dict[str, dict | list] = {
         "/api/v1/colonists": [COLONIST],
-        "/api/v1/resources": RESOURCES,
-        "/api/v1/map": MAP_DATA,
+        "/api/v1/resources/summary?map_id=0": RESOURCES_SUMMARY,
+        "/api/v1/map/buildings?map_id=0": [],
         "/api/v1/research/summary": RESEARCH,
-        "/api/v1/threats": [],
+        "/api/v1/incidents?map_id=0": {"incidents": []},
         "/api/v1/game/state": colony,
-        "/api/v1/map/weather": WEATHER,
+        "/api/v1/map/weather?map_id=0": WEATHER,
     }
 
     def handler(request: httpx.Request) -> httpx.Response:

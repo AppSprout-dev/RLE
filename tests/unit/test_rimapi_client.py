@@ -92,15 +92,25 @@ def all_routes(
     sample_colony_dict: dict,
     sample_weather_dict: dict,
 ) -> dict[str, dict | list]:
+    # Resource summary in upstream RIMAPI format
+    resources_summary = {
+        "total_items": 1644,
+        "total_market_value": 9186.0,
+        "critical_resources": {
+            "food_summary": {"food_total": 120},
+            "medicine_total": 8,
+            "weapon_count": 5,
+        },
+    }
     return {
         "/api/v1/colonists": [sample_colonist_dict],
         "/api/v1/colonist?id=col_01": sample_colonist_dict,
-        "/api/v1/resources": sample_resources_dict,
-        "/api/v1/map": sample_map_dict,
+        "/api/v1/resources/summary?map_id=0": resources_summary,
+        "/api/v1/map/buildings?map_id=0": [],
         "/api/v1/research/summary": sample_research_dict,
-        "/api/v1/threats": [sample_threat_dict],
+        "/api/v1/incidents?map_id=0": {"incidents": [sample_threat_dict]},
         "/api/v1/game/state": sample_colony_dict,
-        "/api/v1/map/weather": sample_weather_dict,
+        "/api/v1/map/weather?map_id=0": sample_weather_dict,
     }
 
 
@@ -147,7 +157,9 @@ class TestReadEndpoints:
     async def test_get_resources(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.get_resources()
         assert isinstance(result, ResourceData)
-        assert result.food == 120.5
+        assert result.food == 120.0
+        assert result.medicine == 8
+        assert result.silver == 9186
 
     async def test_get_map(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.get_map()
