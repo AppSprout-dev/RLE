@@ -32,6 +32,12 @@ _SHARED_SYSTEM_PREFIX = (
     '{"actions": [{"action_type": "<type>", "target_colonist_id": "<id or null>", '
     '"parameters": {}, "priority": <1-10>, "reason": "<why>"}], '
     '"summary": "<brief summary>", "confidence": <0.0-1.0>}\n\n'
+    "IMPORTANT: For actions targeting a colonist (draft, undraft, move, set_work_priority, "
+    "assign_researcher, assign_bed_rest, administer_medicine, set_recreation_policy, "
+    "haul_resource), you MUST set target_colonist_id to a valid colonist_id from the "
+    "colony state. Never use 0 or null for pawn-targeting actions.\n\n"
+    "For place_blueprint, include x, z coordinates and def_name in parameters.\n"
+    "For toggle_power, include a valid building_id from the structures list.\n\n"
     "Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.\n\n"
 )
 

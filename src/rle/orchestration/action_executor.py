@@ -117,7 +117,21 @@ class ActionExecutor:
     async def _do_place_blueprint(
         self, cid: str, params: dict[str, Any],
     ) -> None:
-        await self._client.place_blueprint(params)
+        # Agent provides simple params (def_name, x, z, x2, z2).
+        # Use designate_area for zone-type placements, or place_blueprint for buildings.
+        if "x" in params and "z" in params:
+            x1 = params.get("x", 0)
+            z1 = params.get("z", 0)
+            x2 = params.get("x2", x1)
+            z2 = params.get("z2", z1)
+            def_name = params.get("def_name", "Wall")
+            await self._client.designate_area(
+                map_id=params.get("map_id", 0),
+                designation_type=def_name,
+                x1=x1, z1=z1, x2=x2, z2=z2,
+            )
+        else:
+            raise ValueError("place_blueprint requires x, z coordinates in parameters")
 
     async def _do_move(self, cid: str, params: dict[str, Any]) -> None:
         await self._client.move_colonist(cid, params.get("x", 0), params.get("z", 0))
@@ -137,8 +151,8 @@ class ActionExecutor:
             await self._client.set_time_assignment(cid, hour, assignment)
 
     async def _do_haul(self, cid: str, params: dict[str, Any]) -> None:
-        target_id = params.get("target_thing_id")
-        await self._client.set_colonist_job(cid, "HaulToCell", target_thing_id=target_id)
+        # Set hauling work priority to 1 (highest) — more reliable than direct job assignment
+        await self._client.set_work_priorities(cid, {"Hauling": 1})
 
     async def _do_set_growing_zone(self, cid: str, params: dict[str, Any]) -> None:
         cells = params.get("cells", [])

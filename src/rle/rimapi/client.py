@@ -14,6 +14,7 @@ from rle.rimapi.schemas import (
     MapData,
     ResearchData,
     ResourceData,
+    StructureData,
     ThreatData,
     WeatherData,
 )
@@ -211,13 +212,25 @@ class RimAPIClient:
             )
 
     async def get_map(self) -> MapData:
-        # TODO: enrich with /api/v1/map/buildings and /api/v1/map/terrain
+        try:
+            buildings = await self._get("/api/v1/map/buildings?map_id=0")
+        except (RimAPIResponseError, RimAPIConnectionError):
+            buildings = []
+        structures = []
+        for b in buildings[:50]:  # Cap to avoid huge payloads
+            structures.append(StructureData(
+                structure_id=str(b.get("id", b.get("thing_id", ""))),
+                def_name=b.get("def_name", b.get("label", "Unknown")),
+                position=b.get("position", [0, 0]),
+                hit_points=float(b.get("hit_points", 100)),
+                max_hit_points=float(b.get("max_hit_points", 100)),
+            ))
         return MapData(
             size=(250, 250),
             biome="temperate_forest",
             season="spring",
             temperature=15.0,
-            structures=[],
+            structures=structures,
         )
 
     async def get_research(self) -> ResearchData:

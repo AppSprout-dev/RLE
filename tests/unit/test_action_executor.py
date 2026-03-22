@@ -111,13 +111,26 @@ class TestDispatch:
         plan = _make_plan(
             Action(
                 action_type=ActionType.PLACE_BLUEPRINT,
-                parameters={"MapId": 0, "def_name": "Wall"},
+                parameters={"def_name": "Wall", "x": 10, "z": 20, "map_id": 0},
             )
         )
         await executor.execute(plan)
-        client.place_blueprint.assert_awaited_once_with(
-            {"MapId": 0, "def_name": "Wall"},
+        client.designate_area.assert_awaited_once_with(
+            map_id=0, designation_type="Wall", x1=10, z1=20, x2=10, z2=20,
         )
+
+    async def test_place_blueprint_missing_position_skipped(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(
+            Action(
+                action_type=ActionType.PLACE_BLUEPRINT,
+                parameters={"def_name": "Wall"},
+            )
+        )
+        result = await executor.execute(plan)
+        client.designate_area.assert_not_awaited()
+        assert result.executed == 0
 
     async def test_move_colonist(self) -> None:
         client = AsyncMock()
