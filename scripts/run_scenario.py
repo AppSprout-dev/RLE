@@ -101,6 +101,9 @@ async def main(args: argparse.Namespace) -> None:
     provider = config.get_provider()
     helix = HelixConfig.default().to_geometry()
     agents = _create_agents(provider, helix)
+    if args.no_think:
+        for agent in agents:
+            agent.set_no_think(True)
 
     scorer = CompositeScorer(scenario.scoring_weights or None)
     recorder = TimeSeriesRecorder()
@@ -165,5 +168,6 @@ if __name__ == "__main__":
         "--sequential", action="store_true",
         help="Run agents sequentially (default: parallel)",
     )
+    parser.add_argument("--no-think", action="store_true", help="Skip reasoning tokens")
     parser.add_argument("--log-level", default="INFO", help="Logging level")
     asyncio.run(main(parser.parse_args()))

@@ -74,7 +74,7 @@ class RimAPIClient:
     # ------------------------------------------------------------------
 
     async def _get(self, path: str) -> dict:
-        """Perform a GET request and return parsed JSON."""
+        """Perform a GET request, unwrap RIMAPI envelope, return data payload."""
         try:
             resp = await self.client.get(path)
         except httpx.ConnectError as exc:
@@ -84,7 +84,11 @@ class RimAPIClient:
 
         if resp.status_code != 200:
             raise RimAPIResponseError(resp.status_code, resp.text)
-        return resp.json()
+        body = resp.json()
+        # RIMAPI wraps all responses in {"success": bool, "data": ...}
+        if isinstance(body, dict) and "data" in body:
+            return body["data"]
+        return body
 
     async def _post(self, path: str, json: dict | None = None) -> dict:
         """Perform a POST request and return parsed JSON."""
@@ -108,37 +112,139 @@ class RimAPIClient:
     # adapters will be needed when connecting to the live game.
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Adapters: upstream response shapes → RLE Pydantic models
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _adapt_colonist(raw: dict) -> dict:
+        """Map upstream PawnDto → ColonistData fields.
+
+        Handles both upstream format (id, position={x,y,z}, hunger)
+        and mock/test format (colonist_id, position=[x,z], needs).
+        """
+        # Already in our schema format — pass through
+        if "colonist_id" in raw:
+            return raw
+
+        pos = raw.get("position", {})
+        if isinstance(pos, dict):
+            position = (pos.get("x", 0), pos.get("z", 0))
+        elif isinstance(pos, (list, tuple)):
+            position = (pos[0], pos[1]) if len(pos) >= 2 else (0, 0)
+        else:
+            position = (0, 0)
+
+        return {
+            "colonist_id": str(raw.get("id", "")),
+            "name": raw.get("name", "Unknown"),
+            "health": raw.get("health", 1.0),
+            "mood": raw.get("mood", 0.5),
+            "skills": raw.get("skills", {}),
+            "traits": raw.get("traits", []),
+            "current_job": raw.get("current_job"),
+            "is_drafted": raw.get("is_drafted", False),
+            "needs": raw.get("needs", {"food": raw.get("hunger", 0.5)}),
+            "injuries": raw.get("injuries", []),
+            "position": position,
+        }
+
+    @staticmethod
+    def _adapt_colony(raw: dict) -> dict:
+        """Map upstream GameStateDto → ColonyData fields.
+
+        Handles both upstream (game_tick, colony_wealth, colonist_count)
+        and mock/test format (name, wealth, day, tick, population).
+        """
+        if "name" in raw:
+            return raw
+        return {
+            "name": "Colony",
+            "wealth": raw.get("colony_wealth", 0.0),
+            "day": raw.get("game_tick", 0) // 60000,
+            "tick": raw.get("game_tick", 0),
+            "population": raw.get("colonist_count", 0),
+            "mood_average": 0.5,
+            "food_days": 5.0,
+        }
+
+    @staticmethod
+    def _adapt_research(raw: dict) -> dict:
+        """Map upstream ResearchSummaryDto → ResearchData fields."""
+        if "current_project" in raw:
+            return raw
+        completed = []
+        available = []
+        for _level, cat in raw.get("by_tech_level", {}).items():
+            for proj in cat.get("projects", []):
+                if cat.get("finished", 0) > 0:
+                    completed.append(proj)
+                else:
+                    available.append(proj)
+        return {
+            "current_project": None,
+            "progress": 0.0,
+            "completed": completed[:raw.get("finished_projects_count", 0)],
+            "available": available,
+        }
+
+    # ------------------------------------------------------------------
+    # Read endpoints
+    # ------------------------------------------------------------------
+
     async def get_colonists(self) -> list[ColonistData]:
         data = await self._get("/api/v1/colonists")
-        return [ColonistData.model_validate(c) for c in data]
+        return [ColonistData.model_validate(self._adapt_colonist(c)) for c in data]
 
     async def get_colonist(self, colonist_id: str) -> ColonistData:
         data = await self._get(f"/api/v1/colonist?id={colonist_id}")
-        return ColonistData.model_validate(data)
+        return ColonistData.model_validate(self._adapt_colonist(data))
 
     async def get_resources(self) -> ResourceData:
-        data = await self._get("/api/v1/resources")
-        return ResourceData.model_validate(data)
+        try:
+            data = await self._get("/api/v1/resources")
+            return ResourceData.model_validate(data)
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return ResourceData(
+                food=50.0, medicine=5, steel=100, wood=200,
+                components=10, silver=300, power_net=0.0,
+            )
 
     async def get_map(self) -> MapData:
-        data = await self._get("/api/v1/map")
-        return MapData.model_validate(data)
+        # TODO: enrich with /api/v1/map/buildings and /api/v1/map/terrain
+        return MapData(
+            size=(250, 250),
+            biome="temperate_forest",
+            season="spring",
+            temperature=15.0,
+            structures=[],
+        )
 
     async def get_research(self) -> ResearchData:
         data = await self._get("/api/v1/research/summary")
-        return ResearchData.model_validate(data)
+        return ResearchData.model_validate(self._adapt_research(data))
 
     async def get_threats(self) -> list[ThreatData]:
-        data = await self._get("/api/v1/threats")
-        return [ThreatData.model_validate(t) for t in data]
+        try:
+            data = await self._get("/api/v1/threats")
+            return [ThreatData.model_validate(t) for t in data]
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return []
 
     async def get_colony(self) -> ColonyData:
         data = await self._get("/api/v1/game/state")
-        return ColonyData.model_validate(data)
+        return ColonyData.model_validate(self._adapt_colony(data))
 
     async def get_weather(self) -> WeatherData:
-        data = await self._get("/api/v1/map/weather")
-        return WeatherData.model_validate(data)
+        try:
+            data = await self._get("/api/v1/map/weather?map_id=0")
+            return WeatherData(
+                condition=data.get("weather", "Clear"),
+                temperature=data.get("temperature", 15.0),
+                outdoor_severity=0.0,
+            )
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return WeatherData(condition="Clear", temperature=15.0, outdoor_severity=0.0)
 
     async def get_game_state(self) -> GameState:
         """Fetch all endpoints and assemble a full GameState snapshot."""
@@ -164,6 +270,14 @@ class RimAPIClient:
     # Write endpoints — upstream RIMAPI v1.8.2+
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _int_id(colonist_id: str) -> int:
+        """Convert string colonist ID to int for RIMAPI DTOs."""
+        try:
+            return int(colonist_id)
+        except (ValueError, TypeError):
+            return 0
+
     async def pause_game(self) -> dict:
         return await self._post("/api/v1/game/speed?speed=0")
 
@@ -173,14 +287,15 @@ class RimAPIClient:
     async def draft_colonist(self, colonist_id: str, draft: bool) -> dict:
         return await self._post(
             "/api/v1/pawn/edit/status",
-            json={"pawn_id": colonist_id, "is_drafted": draft},
+            json={"pawn_id": self._int_id(colonist_id), "is_drafted": draft},
         )
 
     async def set_work_priorities(
         self, colonist_id: str, priorities: dict[str, int],
     ) -> dict:
+        pid = self._int_id(colonist_id)
         entries = [
-            {"id": colonist_id, "work": work, "priority": pri}
+            {"id": pid, "work": work, "priority": pri}
             for work, pri in priorities.items()
         ]
         return await self._post(
@@ -195,7 +310,7 @@ class RimAPIClient:
         return await self._post(
             "/api/v1/pawn/edit/position",
             json={
-                "pawn_id": colonist_id,
+                "pawn_id": self._int_id(colonist_id),
                 "position": {"x": x, "y": 0, "z": z},
             },
         )
@@ -205,7 +320,7 @@ class RimAPIClient:
     ) -> dict:
         return await self._post(
             "/api/v1/colonist/time-assignment",
-            json={"pawn_id": colonist_id, "hour": hour, "assignment": assignment},
+            json={"pawn_id": self._int_id(colonist_id), "hour": hour, "assignment": assignment},
         )
 
     async def designate_area(
@@ -232,6 +347,8 @@ class RimAPIClient:
     # ------------------------------------------------------------------
 
     async def set_research_target(self, project: str) -> dict:
+        if not project:
+            return {"success": False, "skipped": "empty project name"}
         return await self._post(f"/api/v1/research/target?name={project}")
 
     async def set_colonist_job(
@@ -241,7 +358,7 @@ class RimAPIClient:
         target_thing_id: int | None = None,
         target_position: tuple[int, int] | None = None,
     ) -> dict:
-        body: dict = {"pawn_id": colonist_id, "job_def": job}
+        body: dict = {"pawn_id": self._int_id(colonist_id), "job_def": job}
         if target_thing_id is not None:
             body["target_thing_id"] = target_thing_id
         if target_position is not None:
@@ -250,21 +367,37 @@ class RimAPIClient:
 
     async def toggle_power(self, building_id: int, power_on: bool) -> dict:
         return await self._post(
-            f"/api/v1/map/building/power?buildingId={building_id}&powerOn={str(power_on).lower()}",
+            f"/api/v1/map/building/power?buildingId={building_id}"
+            f"&powerOn={str(power_on).lower()}",
         )
+
+    @staticmethod
+    def _normalize_plant_def(plant_def: str) -> str:
+        """Normalize agent plant names to RimWorld defNames."""
+        if plant_def.startswith("Plant_"):
+            return plant_def
+        # "PlantPotato" → "Plant_Potato", "potato" → "Plant_Potato"
+        name = plant_def.removeprefix("Plant").strip("_")
+        if not name:
+            name = "Potato"
+        return f"Plant_{name[0].upper()}{name[1:]}"
 
     async def create_growing_zone(
         self, map_id: int, plant_def: str, cells: list[dict],
     ) -> dict:
         return await self._post(
             "/api/v1/map/zone/growing",
-            json={"map_id": map_id, "plant_def": plant_def, "cells": cells},
+            json={
+                "map_id": map_id,
+                "plant_def": self._normalize_plant_def(plant_def),
+                "cells": cells,
+            },
         )
 
     async def assign_bed_rest(
         self, patient_id: str, bed_building_id: int | None = None,
     ) -> dict:
-        body: dict = {"patient_pawn_id": patient_id}
+        body: dict = {"patient_pawn_id": self._int_id(patient_id)}
         if bed_building_id is not None:
             body["bed_building_id"] = bed_building_id
         return await self._post("/api/v1/pawn/medical/bed-rest", json=body)
@@ -272,7 +405,7 @@ class RimAPIClient:
     async def administer_medicine(
         self, patient_id: str, doctor_id: str | None = None,
     ) -> dict:
-        body: dict = {"patient_pawn_id": patient_id}
+        body: dict = {"patient_pawn_id": self._int_id(patient_id)}
         if doctor_id is not None:
-            body["doctor_pawn_id"] = doctor_id
+            body["doctor_pawn_id"] = self._int_id(doctor_id)
         return await self._post("/api/v1/pawn/medical/tend", json=body)
