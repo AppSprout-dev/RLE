@@ -97,7 +97,14 @@ async def main(args: argparse.Namespace) -> None:
     print(f"Duration: {scenario.expected_duration_days} days, max {scenario.max_ticks} ticks")
 
     # Setup
-    config = RLEConfig()
+    overrides: dict[str, str] = {}
+    if args.provider:
+        overrides["provider"] = args.provider
+    if args.model:
+        overrides["model"] = args.model
+    if args.base_url:
+        overrides["provider_base_url"] = args.base_url
+    config = RLEConfig(**overrides) if overrides else RLEConfig()
     provider = config.get_provider()
     helix = HelixConfig.default().to_geometry()
     agents = _create_agents(provider, helix)
@@ -161,6 +168,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run an RLE scenario")
     parser.add_argument("scenario", nargs="?", help="Scenario name or number prefix")
     parser.add_argument("--list", action="store_true", help="List available scenarios")
+    parser.add_argument(
+        "--provider", choices=["anthropic", "openai", "local"],
+        help="LLM provider (default: from config)",
+    )
+    parser.add_argument("--model", help="Model name (e.g. unsloth/nvidia-nemotron-3-nano-4b)")
+    parser.add_argument("--base-url", help="Provider API base URL")
     parser.add_argument("--ticks", type=int, help="Override max ticks")
     parser.add_argument("--output", help="Output directory for CSV results")
     parser.add_argument("--visualize", action="store_true", help="Show live helix visualization")
