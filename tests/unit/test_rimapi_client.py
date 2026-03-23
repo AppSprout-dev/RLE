@@ -267,7 +267,7 @@ class TestForkEndpoints:
 
     async def test_create_growing_zone(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.create_growing_zone(
-            0, "PlantPotato", [{"X": 10, "Z": 20}],
+            0, "PlantPotato", x1=115, z1=130, x2=120, z2=135,
         )
         assert result["success"] is True
 

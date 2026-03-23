@@ -433,14 +433,21 @@ class RimAPIClient:
         return f"Plant_{name[0].upper()}{name[1:]}"
 
     async def create_growing_zone(
-        self, map_id: int, plant_def: str, cells: list[dict],
+        self,
+        map_id: int,
+        plant_def: str,
+        x1: int,
+        z1: int,
+        x2: int,
+        z2: int,
     ) -> dict:
         return await self._post(
             "/api/v1/map/zone/growing",
             json={
                 "map_id": map_id,
                 "plant_def": self._normalize_plant_def(plant_def),
-                "cells": cells,
+                "point_a": {"x": x1, "y": 0, "z": z1},
+                "point_b": {"x": x2, "y": 0, "z": z2},
             },
         )
 

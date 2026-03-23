@@ -155,14 +155,14 @@ class ActionExecutor:
         await self._client.set_work_priorities(cid, {"Hauling": 1})
 
     async def _do_set_growing_zone(self, cid: str, params: dict[str, Any]) -> None:
-        cells = params.get("cells", [])
-        if not cells:
-            logger.info("Skipping set_growing_zone: no cells specified")
-            return
+        x1 = params.get("x1", params.get("x", 0))
+        z1 = params.get("z1", params.get("z", 0))
+        x2 = params.get("x2", x1 + 5)
+        z2 = params.get("z2", z1 + 5)
         await self._client.create_growing_zone(
             map_id=params.get("map_id", 0),
             plant_def=params.get("plant_def", "PlantPotato"),
-            cells=cells,
+            x1=x1, z1=z1, x2=x2, z2=z2,
         )
 
     async def _do_toggle_power(self, cid: str, params: dict[str, Any]) -> None:
