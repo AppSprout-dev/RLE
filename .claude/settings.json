@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/redmo/Projects/felix-agent-sdk/**)",
+      "Read(//c/Users/redmo/Projects/rimapi-dashboard/**)",
+      "Bash(python -m pytest:*)",
+      "Bash(pytest:*)",
+      "Bash(python -m ruff:*)",
+      "Bash(ruff:*)",
+      "Bash(mypy:*)",
+      "Bash(pip install:*)",
+      "Bash(pip list:*)",
+      "Bash(pip show:*)",
+      "Bash(python scripts/*)",
+      "Bash(python -c:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(curl:*)",
+      "Bash(OPENAI_API_KEY=*)",
+      "Bash(PYTHONIOENCODING=*)",
+      "Bash(bun run:*)",
+      "Bash(bun install:*)"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\redmo\\Projects\\rimapi-dashboard\\src\\components\\widgets\\rle",
+      "c:\\Users\\redmo\\Projects\\rimapi-dashboard\\src\\features\\dashboard"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ruff check --fix --quiet \"$CLAUDE_FILE_PATH\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

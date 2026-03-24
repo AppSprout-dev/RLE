@@ -59,12 +59,19 @@ pip install -e ".[dev]"
 ### Run
 
 ```bash
-# Single scenario against live RimWorld colony
+# Single scenario against live RimWorld colony (local LM Studio)
 python scripts/run_scenario.py crashlanded_survival \
   --provider openai \
   --model unsloth/nvidia-nemotron-3-nano-4b \
   --base-url http://localhost:1234/v1 \
-  --no-think --visualize
+  --no-think --visualize --ticks 10
+
+# Same scenario via OpenRouter (cloud, ~$0.01)
+OPENAI_API_KEY=<your-key> python scripts/run_scenario.py crashlanded_survival \
+  --provider openai \
+  --model nvidia/nemotron-3-super-120b-a12b \
+  --base-url https://openrouter.ai/api/v1 \
+  --no-think --visualize --ticks 10
 
 # Full benchmark (mock game state, real LLM)
 python scripts/run_benchmark.py \
@@ -77,6 +84,20 @@ python scripts/run_benchmark.py \
 python scripts/run_scenario.py --list
 ```
 
+### Dashboard (optional)
+
+```bash
+# Terminal 1: Run RLE with --output to export tick data
+python scripts/run_scenario.py crashlanded_survival --output results/live/ ...
+
+# Terminal 2: Serve tick data for dashboard
+python scripts/serve_dashboard.py results/live
+
+# Terminal 3: Start dashboard
+cd ../rimapi-dashboard && bun run start
+# Open http://localhost:3000, add the 5 RLE widgets
+```
+
 ## Benchmark Results
 
 Tested across 6 scenarios, 10 ticks each:
@@ -87,7 +108,7 @@ Tested across 6 scenarios, 10 ticks each:
 | Local (RX 7800 XT 16GB) | Nemotron Nano 4B | 0.739 | 100% | 16.8 | free |
 | OpenRouter (cloud) | Nemotron Super 120B | 0.739 | 99.4% | 4.7 | ~$0.09 |
 
-Live game test (5 ticks, Crashlanded): 89% action execution rate, 100% parse rate, all colonists alive.
+Live game test (10 ticks, Crashlanded, real RIMAPI data): **0.843 composite**, 96.8% execution rate, 100% parse rate, all colonists alive.
 
 ## Scenarios
 
