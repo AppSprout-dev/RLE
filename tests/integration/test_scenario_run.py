@@ -47,6 +47,7 @@ _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/pawn/edit/status": {"success": True},
     "/api/v1/pawn/edit/position": {"success": True},
     "/api/v1/colonists/work-priority": {"success": True},
+    "/api/v1/colonist/work-priority": {"success": True},
     "/api/v1/builder/blueprint": {"success": True},
     "/api/v1/colonist/time-assignment": {"success": True},
 }

@@ -358,15 +358,20 @@ class RimAPIClient:
     async def set_work_priorities(
         self, colonist_id: str, priorities: dict[str, int],
     ) -> dict:
+        """Set work priorities one at a time via the singular endpoint.
+
+        The bulk endpoint (/api/v1/colonists/work-priority) has a
+        deserialization bug where Priorities list is always null.
+        Use the singular endpoint which has explicit [JsonProperty] attrs.
+        """
         pid = self._int_id(colonist_id)
-        entries = [
-            {"id": pid, "work": work, "priority": pri}
-            for work, pri in priorities.items()
-        ]
-        return await self._post(
-            "/api/v1/colonists/work-priority",
-            json={"priorities": entries},
-        )
+        last_result: dict = {}
+        for work, pri in priorities.items():
+            last_result = await self._post(
+                "/api/v1/colonist/work-priority",
+                json={"id": pid, "work": work, "priority": pri},
+            )
+        return last_result
 
     async def place_blueprint(self, blueprint: dict) -> dict:
         return await self._post("/api/v1/builder/blueprint", json=blueprint)
