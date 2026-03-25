@@ -30,11 +30,17 @@ from rle.scenarios.evaluator import ScenarioEvaluator
 from rle.scenarios.loader import list_scenarios
 from rle.scenarios.schema import ScenarioConfig
 from rle.scoring.composite import CompositeScorer
+from rle.scoring.delta import PairedResult
 from rle.scoring.recorder import TimeSeriesRecorder
 from rle.tracking.hf_logger import HFLogger
 from rle.tracking.history import append_history, get_run_dir, update_baseline
 from rle.tracking.metadata import collect_metadata
 from rle.tracking.wandb_logger import WandBLogger
+
+logger = logging.getLogger(__name__)
+
+# Seconds to wait after loading a save before starting a run.
+GAME_LOAD_WAIT_SECONDS = 2
 
 # Mock data for --dry-run mode
 _MOCK_ACTION_PLAN = json.dumps({
@@ -186,6 +192,7 @@ async def _run_scenario(
     visualize: bool = False,
     no_think: bool = False,
     parallel: bool = True,
+    no_agent: bool = False,
 ) -> dict:
     agents = _create_agents(provider, helix, provider_kwargs=provider_kwargs, no_think=no_think)
     scorer = CompositeScorer(scenario.scoring_weights or None)
@@ -203,6 +210,7 @@ async def _run_scenario(
         initial_wealth=8000.0,
         visualizer=visualizer,
         parallel=parallel,
+        no_agent=no_agent,
     )
     max_ticks = max_ticks_override or scenario.max_ticks
     t0 = time.monotonic()
@@ -349,7 +357,13 @@ async def main(args: argparse.Namespace) -> None:
             "ticks_per_scenario": ticks_override,
         })
 
+    num_runs = getattr(args, "runs", 1) or 1
+    no_baseline = getattr(args, "no_baseline", False)
+    is_paired = not use_mock_rimapi and not no_baseline
+
     results = []
+    paired_results: list[PairedResult] = []
+
     async with RimAPIClient(config.rimapi_url) as client:
         if use_mock_rimapi:
             client._client = httpx.AsyncClient(
@@ -357,23 +371,65 @@ async def main(args: argparse.Namespace) -> None:
             )
 
         for scenario in scenarios:
-            print(f"\nRunning: {scenario.name} ({scenario.difficulty})...")
-            result = await _run_scenario(
-                scenario, config, client, provider, helix, output_dir,
-                max_ticks_override=ticks_override,
-                provider_kwargs=provider_kwargs or None,
-                visualize=args.visualize,
-                no_think=args.no_think,
-                parallel=not args.sequential,
-            )
-            results.append(result)
-            print(
-                f"  -> {result['outcome']} | score={result['score']:.3f} "
-                f"| {result['ticks']} ticks | {result['elapsed_s']}s "
-                f"| parse {result['parse_rate']:.0%} ({result['parse_failures']} fail)"
-            )
+            paired = PairedResult(scenario=scenario.name) if is_paired else None
 
-    _print_leaderboard(results, model=args.model)
+            for run_id in range(num_runs):
+                run_label = f" (run {run_id + 1}/{num_runs})" if num_runs > 1 else ""
+
+                # Load save if available (for reproducible initial conditions)
+                if scenario.save_name and not use_mock_rimapi:
+                    try:
+                        await client.load_game(scenario.save_name)
+                        await asyncio.sleep(GAME_LOAD_WAIT_SECONDS)  # Wait for game to load
+                    except Exception as e:
+                        logger.warning("Could not load save %s: %s", scenario.save_name, e)
+
+                # Agent run
+                print(f"\nRunning: {scenario.name} ({scenario.difficulty}){run_label}...")
+                result = await _run_scenario(
+                    scenario, config, client, provider, helix, output_dir,
+                    max_ticks_override=ticks_override,
+                    provider_kwargs=provider_kwargs or None,
+                    visualize=args.visualize,
+                    no_think=args.no_think,
+                    parallel=not args.sequential,
+                )
+                results.append(result)
+                if paired:
+                    paired.agent_scores.append(result["score"])
+                print(
+                    f"  -> agent: {result['outcome']} | score={result['score']:.3f} "
+                    f"| {result['ticks']} ticks | {result['elapsed_s']}s "
+                    f"| parse {result['parse_rate']:.0%} ({result['parse_failures']} fail)"
+                )
+
+                # Baseline run (reload same save, no agents)
+                if is_paired:
+                    if scenario.save_name:
+                        try:
+                            await client.load_game(scenario.save_name)
+                            await asyncio.sleep(GAME_LOAD_WAIT_SECONDS)
+                        except Exception as e:
+                            logger.warning("Could not reload save: %s", e)
+
+                    print(f"  baseline{run_label}...")
+                    baseline = await _run_scenario(
+                        scenario, config, client, provider, helix, output_dir,
+                        max_ticks_override=ticks_override,
+                        no_agent=True,
+                    )
+                    paired.baseline_scores.append(baseline["score"])
+                    print(f"  -> baseline: score={baseline['score']:.3f}")
+
+            if paired:
+                paired_results.append(paired)
+
+    # Print results
+    if is_paired and paired_results:
+        from rle.scoring.delta import print_paired_leaderboard
+        print_paired_leaderboard(paired_results, model=args.model, num_runs=num_runs)
+    else:
+        _print_leaderboard(results, model=args.model)
 
     # Build enriched summary with metadata
     metadata = collect_metadata()
@@ -386,8 +442,12 @@ async def main(args: argparse.Namespace) -> None:
         "parallel": not args.sequential,
         "tick_interval": config.tick_interval,
         "ticks_per_scenario": ticks_override,
+        "num_runs": num_runs,
+        "paired": is_paired,
         "scenarios": results,
     }
+    if is_paired and paired_results:
+        summary["paired_results"] = [p.to_dict() for p in paired_results]
 
     # Auto-generate run directory if --output not specified
     output_dir = Path(args.output) if args.output else get_run_dir(args.model)
@@ -456,6 +516,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--sequential", action="store_true",
         help="Run agents sequentially (default: parallel)",
+    )
+    parser.add_argument(
+        "--runs", type=int, default=1,
+        help="Number of paired runs per scenario (default: 1, use 4+ for statistical rigor)",
+    )
+    parser.add_argument(
+        "--no-baseline", action="store_true",
+        help="Skip baseline (no-agent) runs — agent-only, no paired comparison",
     )
     parser.add_argument("--wandb", action="store_true", help="Log to Weights & Biases")
     parser.add_argument("--push-hf", action="store_true", help="Push results to HuggingFace Hub")

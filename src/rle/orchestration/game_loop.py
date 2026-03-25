@@ -58,10 +58,12 @@ class RLEGameLoop:
         parallel: bool = True,
         sse_client: RimAPISSEClient | None = None,
         dashboard_export_dir: Path | None = None,
+        no_agent: bool = False,
     ) -> None:
         self._config = config
         self._client = client
         self._agents = agents
+        self._no_agent = no_agent
         self._state_manager = GameStateManager(client, expected_duration_days, sse_client)
         self._executor = ActionExecutor(client)
         self._resolver = ActionResolver()
@@ -276,40 +278,49 @@ class RLEGameLoop:
         self._spoke_manager.process_all_messages()
         self._broadcast_phase_if_changed(current_time)
 
-        # 4. Inject SSE events into agents for this tick
-        pending_events = self._state_manager.pending_events
-        for agent in self._agents:
-            agent.set_pending_events(pending_events)
-
-        # 5. Multi-agent deliberation (agents read spoke messages internally)
-        tick_num = len(self._tick_results)
-        if self._parallel:
-            results = await self._deliberate_parallel(state, current_time, tick_num)
-        else:
-            results = self._deliberate_sequential(state, current_time, tick_num)
-
-        # 5. Collect plans, update visualizer, send results via CentralPost
+        # 4-6. Agent deliberation + conflict resolution (skipped in no-agent mode)
         plans: list[ActionPlan] = []
-        for agent, plan in results:
-            if plan is None:
-                continue
-            plans.append(plan)
-            self._update_visualizer_agent(agent, plan, current_time)
-            spoke = self._spoke_manager.get_spoke(agent.agent_id)
-            if spoke and spoke.is_connected:
-                spoke.send_message(
-                    MessageType.TASK_COMPLETE,
-                    {
-                        "role": plan.role,
-                        "summary": plan.summary,
-                        "confidence": plan.confidence,
-                        "num_actions": len(plan.actions),
-                        "action_types": [a.action_type.value for a in plan.actions],
-                    },
-                )
+        if self._no_agent:
+            # Baseline mode: no deliberation, no actions. Colony runs unmanaged.
+            resolved = ActionPlan(
+                role="baseline", tick=state.colony.tick, actions=[], summary="No agents",
+            )
+        else:
+            # Inject SSE events into agents
+            pending_events = self._state_manager.pending_events
+            for agent in self._agents:
+                agent.set_pending_events(pending_events)
 
-        # 6. Resolve conflicts across all agent plans
-        resolved = self._resolver.resolve(plans, state)
+            # Multi-agent deliberation
+            tick_num = len(self._tick_results)
+            if self._parallel:
+                results = await self._deliberate_parallel(state, current_time, tick_num)
+            else:
+                results = self._deliberate_sequential(state, current_time, tick_num)
+
+            # Collect plans, update visualizer, send via CentralPost
+            for agent, plan in results:
+                if plan is None:
+                    continue
+                plans.append(plan)
+                self._update_visualizer_agent(agent, plan, current_time)
+                spoke = self._spoke_manager.get_spoke(agent.agent_id)
+                if spoke and spoke.is_connected:
+                    spoke.send_message(
+                        MessageType.TASK_COMPLETE,
+                        {
+                            "role": plan.role,
+                            "summary": plan.summary,
+                            "confidence": plan.confidence,
+                            "num_actions": len(plan.actions),
+                            "action_types": [
+                                a.action_type.value for a in plan.actions
+                            ],
+                        },
+                    )
+
+            # Resolve conflicts
+            resolved = self._resolver.resolve(plans, state)
 
         # 7. Execute merged plan
         exec_result = await self._executor.execute(resolved)

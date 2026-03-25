@@ -143,6 +143,7 @@ async def main(args: argparse.Namespace) -> None:
             parallel=not args.sequential,
             sse_client=sse,
             dashboard_export_dir=Path(args.output) if args.output else None,
+            no_agent=args.no_agent,
         )
         try:
             if visualizer:
@@ -183,5 +184,9 @@ if __name__ == "__main__":
         help="Run agents sequentially (default: parallel)",
     )
     parser.add_argument("--no-think", action="store_true", help="Skip reasoning tokens")
+    parser.add_argument(
+        "--no-agent", action="store_true",
+        help="Baseline mode: no agent deliberation, colony runs unmanaged",
+    )
     parser.add_argument("--log-level", default="INFO", help="Logging level")
     asyncio.run(main(parser.parse_args()))

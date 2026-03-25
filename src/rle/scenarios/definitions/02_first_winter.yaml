@@ -4,6 +4,7 @@ difficulty: medium
 expected_duration_days: 60
 initial_population: 3
 max_ticks: 600
+save_name: rle_first_winter_v1
 
 victory_conditions:
   - metric: days_survived

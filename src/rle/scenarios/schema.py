@@ -39,3 +39,4 @@ class ScenarioConfig(BaseModel):
     failure_conditions: list[FailureCondition]
     scoring_weights: dict[str, float] = {}
     max_ticks: int | None = None
+    save_name: str = ""

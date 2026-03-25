@@ -4,6 +4,7 @@ difficulty: easy
 expected_duration_days: 30
 initial_population: 3
 max_ticks: 300
+save_name: rle_crashlanded_v1
 
 victory_conditions:
   - metric: days_survived

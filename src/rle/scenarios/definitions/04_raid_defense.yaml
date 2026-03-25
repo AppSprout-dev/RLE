@@ -4,6 +4,7 @@ difficulty: hard
 expected_duration_days: 15
 initial_population: 5
 max_ticks: 150
+save_name: rle_raid_defense_v1
 
 victory_conditions:
   - metric: days_survived

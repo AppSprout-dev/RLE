@@ -335,6 +335,14 @@ class RimAPIClient:
         except (ValueError, TypeError):
             return 0
 
+    async def save_game(self, name: str) -> dict:
+        """Save the current game state for benchmark reproducibility."""
+        return await self._post(f"/api/v1/game/save?name={name}")
+
+    async def load_game(self, name: str) -> dict:
+        """Load a previously saved game state."""
+        return await self._post(f"/api/v1/game/load?name={name}")
+
     async def pause_game(self) -> dict:
         return await self._post("/api/v1/game/speed?speed=0")
 

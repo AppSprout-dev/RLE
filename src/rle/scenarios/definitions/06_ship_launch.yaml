@@ -4,6 +4,7 @@ difficulty: extreme
 expected_duration_days: 120
 initial_population: 5
 max_ticks: 1200
+save_name: rle_ship_launch_v1
 
 victory_conditions:
   - metric: research_completed
