@@ -142,6 +142,7 @@ async def main(args: argparse.Namespace) -> None:
             visualizer=visualizer,
             parallel=not args.sequential,
             sse_client=sse,
+            dashboard_export_dir=Path(args.output) if args.output else None,
         )
         try:
             if visualizer:

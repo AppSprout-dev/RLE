@@ -31,6 +31,10 @@ from rle.scenarios.loader import list_scenarios
 from rle.scenarios.schema import ScenarioConfig
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.recorder import TimeSeriesRecorder
+from rle.tracking.hf_logger import HFLogger
+from rle.tracking.history import append_history, get_run_dir, update_baseline
+from rle.tracking.metadata import collect_metadata
+from rle.tracking.wandb_logger import WandBLogger
 
 # Mock data for --dry-run mode
 _MOCK_ACTION_PLAN = json.dumps({
@@ -97,33 +101,25 @@ _MOCK_ROUTES: dict[str, dict | list] = {
 }
 
 
-_MOCK_POST_ROUTES: set[str] = {
-    "/api/v1/game/speed",
-    "/api/v1/pawn/edit/status",
-    "/api/v1/pawn/edit/priority",
-    "/api/v1/pawn/move",
-    "/api/v1/colony/blueprint",
-    "/api/v1/colony/haul",
-    "/api/v1/colony/growing",
-    "/api/v1/colony/power",
-    "/api/v1/colony/recreation",
-    "/api/v1/colony/medicine",
-    "/api/v1/colony/bed",
-    "/api/v1/pawn/job",
-    "/api/v1/colony/research",
-}
-
-
 def _make_mock_transport() -> httpx.MockTransport:
     _POST_OK = httpx.Response(
-        200, content=b'{"ok": true}',
+        200, content=b'{"success": true, "errors": [], "warnings": []}',
         headers={"content-type": "application/json"},
     )
 
     def handler(request: httpx.Request) -> httpx.Response:
-        path = request.url.raw_path.decode().split("?")[0]
-        if request.method == "POST" and path in _MOCK_POST_ROUTES:
+        # All POSTs succeed in mock mode (game control, actions, etc.)
+        if request.method == "POST":
             return _POST_OK
+        # GET routes matched by full path including query string
+        raw = request.url.raw_path.decode()
+        if raw in _MOCK_ROUTES:
+            return httpx.Response(
+                200, content=json.dumps(_MOCK_ROUTES[raw]).encode(),
+                headers={"content-type": "application/json"},
+            )
+        # Also try without query string for routes stored that way
+        path = raw.split("?")[0]
         if path in _MOCK_ROUTES:
             return httpx.Response(
                 200, content=json.dumps(_MOCK_ROUTES[path]).encode(),
@@ -338,6 +334,21 @@ async def main(args: argparse.Namespace) -> None:
             "chat_template_kwargs": {"enable_thinking": False},
         }
 
+    # Initialize W&B logger (no-op if --wandb not passed or wandb not installed)
+    wandb_logger = WandBLogger(
+        enabled=args.wandb,
+        run_name=f"{args.model or config.model}_{ticks_override or 'full'}ticks",
+    )
+    if wandb_logger.enabled:
+        wandb_logger.log_config({
+            **collect_metadata(),
+            "model": args.model or config.model,
+            "provider": args.provider or config.provider,
+            "no_think": args.no_think,
+            "parallel": not args.sequential,
+            "ticks_per_scenario": ticks_override,
+        })
+
     results = []
     async with RimAPIClient(config.rimapi_url) as client:
         if use_mock_rimapi:
@@ -364,19 +375,66 @@ async def main(args: argparse.Namespace) -> None:
 
     _print_leaderboard(results, model=args.model)
 
-    if output_dir:
-        summary = {
-            "model": args.model or config.model,
-            "provider": args.provider or config.provider,
-            "base_url": args.base_url or None,
-            "no_think": args.no_think,
-            "ticks_per_scenario": ticks_override,
-            "scenarios": results,
-        }
-        summary_path = output_dir / "benchmark_summary.json"
-        summary_path.write_text(json.dumps(summary, indent=2))
-        print(f"\nResults exported to {output_dir}/")
-        print(f"Summary JSON: {summary_path}")
+    # Build enriched summary with metadata
+    metadata = collect_metadata()
+    summary = {
+        **metadata,
+        "model": args.model or config.model,
+        "provider": args.provider or config.provider,
+        "base_url": args.base_url or None,
+        "no_think": args.no_think,
+        "parallel": not args.sequential,
+        "tick_interval": config.tick_interval,
+        "ticks_per_scenario": ticks_override,
+        "scenarios": results,
+    }
+
+    # Auto-generate run directory if --output not specified
+    output_dir = Path(args.output) if args.output else get_run_dir(args.model)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = output_dir / "benchmark_summary.json"
+    summary_path.write_text(json.dumps(summary, indent=2, default=str))
+    print(f"\nResults exported to {output_dir}/")
+
+    # Only track real benchmark runs (not mock/dry-run JSON compliance tests)
+    scores = [r.get("score", 0) for r in results]
+    avg = sum(scores) / len(scores) if scores else 0
+    if not use_mock_rimapi:
+        history_path = append_history(summary)
+        print(f"History appended to {history_path}")
+
+        is_new_best, prev_score = update_baseline(summary)
+        if is_new_best:
+            delta = f"+{avg - prev_score:.3f}" if prev_score else "first run"
+            print(f"NEW BASELINE: {avg:.3f} ({delta})")
+        elif prev_score is not None:
+            print(f"Baseline: {prev_score:.3f} (this run: {avg:.3f})")
+    else:
+        print("(dry-run: skipping history/baseline tracking)")
+
+    # W&B logging (optional)
+    if wandb_logger.enabled:
+        wandb_logger.log_final_summary(
+            avg_score=avg,
+            parse_rate=sum(r.get("parse_successes", 0) for r in results)
+            / max(1, sum(r["parse_successes"] + r["parse_failures"] for r in results)),
+            total_time=sum(r.get("elapsed_s", 0) for r in results),
+        )
+        for r in results:
+            wandb_logger.log_scenario_result(r)
+        wandb_logger.finish()
+        print("W&B run logged")
+
+    # HuggingFace Hub push (optional)
+    if args.push_hf:
+        hf = HFLogger(enabled=True)
+        if hf.enabled:
+            hf.push_results(
+                history_path=history_path,
+                baselines_dir=Path("results/baselines"),
+                run_dir=output_dir,
+            )
+            print("Results pushed to HuggingFace Hub")
 
 
 if __name__ == "__main__":
@@ -399,5 +457,7 @@ if __name__ == "__main__":
         "--sequential", action="store_true",
         help="Run agents sequentially (default: parallel)",
     )
+    parser.add_argument("--wandb", action="store_true", help="Log to Weights & Biases")
+    parser.add_argument("--push-hf", action="store_true", help="Push results to HuggingFace Hub")
     parser.add_argument("--log-level", default="WARNING", help="Logging level")
     asyncio.run(main(parser.parse_args()))

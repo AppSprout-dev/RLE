@@ -273,6 +273,11 @@ class RimWorldRoleAgent(LLMAgent):
         except json.JSONDecodeError as e:
             raise ActionPlanParseError(result.content, f"Invalid JSON after repair: {e}") from e
 
+        if not isinstance(data, dict):
+            raise ActionPlanParseError(
+                result.content, f"Expected JSON object, got {type(data).__name__}",
+            )
+
         actions: list[Action] = []
         for raw_action in data.get("actions", []):
             try:
@@ -345,8 +350,13 @@ class RimWorldRoleAgent(LLMAgent):
                 "%s: parse failed, retrying with correction prompt: %s",
                 self.ROLE_NAME, first_error.reason,
             )
-            retry_result = self._retry_with_correction(result.content, first_error.reason)
-            plan = self.parse_action_plan(retry_result, state.colony.tick)
+            try:
+                retry_result = self._retry_with_correction(result.content, first_error.reason)
+                plan = self.parse_action_plan(retry_result, state.colony.tick)
+            except (ActionPlanParseError, Exception) as retry_error:
+                raise ActionPlanParseError(
+                    result.content, f"Retry also failed: {retry_error}",
+                ) from retry_error
 
         self._last_action_plan = plan
         return plan

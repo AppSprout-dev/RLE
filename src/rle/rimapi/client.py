@@ -234,10 +234,17 @@ class RimAPIClient:
             temperature = 15.0
         structures = []
         for b in buildings[:50]:
+            pos = b.get("position", [0, 0])
+            if isinstance(pos, dict):
+                pos = (pos.get("x", 0), pos.get("z", 0))
+            elif isinstance(pos, list) and len(pos) >= 2:
+                pos = (pos[0], pos[1])
+            else:
+                pos = (0, 0)
             structures.append(StructureData(
                 structure_id=str(b.get("id", b.get("thing_id", ""))),
                 def_name=b.get("def_name", b.get("label", "Unknown")),
-                position=b.get("position", [0, 0]),
+                position=pos,
                 hit_points=float(b.get("hit_points", 100)),
                 max_hit_points=float(b.get("max_hit_points", 100)),
             ))

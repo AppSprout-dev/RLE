@@ -32,11 +32,14 @@ htmlcov/
 # ruff
 .ruff_cache/
 
-# Results output
-results/
+# Results — everything ignored except history + baselines
+results/*
+!results/benchmark_history.jsonl
+!results/baselines/
 
 # Original Plan
 logical-swinging-popcorn.md
 
 # Claude
 .claude/settings.local.json
+.claude/scheduled_tasks.lock

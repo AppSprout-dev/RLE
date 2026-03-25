@@ -32,6 +32,10 @@ dev = [
 viz = [
     "matplotlib>=3.5",
 ]
+tracking = [
+    "wandb>=0.15",
+    "huggingface-hub>=0.20",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
