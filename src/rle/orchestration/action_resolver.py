@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict
 
-from rle.agents.actions import Action, ActionPlan
+from rle.agents.actions import Action, ActionPlan, ActionType
 from rle.rimapi.schemas import GameState
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class ActionResolver:
 
         resolved: list[Action] = []
         resolved.extend(self._resolve_colony_actions(colony_actions))
-        resolved.extend(self._resolve_pawn_conflicts(pawn_actions))
+        resolved.extend(self._resolve_pawn_conflicts(pawn_actions, crisis))
 
         avg_confidence = (
             sum(p.confidence for p in plans) / len(plans) if plans else 0.5
@@ -139,8 +139,15 @@ class ActionResolver:
     # Conflict resolution
     # ------------------------------------------------------------------
 
-    def _resolve_pawn_conflicts(self, actions: list[_TaggedAction]) -> list[Action]:
-        """Group by colonist, keep best action per pawn."""
+    def _resolve_pawn_conflicts(
+        self, actions: list[_TaggedAction], crisis: CrisisState,
+    ) -> list[Action]:
+        """Group by colonist, keep best action per pawn.
+
+        During peacetime (no raid, no medical emergency), NO_ACTION is
+        preferred over regular actions — this implements "do no harm".
+        """
+        peacetime = not crisis.raid_active and not crisis.medical_emergency
         by_pawn: dict[str, list[_TaggedAction]] = {}
         for ta in actions:
             cid = ta.action.target_colonist_id or ""
@@ -151,6 +158,8 @@ class ActionResolver:
             winner = min(
                 candidates,
                 key=lambda ta: (
+                    # Peacetime: prefer NO_ACTION (do no harm)
+                    0 if peacetime and ta.action.action_type == ActionType.NO_ACTION else 1,
                     ta.action.priority,   # Rule 2: lower priority number wins
                     ta.role_priority,     # Rule 1/3: role priority
                     -ta.plan_confidence,  # Rule 4: higher confidence wins (negate)

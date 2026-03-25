@@ -263,6 +263,74 @@ class TestCrisisDetection:
 
 
 # ------------------------------------------------------------------
+# Peacetime NO_ACTION preference (do no harm)
+# ------------------------------------------------------------------
+
+
+class TestPeacetimeNoAction:
+    def test_no_action_wins_during_peacetime(self) -> None:
+        """When no crisis is active, NO_ACTION beats a regular action for same pawn."""
+        resolver = ActionResolver()
+        plans = [
+            _plan("resource_manager", [
+                Action(action_type=ActionType.SET_WORK_PRIORITY,
+                       target_colonist_id="col_01", priority=3),
+            ], confidence=0.9),
+            _plan("social_overseer", [
+                Action(action_type=ActionType.NO_ACTION,
+                       target_colonist_id="col_01", priority=5),
+            ], confidence=0.5),
+        ]
+        state = _make_state()  # No threats = peacetime
+        result = resolver.resolve(plans, state)
+        pawn_actions = [a for a in result.actions if a.target_colonist_id == "col_01"]
+        assert len(pawn_actions) == 1
+        assert pawn_actions[0].action_type == ActionType.NO_ACTION
+
+    def test_real_action_wins_during_raid(self) -> None:
+        """During a raid, regular actions beat NO_ACTION."""
+        resolver = ActionResolver()
+        raid = ThreatData(
+            threat_id="t_01", threat_type="raid", faction="pirate",
+            enemy_count=10, threat_level=0.8,
+        )
+        plans = [
+            _plan("defense_commander", [
+                Action(action_type=ActionType.DRAFT_COLONIST,
+                       target_colonist_id="col_01", priority=1),
+            ]),
+            _plan("resource_manager", [
+                Action(action_type=ActionType.NO_ACTION,
+                       target_colonist_id="col_01", priority=5),
+            ]),
+        ]
+        state = _make_state(threats=[raid])
+        result = resolver.resolve(plans, state)
+        pawn_actions = [a for a in result.actions if a.target_colonist_id == "col_01"]
+        assert len(pawn_actions) == 1
+        assert pawn_actions[0].action_type == ActionType.DRAFT_COLONIST
+
+    def test_real_action_wins_during_medical_emergency(self) -> None:
+        """During a medical emergency, regular actions beat NO_ACTION."""
+        resolver = ActionResolver()
+        plans = [
+            _plan("medical_officer", [
+                Action(action_type=ActionType.ASSIGN_BED_REST,
+                       target_colonist_id="col_01", priority=2),
+            ]),
+            _plan("resource_manager", [
+                Action(action_type=ActionType.NO_ACTION,
+                       target_colonist_id="col_01", priority=5),
+            ]),
+        ]
+        state = _make_state(colonist_health=0.3)  # medical emergency
+        result = resolver.resolve(plans, state)
+        pawn_actions = [a for a in result.actions if a.target_colonist_id == "col_01"]
+        assert len(pawn_actions) == 1
+        assert pawn_actions[0].action_type == ActionType.ASSIGN_BED_REST
+
+
+# ------------------------------------------------------------------
 # Merged plan metadata
 # ------------------------------------------------------------------
 

@@ -52,6 +52,7 @@ class ConstructionPlanner(RimWorldRoleAgent):
                     "skills": {
                         k: v for k, v in c.skills.items() if k == "construction"
                     },
+                    "current_job": c.current_job,
                 }
                 for c in state.colonists
             ],

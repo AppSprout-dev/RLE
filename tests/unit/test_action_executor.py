@@ -13,14 +13,14 @@ def _make_plan(*actions: Action) -> ActionPlan:
 
 
 class TestExecute:
-    async def test_no_action_skipped(self) -> None:
+    async def test_no_action_excluded_from_totals(self) -> None:
         client = AsyncMock()
         executor = ActionExecutor(client)
         plan = _make_plan(Action(action_type=ActionType.NO_ACTION))
         result = await executor.execute(plan)
-        assert result.executed == 1
+        assert result.executed == 0
         assert result.failed == 0
-        assert result.total == 1
+        assert result.total == 0
 
     async def test_not_implemented_counted_as_failed(self) -> None:
         client = AsyncMock()
@@ -37,7 +37,8 @@ class TestExecute:
         assert result.failed == 1
         assert result.total == 1
 
-    async def test_execution_result_counts(self) -> None:
+    async def test_execution_result_counts_exclude_no_action(self) -> None:
+        """NO_ACTION is excluded from totals; only real actions count."""
         client = AsyncMock()
         client.set_research_target = AsyncMock(side_effect=NotImplementedError)
         executor = ActionExecutor(client)
@@ -50,9 +51,9 @@ class TestExecute:
             Action(action_type=ActionType.NO_ACTION),
         )
         result = await executor.execute(plan)
-        assert result.executed == 2
+        assert result.executed == 0
         assert result.failed == 1
-        assert result.total == 3
+        assert result.total == 1
 
     async def test_empty_plan(self) -> None:
         client = AsyncMock()

@@ -41,6 +41,16 @@ _SHARED_SYSTEM_PREFIX = (
     "Note: Colonist skills, traits, and current job may not be available. "
     "Make decisions based on available data: health, mood, hunger, position, "
     "and colony resources (food count, medicine, market value).\n\n"
+    "CRITICAL — Do No Harm principle:\n"
+    "- Only propose actions that IMPROVE on the colony's current trajectory. "
+    "RimWorld colonists are already productive by default.\n"
+    "- If colonists are already productive and no crisis exists, respond with a single "
+    "no_action. Unnecessary overrides of productive colonists are WORSE than doing nothing.\n"
+    "- Check each colonist's current_job before proposing actions. If they are already doing "
+    "useful work (mining, growing, hauling, cooking, constructing, researching), "
+    "do NOT interrupt them.\n"
+    "- Reserve interventions for: active threats, medical emergencies, mood crises (mood < 0.3), "
+    "starvation risk (food_days < 2), or clear optimization opportunities.\n\n"
     "Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.\n\n"
 )
 

@@ -327,6 +327,8 @@ async def main(args: argparse.Namespace) -> None:
     helix = HelixConfig.default().to_geometry()
     scenarios = list_scenarios()
     provider, config = _build_provider(args)
+    if args.tick_interval is not None and not args.dry_run:
+        config = RLEConfig(**{**config.model_dump(), "tick_interval": args.tick_interval})
     use_mock_rimapi = args.dry_run or args.provider is not None
     ticks_override = _resolve_ticks(args, use_mock_rimapi)
 
@@ -511,6 +513,10 @@ if __name__ == "__main__":
     parser.add_argument("--model", help="Model name (e.g. qwen/qwen3.5-9b)")
     parser.add_argument("--base-url", help="Provider API base URL (e.g. http://localhost:1234/v1)")
     parser.add_argument("--ticks", type=int, help="Override max ticks per scenario")
+    parser.add_argument(
+        "--tick-interval", type=float,
+        help="Seconds between ticks (default: 1.0, use 30-60 for live game)",
+    )
     parser.add_argument("--no-think", action="store_true", help="Disable thinking mode (Qwen3.5)")
     parser.add_argument("--visualize", action="store_true", help="Show live helix visualization")
     parser.add_argument(

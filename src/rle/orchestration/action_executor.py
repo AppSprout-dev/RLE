@@ -36,10 +36,18 @@ class ActionExecutor:
         self._client = client
 
     async def execute(self, plan: ActionPlan) -> ExecutionResult:
-        """Execute all actions in a plan, return summary."""
+        """Execute all actions in a plan, return summary.
+
+        NO_ACTION is excluded from totals so the efficiency metric
+        reflects real RIMAPI call success rate.
+        """
         executed = 0
         failed = 0
+        no_action_count = 0
         for action in plan.actions:
+            if action.action_type == ActionType.NO_ACTION:
+                no_action_count += 1
+                continue
             try:
                 await self._dispatch(action)
                 executed += 1
@@ -57,7 +65,7 @@ class ActionExecutor:
         return ExecutionResult(
             executed=executed,
             failed=failed,
-            total=len(plan.actions),
+            total=len(plan.actions) - no_action_count,
         )
 
     # Actions that require a valid colonist/pawn ID to execute.

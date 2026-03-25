@@ -49,6 +49,7 @@ class DefenseCommander(RimWorldRoleAgent):
                     "skills": {k: v for k, v in c.skills.items() if k in combat_skills},
                     "traits": c.traits,
                     "is_drafted": c.is_drafted,
+                    "current_job": c.current_job,
                     "position": c.position,
                     "injuries": c.injuries,
                 }

@@ -104,6 +104,8 @@ async def main(args: argparse.Namespace) -> None:
         overrides["model"] = args.model
     if args.base_url:
         overrides["provider_base_url"] = args.base_url
+    if args.tick_interval is not None:
+        overrides["tick_interval"] = str(args.tick_interval)
     config = RLEConfig(**overrides) if overrides else RLEConfig()
     provider = config.get_provider()
     helix = HelixConfig.default().to_geometry()
@@ -177,6 +179,10 @@ if __name__ == "__main__":
     parser.add_argument("--model", help="Model name (e.g. unsloth/nvidia-nemotron-3-nano-4b)")
     parser.add_argument("--base-url", help="Provider API base URL")
     parser.add_argument("--ticks", type=int, help="Override max ticks")
+    parser.add_argument(
+        "--tick-interval", type=float,
+        help="Seconds between ticks (default: 1.0, use 30-60 for live game)",
+    )
     parser.add_argument("--output", help="Output directory for CSV results")
     parser.add_argument("--visualize", action="store_true", help="Show live helix visualization")
     parser.add_argument(

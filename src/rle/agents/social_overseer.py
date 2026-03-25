@@ -35,6 +35,7 @@ class SocialOverseer(RimWorldRoleAgent):
                     "mood": c.mood,
                     "needs": c.needs,
                     "traits": c.traits,
+                    "current_job": c.current_job,
                     "health": c.health,
                     "is_drafted": c.is_drafted,
                 }
