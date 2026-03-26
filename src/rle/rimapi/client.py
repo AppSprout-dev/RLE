@@ -119,16 +119,23 @@ class RimAPIClient:
 
     @staticmethod
     def _adapt_colonist(raw: dict) -> dict:
-        """Map upstream PawnDto → ColonistData fields.
+        """Map upstream detailed PawnDto → ColonistData fields.
 
-        Handles both upstream format (id, position={x,y,z}, hunger)
-        and mock/test format (colonist_id, position=[x,z], needs).
+        Handles three formats:
+        - Detailed upstream: {colonist: {id, ...}, colonist_work_info: {skills, ...}, ...}
+        - Basic upstream: {id, name, health, mood, hunger, position}
+        - Mock/test: {colonist_id, name, skills, ...}
         """
         # Already in our schema format — pass through
         if "colonist_id" in raw:
             return raw
 
-        pos = raw.get("position", {})
+        # Detailed endpoint: {colonist: {...}, colonist_work_info: {...}, ...}
+        pawn = raw.get("colonist", raw)
+        work_info = raw.get("colonist_work_info", {})
+        medical = raw.get("colonist_medical_info", {})
+
+        pos = pawn.get("position", {})
         if isinstance(pos, dict):
             position = (pos.get("x", 0), pos.get("z", 0))
         elif isinstance(pos, (list, tuple)):
@@ -136,17 +143,43 @@ class RimAPIClient:
         else:
             position = (0, 0)
 
+        # Map skills list → {name: level} dict
+        skills_list = work_info.get("skills", [])
+        if isinstance(skills_list, list):
+            skills = {s["name"]: s["level"] for s in skills_list if isinstance(s, dict)}
+        else:
+            skills = skills_list if isinstance(skills_list, dict) else {}
+
+        # Map traits list → [name, ...] list
+        traits_list = work_info.get("traits", [])
+        if isinstance(traits_list, list) and traits_list and isinstance(traits_list[0], dict):
+            traits = [t["name"] for t in traits_list]
+        else:
+            traits = traits_list if isinstance(traits_list, list) else []
+
+        # Map needs from root-level fields
+        needs = {
+            "food": pawn.get("hunger", raw.get("hunger", 0.5)),
+            "rest": raw.get("sleep", 0.5),
+            "joy": raw.get("joy", 0.5),
+            "comfort": raw.get("comfort", 0.5),
+        }
+
+        # Hediffs as injuries
+        hediffs = medical.get("hediffs", [])
+        injuries = [h.get("label", str(h)) for h in hediffs] if hediffs else []
+
         return {
-            "colonist_id": str(raw.get("id", "")),
-            "name": raw.get("name", "Unknown"),
-            "health": raw.get("health", 1.0),
-            "mood": raw.get("mood", 0.5),
-            "skills": raw.get("skills", {}),
-            "traits": raw.get("traits", []),
-            "current_job": raw.get("current_job"),
-            "is_drafted": raw.get("is_drafted", False),
-            "needs": raw.get("needs", {"food": raw.get("hunger", 0.5)}),
-            "injuries": raw.get("injuries", []),
+            "colonist_id": str(pawn.get("id", "")),
+            "name": pawn.get("name", "Unknown"),
+            "health": pawn.get("health", 1.0),
+            "mood": pawn.get("mood", 0.5),
+            "skills": skills,
+            "traits": traits,
+            "current_job": work_info.get("current_job") or None,
+            "is_drafted": pawn.get("is_drafted", False),
+            "needs": needs,
+            "injuries": injuries,
             "position": position,
         }
 
@@ -194,7 +227,11 @@ class RimAPIClient:
     # ------------------------------------------------------------------
 
     async def get_colonists(self) -> list[ColonistData]:
-        data = await self._get("/api/v1/colonists")
+        try:
+            data = await self._get("/api/v1/colonists/detailed")
+        except (RimAPIResponseError, RimAPIConnectionError):
+            # Fall back to basic endpoint if detailed isn't available
+            data = await self._get("/api/v1/colonists")
         return [ColonistData.model_validate(self._adapt_colonist(c)) for c in data]
 
     async def get_colonist(self, colonist_id: str) -> ColonistData:
