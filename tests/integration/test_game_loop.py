@@ -88,6 +88,7 @@ def _colony_dict(day: int = 12, tick: int = 720000) -> dict:
 _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/game/speed?speed=0": {"success": True},
     "/api/v1/game/speed?speed=1": {"success": True},
+    "/api/v1/game/speed?speed=3": {"success": True},
     "/api/v1/pawn/edit/status": {"success": True},
     "/api/v1/pawn/edit/position": {"success": True},
     "/api/v1/colonists/work-priority": {"success": True},

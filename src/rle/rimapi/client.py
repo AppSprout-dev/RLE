@@ -346,8 +346,9 @@ class RimAPIClient:
     async def pause_game(self) -> dict:
         return await self._post("/api/v1/game/speed?speed=0")
 
-    async def unpause_game(self) -> dict:
-        return await self._post("/api/v1/game/speed?speed=1")
+    async def unpause_game(self, speed: int = 3) -> dict:
+        """Unpause at given speed (1=normal, 2=fast, 3=very fast)."""
+        return await self._post(f"/api/v1/game/speed?speed={speed}")
 
     async def draft_colonist(self, colonist_id: str, draft: bool) -> dict:
         return await self._post(
