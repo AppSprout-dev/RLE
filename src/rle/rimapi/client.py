@@ -374,11 +374,17 @@ class RimAPIClient:
 
     async def save_game(self, name: str) -> dict:
         """Save the current game state for benchmark reproducibility."""
-        return await self._post(f"/api/v1/game/save?name={name}")
+        return await self._post("/api/v1/game/save", json={"file_name": name})
 
-    async def load_game(self, name: str) -> dict:
+    async def load_game(
+        self, name: str, check_version: bool = False, skip_mod_mismatch: bool = True,
+    ) -> dict:
         """Load a previously saved game state."""
-        return await self._post(f"/api/v1/game/load?name={name}")
+        return await self._post("/api/v1/game/load", json={
+            "file_name": name,
+            "check_version": check_version,
+            "skip_mod_mismatch": skip_mod_mismatch,
+        })
 
     async def pause_game(self) -> dict:
         return await self._post("/api/v1/game/speed?speed=0")
@@ -494,10 +500,23 @@ class RimAPIClient:
     # Write endpoints — RLE fork (AppSprout-dev/RIMAPI:rle-testing)
     # ------------------------------------------------------------------
 
-    async def set_research_target(self, project: str) -> dict:
+    async def set_research_target(self, project: str, force: bool = False) -> dict:
         if not project:
             return {"success": False, "skipped": "empty project name"}
-        return await self._post(f"/api/v1/research/target?name={project}")
+        url = f"/api/v1/research/target?name={project}"
+        if force:
+            url += "&force=true"
+        return await self._post(url)
+
+    async def stop_research(self) -> dict:
+        return await self._post("/api/v1/research/stop")
+
+    async def get_endpoints(self) -> list[dict]:
+        """Discover all registered API routes from RIMAPI."""
+        try:
+            return await self._get("/api/v1/dev/endpoints")
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return []
 
     async def set_colonist_job(
         self,
