@@ -28,11 +28,10 @@ class TestResourceManagerClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            "set_work_priority",
-            "haul_resource",
-            "set_growing_zone",
+            "work_priority",
+            "growing_zone",
+            "stockpile_zone",
             "toggle_power",
-            "create_stockpile",
             "job_assign",
             "designate_area",
             "no_action",
@@ -102,9 +101,8 @@ class TestDefenseCommanderClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            "draft_colonist",
-            "undraft_colonist",
-            "move_colonist",
+            "draft",
+            "move",
             "no_action",
         }
         assert DefenseCommander.ALLOWED_ACTIONS == expected
@@ -162,8 +160,9 @@ class TestResearchDirectorClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            "set_research_target",
-            "assign_researcher",
+            "research_target",
+            "research_stop",
+            "work_priority",
             "no_action",
         }
         assert ResearchDirector.ALLOWED_ACTIONS == expected
@@ -209,8 +208,8 @@ class TestSocialOverseerClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            "set_recreation_policy",
-            "assign_social_activity",
+            "time_assignment",
+            "work_priority",
             "no_action",
         }
         assert SocialOverseer.ALLOWED_ACTIONS == expected
@@ -256,9 +255,9 @@ class TestConstructionPlannerClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            "place_blueprint",
-            "cancel_blueprint",
+            "blueprint",
             "designate_area",
+            "work_priority",
             "no_action",
         }
         assert ConstructionPlanner.ALLOWED_ACTIONS == expected
@@ -304,8 +303,9 @@ class TestMedicalOfficerClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            "assign_bed_rest",
-            "administer_medicine",
+            "bed_rest",
+            "tend",
+            "work_priority",
             "no_action",
         }
         assert MedicalOfficer.ALLOWED_ACTIONS == expected

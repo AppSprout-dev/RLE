@@ -13,8 +13,8 @@ class SocialOverseer(RimWorldRoleAgent):
 
     ROLE_NAME: ClassVar[str] = "social_overseer"
     ALLOWED_ACTIONS: ClassVar[set[str]] = {
-        "set_recreation_policy",
-        "assign_social_activity",
+        "time_assignment",
+        "work_priority",
         "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.3, 0.7)

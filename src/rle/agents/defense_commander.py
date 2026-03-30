@@ -13,9 +13,8 @@ class DefenseCommander(RimWorldRoleAgent):
 
     ROLE_NAME: ClassVar[str] = "defense_commander"
     ALLOWED_ACTIONS: ClassVar[set[str]] = {
-        "draft_colonist",
-        "undraft_colonist",
-        "move_colonist",
+        "draft",
+        "move",
         "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.1, 0.6)

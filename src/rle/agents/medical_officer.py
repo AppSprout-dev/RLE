@@ -13,8 +13,9 @@ class MedicalOfficer(RimWorldRoleAgent):
 
     ROLE_NAME: ClassVar[str] = "medical_officer"
     ALLOWED_ACTIONS: ClassVar[set[str]] = {
-        "assign_bed_rest",
-        "administer_medicine",
+        "bed_rest",
+        "tend",
+        "work_priority",
         "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.1, 0.5)

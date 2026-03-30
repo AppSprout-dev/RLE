@@ -13,8 +13,9 @@ class ResearchDirector(RimWorldRoleAgent):
 
     ROLE_NAME: ClassVar[str] = "research_director"
     ALLOWED_ACTIONS: ClassVar[set[str]] = {
-        "set_research_target",
-        "assign_researcher",
+        "research_target",
+        "research_stop",
+        "work_priority",
         "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.3, 0.8)

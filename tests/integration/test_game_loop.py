@@ -32,7 +32,7 @@ from rle.scoring.recorder import TimeSeriesRecorder
 ACTION_PLAN_JSON = json.dumps({
     "actions": [
         {
-            "action_type": "set_work_priority",
+            "action_type": "work_priority",
             "target_colonist_id": "col_01",
             "parameters": {"skill": "growing", "priority": 1},
             "priority": 2,

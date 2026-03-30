@@ -13,9 +13,9 @@ class ConstructionPlanner(RimWorldRoleAgent):
 
     ROLE_NAME: ClassVar[str] = "construction_planner"
     ALLOWED_ACTIONS: ClassVar[set[str]] = {
-        "place_blueprint",
-        "cancel_blueprint",
+        "blueprint",
         "designate_area",
+        "work_priority",
         "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.2, 0.6)

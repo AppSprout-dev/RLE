@@ -13,11 +13,10 @@ class ResourceManager(RimWorldRoleAgent):
 
     ROLE_NAME: ClassVar[str] = "resource_manager"
     ALLOWED_ACTIONS: ClassVar[set[str]] = {
-        "set_work_priority",
-        "haul_resource",
-        "set_growing_zone",
+        "work_priority",
+        "growing_zone",
+        "stockpile_zone",
         "toggle_power",
-        "create_stockpile",
         "job_assign",
         "designate_area",
         "no_action",
