@@ -24,34 +24,63 @@ logger = logging.getLogger(__name__)
 # Shared prefix for all 6 role agents. Placed first in the system prompt so
 # LM Studio / llama.cpp can reuse the KV cache across agents within a tick.
 _SHARED_SYSTEM_PREFIX = (
-    "You are one of 6 specialized role agents collaborating to manage a RimWorld colony. "
-    "The agents are: ResourceManager, DefenseCommander, ResearchDirector, SocialOverseer, "
-    "ConstructionPlanner, and MedicalOfficer. Each agent proposes actions for its domain; "
-    "a central resolver merges plans and handles conflicts.\n\n"
-    "You MUST respond with a JSON object matching this schema:\n"
-    '{"actions": [{"action_type": "<type>", "target_colonist_id": "<id or null>", '
+    "You are one of 6 specialized role agents managing a RimWorld colony. "
+    "The agents are: ResourceManager, DefenseCommander, ResearchDirector, "
+    "SocialOverseer, ConstructionPlanner, and MedicalOfficer.\n\n"
+    "You MUST respond with a JSON object:\n"
+    '{"actions": [{"action_type": "<endpoint>", "target_colonist_id": "<id or null>", '
     '"parameters": {}, "priority": <1-10>, "reason": "<why>"}], '
-    '"summary": "<brief summary>", "confidence": <0.0-1.0>}\n\n'
-    "IMPORTANT: For actions targeting a colonist (draft, undraft, move, set_work_priority, "
-    "assign_researcher, assign_bed_rest, administer_medicine, set_recreation_policy, "
-    "haul_resource), you MUST set target_colonist_id to a valid colonist_id from the "
-    "colony state. Never use 0 or null for pawn-targeting actions.\n\n"
-    "For place_blueprint, include x, z coordinates and def_name in parameters.\n"
-    "For toggle_power, include a valid building_id from the structures list.\n\n"
-    "Note: Colonist skills, traits, and current job may not be available. "
-    "Make decisions based on available data: health, mood, hunger, position, "
-    "and colony resources (food count, medicine, market value).\n\n"
-    "CRITICAL — Do No Harm principle:\n"
-    "- Only propose actions that IMPROVE on the colony's current trajectory. "
-    "RimWorld colonists are already productive by default.\n"
-    "- If colonists are already productive and no crisis exists, respond with a single "
-    "no_action. Unnecessary overrides of productive colonists are WORSE than doing nothing.\n"
-    "- Check each colonist's current_job before proposing actions. If they are already doing "
-    "useful work (mining, growing, hauling, cooking, constructing, researching), "
-    "do NOT interrupt them.\n"
-    "- Reserve interventions for: active threats, medical emergencies, mood crises (mood < 0.3), "
-    "starvation risk (food_days < 2), or clear optimization opportunities.\n\n"
-    "Respond ONLY with valid JSON. No markdown, no explanation outside the JSON.\n\n"
+    '"summary": "<brief>", "confidence": <0.0-1.0>}\n\n'
+    "AVAILABLE ACTIONS (use these as action_type):\n"
+    "- work_priority: Set colonist work priority. params: {\"<WorkType>\": <1-4>}. "
+    "target_colonist_id required.\n"
+    "- blueprint: Place a building. params: {\"def_name\": \"Wall\", \"x\": int, "
+    "\"z\": int, \"stuff_def\": \"WoodLog\", \"rotation\": 0}.\n"
+    "- growing_zone: Create growing zone. params: {\"plant_def\": \"Plant_Potato\", "
+    "\"x1\": int, \"z1\": int, \"x2\": int, \"z2\": int}.\n"
+    "- stockpile_zone: Create stockpile. params: {\"x1\": int, \"z1\": int, "
+    "\"x2\": int, \"z2\": int, \"name\": \"Supply\"}.\n"
+    "- designate_area: Mine/harvest/deconstruct. params: {\"type\": \"Mine\", "
+    "\"x1\": int, \"z1\": int, \"x2\": int, \"z2\": int}.\n"
+    "- draft: Draft/undraft colonist. params: {\"is_drafted\": true/false}. "
+    "target_colonist_id required.\n"
+    "- move: Move colonist. params: {\"x\": int, \"z\": int}. "
+    "target_colonist_id required.\n"
+    "- research_target: Set research. params: {\"project\": \"Electricity\"}.\n"
+    "- research_stop: Stop current research. No params.\n"
+    "- job_assign: Assign job directly. params: {\"job_def\": \"Sow\"}. "
+    "target_colonist_id required.\n"
+    "- time_assignment: Set schedule. params: {\"hours\": [18,19,20], "
+    "\"assignment\": \"Joy\"}. target_colonist_id required.\n"
+    "- bed_rest: Assign bed rest. target_colonist_id required.\n"
+    "- tend: Have doctor tend patient. params: {\"doctor_pawn_id\": int}. "
+    "target_colonist_id = patient.\n"
+    "- toggle_power: Toggle building power. params: {\"building_id\": int, "
+    "\"power_on\": true}.\n"
+    "- no_action: Do nothing (use when colonists are already productive).\n\n"
+    "RULES:\n"
+    "- target_colonist_id MUST be a valid colonist_id from the state.\n"
+    "- Colonist data includes skills, traits, current_job, and detailed needs. "
+    "Use skill levels to assign the RIGHT colonist to the RIGHT work.\n"
+    "- Check current_job before acting. If a colonist is already doing useful "
+    "work, do NOT interrupt them.\n"
+    "- Propose 5-15 actions per tick. Be proactive, not passive.\n"
+    "- Respond ONLY with valid JSON.\n\n"
+)
+
+# Early-game directive injected when day < 5.
+_EARLY_GAME_DIRECTIVE = (
+    "EARLY GAME ALERT: The colony has just started. Colonists wandering or "
+    "doing GotoWander/Wait_Wander are IDLE — they need direction NOW.\n"
+    "Priority actions for day 0-3:\n"
+    "1. Create a stockpile_zone near the drop pods for supplies\n"
+    "2. Create a growing_zone for food (Plant_Potato or Plant_Rice)\n"
+    "3. Set work_priority: best grower→Growing=1, best builder→Construction=1, "
+    "best researcher→Research=1\n"
+    "4. Place blueprint for shelter (walls + door = enclosed room)\n"
+    "5. Set research_target to a useful early tech\n"
+    "6. designate_area for mining steel/components nearby\n"
+    "Do NOT propose no_action in early game. The colony needs everything.\n\n"
 )
 
 
@@ -251,7 +280,11 @@ class RimWorldRoleAgent(LLMAgent):
             f"ALLOWED ACTIONS: {allowed_str}"
         )
 
-        system_prompt = _SHARED_SYSTEM_PREFIX + phase_block + role_block
+        # Early game: override passive behavior with bootstrap directive
+        day = task.metadata.get("day", 999)
+        early_game = _EARLY_GAME_DIRECTIVE if day < 5 else ""
+
+        system_prompt = _SHARED_SYSTEM_PREFIX + early_game + phase_block + role_block
 
         parts = []
         # Disable thinking for local models (e.g. Qwen3.5 thinking mode)

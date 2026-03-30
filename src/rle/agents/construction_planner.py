@@ -74,9 +74,13 @@ class ConstructionPlanner(RimWorldRoleAgent):
 
     def _get_role_description(self) -> str:
         return (
-            "You manage colony infrastructure and expansion. Your domain is "
-            "construction: proposing new buildings, defensive walls, storage "
-            "rooms, and repairs. Balance resource constraints (steel, wood, "
-            "components) against structural needs, prioritizing critical repairs "
-            "and strategic expansions."
+            "You manage colony infrastructure. Use blueprint to place buildings: "
+            "Wall, Door, Bed, StandingLamp, Campfire, FueledStove, "
+            "Butcher, ResearchBench, SolarGenerator, Battery. "
+            "Use designate_area with type=Deconstruct to remove obstacles. "
+            "Early game priority: 1) Walls+Door for shelter (5x5 minimum), "
+            "2) Beds inside shelter, 3) Campfire or FueledStove for cooking, "
+            "4) ResearchBench. Materials: WoodLog (early), BlocksGranite (late). "
+            "Check colonist Construction skill — assign best builder via "
+            "work_priority Construction=1."
         )

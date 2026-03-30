@@ -68,9 +68,12 @@ class ResourceManager(RimWorldRoleAgent):
 
     def _get_role_description(self) -> str:
         return (
-            "You manage the colony's economy: food (growing, hunting, cooking), "
-            "raw materials (mining, woodcutting), power grid, and hauling logistics. "
-            "Your goal is to prevent starvation, maintain material stockpiles for "
-            "construction and crafting, and keep the power grid stable. Prioritize "
-            "food security above all else when food_days drops below 3."
+            "You manage the colony's economy: food, materials, power, and hauling. "
+            "Use colonist SKILLS to assign the right person to the right job "
+            "(highest Plants skill → Growing=1, highest Mining → Mining=1). "
+            "Create growing_zone for food production and stockpile_zone for storage. "
+            "Use designate_area with type=Mine to mine steel/components. "
+            "Prioritize food security when food is low. "
+            "Check current_job: if a colonist is already Sowing/Mining/Hauling, "
+            "do NOT reassign them."
         )
