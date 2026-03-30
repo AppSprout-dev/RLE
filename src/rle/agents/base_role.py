@@ -33,7 +33,11 @@ _SHARED_SYSTEM_PREFIX = (
     '"summary": "<brief>", "confidence": <0.0-1.0>}\n\n'
     "AVAILABLE ACTIONS (use these as action_type):\n"
     "- work_priority: Set colonist work priority. params: {\"<WorkType>\": <1-4>}. "
-    "target_colonist_id required.\n"
+    "target_colonist_id required. "
+    "VALID WORK TYPES: Firefighter, Patient, Doctor, PatientBedRest, "
+    "BasicWorker, Warden, Handling, Cooking, Hunting, Construction, "
+    "Growing, Mining, PlantCutting, Smithing, Tailoring, Art, Crafting, "
+    "Hauling, Cleaning, Research. Use EXACTLY these names.\n"
     "- blueprint: Place a building. params: {\"def_name\": \"Wall\", \"x\": int, "
     "\"z\": int, \"stuff_def\": \"WoodLog\", \"rotation\": 0}.\n"
     "- growing_zone: Create growing zone. params: {\"plant_def\": \"Plant_Potato\", "
