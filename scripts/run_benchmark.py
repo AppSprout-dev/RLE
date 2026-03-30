@@ -19,6 +19,7 @@ from felix_agent_sdk.visualization import HelixVisualizer
 from rle.agents import AGENT_DISPLAY
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
+from rle.agents.map_analyst import MapAnalyst
 from rle.agents.medical_officer import MedicalOfficer
 from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
@@ -104,6 +105,13 @@ _MOCK_ROUTES: dict[str, dict | list] = {
     "/api/v1/map/weather?map_id=0": {
         "weather": "clear", "temperature": 22.0,
     },
+    "/api/v1/map/zones?map_id=0": [],
+    "/api/v1/map/rooms?map_id=0": [],
+    "/api/v1/map/ore?map_id=0": [],
+    "/api/v1/map/farm/summary?map_id=0": {
+        "total_growing_zones": 0, "planted_cells": 0,
+        "harvestable_cells": 0, "crops": {},
+    },
 }
 
 
@@ -147,6 +155,7 @@ def _make_mock_provider() -> MagicMock:
 
 def _create_agents(provider, helix, *, provider_kwargs=None, no_think=False):  # type: ignore[no-untyped-def]
     agents = [
+        MapAnalyst("map_analyst", provider, helix, spawn_time=0.0, velocity=1.0),
         ResourceManager("resource_manager", provider, helix, spawn_time=0.0, velocity=1.0),
         DefenseCommander(
             "defense_commander", provider, helix, spawn_time=0.0, velocity=1.0,

@@ -112,6 +112,13 @@ def all_routes(
         "/api/v1/incidents?map_id=0": {"incidents": [sample_threat_dict]},
         "/api/v1/game/state": sample_colony_dict,
         "/api/v1/map/weather?map_id=0": sample_weather_dict,
+        "/api/v1/map/zones?map_id=0": [],
+        "/api/v1/map/rooms?map_id=0": [],
+        "/api/v1/map/ore?map_id=0": [],
+        "/api/v1/map/farm/summary?map_id=0": {
+            "total_growing_zones": 0, "planted_cells": 0,
+            "harvestable_cells": 0, "crops": {},
+        },
     }
 
 

@@ -6,12 +6,14 @@ from rle.agents.actions import Action, ActionPlan, ActionPlanParseError, resolve
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
+from rle.agents.map_analyst import MapAnalyst
 from rle.agents.medical_officer import MedicalOfficer
 from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
 from rle.agents.social_overseer import SocialOverseer
 
 AGENT_DISPLAY: dict[str, dict[str, str]] = {
+    "map_analyst":          {"label": "MA", "color": "blue"},
     "resource_manager":     {"label": "RM", "color": "green"},
     "defense_commander":    {"label": "DC", "color": "red"},
     "research_director":    {"label": "RD", "color": "cyan"},
@@ -21,6 +23,7 @@ AGENT_DISPLAY: dict[str, dict[str, str]] = {
 }
 
 _ROLE_AGENTS: dict[str, type[RimWorldRoleAgent]] = {
+    "map_analyst": MapAnalyst,
     "resource_manager": ResourceManager,
     "defense_commander": DefenseCommander,
     "research_director": ResearchDirector,
@@ -44,6 +47,7 @@ __all__ = [
     "resolve_endpoint",
     "ConstructionPlanner",
     "DefenseCommander",
+    "MapAnalyst",
     "MedicalOfficer",
     "ResearchDirector",
     "ResourceManager",

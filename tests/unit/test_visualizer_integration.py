@@ -11,11 +11,11 @@ class TestAgentDisplay:
     """Validate the AGENT_DISPLAY config constant."""
 
     EXPECTED_AGENTS = {
-        "resource_manager", "defense_commander", "research_director",
+        "map_analyst", "resource_manager", "defense_commander", "research_director",
         "social_overseer", "construction_planner", "medical_officer",
     }
 
-    def test_all_six_agents_present(self) -> None:
+    def test_all_agents_present(self) -> None:
         assert set(AGENT_DISPLAY.keys()) == self.EXPECTED_AGENTS
 
     def test_each_has_label_and_color(self) -> None:
@@ -32,7 +32,7 @@ class TestAgentDisplay:
         assert len(labels) == len(set(labels))
 
     def test_colors_are_valid(self) -> None:
-        valid = {"cyan", "yellow", "green", "red", "magenta", "white"}
+        valid = {"blue", "cyan", "yellow", "green", "red", "magenta", "white"}
         for agent_id, display in AGENT_DISPLAY.items():
             assert display["color"] in valid, f"{agent_id} has invalid color {display['color']}"
 

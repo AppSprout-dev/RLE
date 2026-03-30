@@ -50,6 +50,52 @@ class ResourceData(BaseModel):
     items: dict[str, int] = {}
 
 
+class ZoneData(BaseModel):
+    """A zone on the map (growing, stockpile, dumping, etc.)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    zone_id: str
+    zone_type: str
+    label: str
+    cell_count: int
+    plant_def: str | None = None
+
+
+class RoomData(BaseModel):
+    """A room detected on the map."""
+
+    model_config = ConfigDict(frozen=True)
+
+    room_id: str
+    role: str
+    size: int
+    temperature: float
+    impressiveness: float = 0.0
+    bed_count: int = 0
+
+
+class OreDeposit(BaseModel):
+    """An ore deposit cluster on the map."""
+
+    model_config = ConfigDict(frozen=True)
+
+    def_name: str
+    count: int
+    positions: list[tuple[int, int]] = []
+
+
+class FarmSummary(BaseModel):
+    """Summary of farming activity on the map."""
+
+    model_config = ConfigDict(frozen=True)
+
+    total_growing_zones: int
+    planted_cells: int
+    harvestable_cells: int
+    crops: dict[str, int] = {}
+
+
 class MapData(BaseModel):
     """Map metadata and structures."""
 
@@ -60,6 +106,10 @@ class MapData(BaseModel):
     season: str
     temperature: float
     structures: list[StructureData]
+    zones: list[ZoneData] = []
+    rooms: list[RoomData] = []
+    ore_deposits: list[OreDeposit] = []
+    farm_summary: FarmSummary | None = None
 
 
 class ResearchData(BaseModel):

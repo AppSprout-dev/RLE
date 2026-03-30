@@ -64,6 +64,14 @@ class RLEGameLoop:
         self._config = config
         self._client = client
         self._agents = agents
+        # Separate MapAnalyst (runs first) from role agents (run in parallel)
+        self._map_analyst: RimWorldRoleAgent | None = None
+        self._role_agents: list[RimWorldRoleAgent] = []
+        for agent in agents:
+            if agent.ROLE_NAME == "map_analyst":
+                self._map_analyst = agent
+            else:
+                self._role_agents.append(agent)
         self._no_agent = no_agent
         self._no_pause = no_pause
         self._state_manager = GameStateManager(client, expected_duration_days, sse_client)
@@ -127,21 +135,21 @@ class RLEGameLoop:
     async def _deliberate_parallel(
         self, state: object, current_time: float, tick_num: int,
     ) -> list[tuple[RimWorldRoleAgent, ActionPlan | None]]:
-        """Run all agents concurrently via asyncio.to_thread."""
+        """Run role agents concurrently via asyncio.to_thread."""
 
         async def _run(agent: RimWorldRoleAgent) -> tuple[RimWorldRoleAgent, ActionPlan | None]:
             return await asyncio.to_thread(
                 self._deliberate_agent, agent, state, current_time, tick_num,
             )
 
-        return list(await asyncio.gather(*[_run(a) for a in self._agents]))
+        return list(await asyncio.gather(*[_run(a) for a in self._role_agents]))
 
     def _deliberate_sequential(
         self, state: object, current_time: float, tick_num: int,
     ) -> list[tuple[RimWorldRoleAgent, ActionPlan | None]]:
-        """Run agents one at a time. Agents read context from their spokes."""
+        """Run role agents one at a time. Agents read context from their spokes."""
         results: list[tuple[RimWorldRoleAgent, ActionPlan | None]] = []
-        for agent in self._agents:
+        for agent in self._role_agents:
             agent_result, plan = self._deliberate_agent(
                 agent, state, current_time, tick_num,
             )
@@ -293,13 +301,39 @@ class RLEGameLoop:
                 role="baseline", tick=state.colony.tick, actions=[], summary="No agents",
             )
         else:
-            # Inject SSE events into agents
+            # Inject SSE events into all agents (including MapAnalyst)
             pending_events = self._state_manager.pending_events
             for agent in self._agents:
                 agent.set_pending_events(pending_events)
 
-            # Multi-agent deliberation
             tick_num = len(self._tick_results)
+
+            # 4a. MapAnalyst deliberates FIRST (sequential)
+            if self._map_analyst:
+                ma_agent, ma_plan = self._deliberate_agent(
+                    self._map_analyst, state, current_time, tick_num,
+                )
+                if ma_plan is not None:
+                    plans.append(ma_plan)
+                    self._update_visualizer_agent(ma_agent, ma_plan, current_time)
+                    spoke = self._spoke_manager.get_spoke(ma_agent.agent_id)
+                    if spoke and spoke.is_connected:
+                        spoke.send_message(
+                            MessageType.TASK_COMPLETE,
+                            {
+                                "role": ma_plan.role,
+                                "summary": ma_plan.summary,
+                                "confidence": ma_plan.confidence,
+                                "num_actions": len(ma_plan.actions),
+                                "action_types": [
+                                    a.action_type for a in ma_plan.actions
+                                ],
+                            },
+                        )
+                    # Route MapAnalyst output to role agent spokes immediately
+                    self._spoke_manager.process_all_messages()
+
+            # 4b. Role agents deliberate (parallel or sequential)
             if self._parallel:
                 results = await self._deliberate_parallel(state, current_time, tick_num)
             else:

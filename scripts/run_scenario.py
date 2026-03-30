@@ -13,6 +13,7 @@ from felix_agent_sdk.visualization import HelixVisualizer
 from rle.agents import AGENT_DISPLAY
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
+from rle.agents.map_analyst import MapAnalyst
 from rle.agents.medical_officer import MedicalOfficer
 from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
@@ -38,8 +39,9 @@ def _find_scenario(query: str) -> Path:
 
 
 def _create_agents(provider, helix):  # type: ignore[no-untyped-def]
-    """Create all 6 role agents."""
+    """Create all 7 role agents (MapAnalyst + 6 domain agents)."""
     return [
+        MapAnalyst("map_analyst", provider, helix, spawn_time=0.0, velocity=1.0),
         ResourceManager("resource_manager", provider, helix, spawn_time=0.0, velocity=1.0),
         DefenseCommander("defense_commander", provider, helix, spawn_time=0.0, velocity=1.0),
         ResearchDirector("research_director", provider, helix, spawn_time=0.0, velocity=1.0),

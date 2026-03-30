@@ -102,6 +102,13 @@ def _make_transport(day: int = 12) -> httpx.MockTransport:
         "/api/v1/map/weather?map_id=0": {
             "weather": "clear", "temperature": 22.0,
         },
+        "/api/v1/map/zones?map_id=0": [],
+        "/api/v1/map/rooms?map_id=0": [],
+        "/api/v1/map/ore?map_id=0": [],
+        "/api/v1/map/farm/summary?map_id=0": {
+            "total_growing_zones": 0, "planted_cells": 0,
+            "harvestable_cells": 0, "crops": {},
+        },
     }
 
     def handler(request: httpx.Request) -> httpx.Response:

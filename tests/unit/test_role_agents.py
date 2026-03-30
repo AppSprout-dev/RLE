@@ -11,6 +11,7 @@ from rle.agents.actions import ActionPlan
 from rle.agents.base_role import _SHARED_SYSTEM_PREFIX
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
+from rle.agents.map_analyst import MapAnalyst
 from rle.agents.medical_officer import MedicalOfficer
 from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
@@ -352,7 +353,63 @@ class TestMedicalOfficerFilter:
 
 
 # ==================================================================
-# Factory registration (all 6 agents)
+# MapAnalyst
+# ==================================================================
+
+
+class TestMapAnalystClassVars:
+    def test_role_name(self) -> None:
+        assert MapAnalyst.ROLE_NAME == "map_analyst"
+
+    def test_allowed_actions(self) -> None:
+        assert MapAnalyst.ALLOWED_ACTIONS == {"no_action"}
+
+    def test_temperature_range(self) -> None:
+        assert MapAnalyst.TEMPERATURE_RANGE == (0.1, 0.4)
+
+
+class TestMapAnalystFilter:
+    def test_includes_spatial_data(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = MapAnalyst("ma-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert "zones" in filtered
+        assert "rooms" in filtered
+        assert "ore_deposits" in filtered
+        assert "structures" in filtered
+        assert "colonist_positions" in filtered
+
+    def test_includes_map_metadata(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = MapAnalyst("ma-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert filtered["map"]["biome"] == "temperate_forest"
+        assert filtered["map"]["size"] == (250, 250)
+
+    def test_colonist_positions_included(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = MapAnalyst("ma-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert len(filtered["colonist_positions"]) == 1
+        assert filtered["colonist_positions"][0]["position"] == (42, 18)
+
+    def test_omits_resources(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        agent = MapAnalyst("ma-01", mock_provider, helix, spawn_time=0.0)
+        filtered = agent.filter_game_state(sample_game_state)
+        assert "resources" not in filtered
+
+
+# ==================================================================
+# Factory registration (all 7 agents)
 # ==================================================================
 
 
@@ -364,6 +421,7 @@ class TestRegistration:
         try:
             factory = AgentFactory(mock_provider, HelixConfig.default())
             roles = [
+                ("map_analyst", MapAnalyst),
                 ("resource_manager", ResourceManager),
                 ("defense_commander", DefenseCommander),
                 ("research_director", ResearchDirector),
@@ -386,10 +444,11 @@ class TestRegistration:
 
 
 class TestSharedSystemPrefix:
-    """All 6 agents must share _SHARED_SYSTEM_PREFIX at the start of their
+    """All 7 agents must share _SHARED_SYSTEM_PREFIX at the start of their
     system prompt, with role-specific content at the end."""
 
     ALL_AGENT_CLASSES = [
+        ("ma", MapAnalyst),
         ("rm", ResourceManager),
         ("dc", DefenseCommander),
         ("rd", ResearchDirector),
@@ -449,10 +508,10 @@ class TestSharedSystemPrefix:
                 f"Role-specific suffix for {role_name} doesn't contain role name"
             )
 
-        # All 6 suffixes must be distinct (role block differs)
+        # All 7 suffixes must be distinct (role block differs)
         unique_suffixes = set(role_suffixes.values())
-        assert len(unique_suffixes) == 6, (
-            "Expected 6 distinct role-specific suffixes"
+        assert len(unique_suffixes) == 7, (
+            "Expected 7 distinct role-specific suffixes"
         )
 
     def test_shared_prefix_contains_json_schema(self) -> None:

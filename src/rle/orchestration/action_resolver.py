@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Default role priorities (lower number = higher priority).
 _DEFAULT_ROLE_PRIORITY: dict[str, int] = {
+    "map_analyst": 10,
     "resource_manager": 3,
     "defense_commander": 3,
     "research_director": 5,

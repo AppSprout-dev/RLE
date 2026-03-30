@@ -35,7 +35,7 @@ def mock_config() -> RLEConfig:
         model="claude-sonnet-4-5",
         tick_interval=0.5,
         helix_preset="default",
-        max_agents=6,
+        max_agents=7,
         log_level="DEBUG",
     )
 

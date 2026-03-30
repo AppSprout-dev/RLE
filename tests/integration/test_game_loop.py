@@ -13,6 +13,7 @@ from felix_agent_sdk.providers.base import BaseProvider
 from felix_agent_sdk.providers.types import CompletionResult
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
+from rle.agents.map_analyst import MapAnalyst
 from rle.agents.medical_officer import MedicalOfficer
 from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
@@ -109,6 +110,13 @@ def _make_transport(day: int = 12, tick: int = 720000) -> httpx.MockTransport:
         "/api/v1/incidents?map_id=0": {"incidents": []},
         "/api/v1/game/state": colony,
         "/api/v1/map/weather?map_id=0": WEATHER,
+        "/api/v1/map/zones?map_id=0": [],
+        "/api/v1/map/rooms?map_id=0": [],
+        "/api/v1/map/ore?map_id=0": [],
+        "/api/v1/map/farm/summary?map_id=0": {
+            "total_growing_zones": 0, "planted_cells": 0,
+            "harvestable_cells": 0, "crops": {},
+        },
     }
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -266,6 +274,7 @@ class TestStop:
 def _make_all_agents(provider: MagicMock) -> list:
     helix = HelixConfig.default().to_geometry()
     return [
+        MapAnalyst("ma-01", provider, helix, spawn_time=0.0, velocity=1.0),
         ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0),
         DefenseCommander("dc-01", provider, helix, spawn_time=0.0, velocity=1.0),
         ResearchDirector("rd-01", provider, helix, spawn_time=0.0, velocity=1.0),
@@ -288,8 +297,8 @@ class TestMultiAgent:
             loop = RLEGameLoop(config, client, agents)
             result = await loop.run_tick()
 
-        # Provider called once per agent
-        assert provider.complete.call_count == 6
+        # Provider called once per agent (1 MapAnalyst + 6 role agents)
+        assert provider.complete.call_count == 7
         # Result is merged plan from orchestrator
         assert result.plan.role == "orchestrator"
 
@@ -306,8 +315,8 @@ class TestMultiAgent:
             results = await loop.run(max_ticks=3)
 
         assert len(results) == 3
-        # 6 agents * 3 ticks = 18 provider calls
-        assert provider.complete.call_count == 18
+        # 7 agents * 3 ticks = 21 provider calls
+        assert provider.complete.call_count == 21
 
 
 # ------------------------------------------------------------------
@@ -434,9 +443,9 @@ class TestParallelDeliberation:
             loop = RLEGameLoop(config, client, agents, parallel=True)
             result = await loop.run_tick()
 
-        assert provider.complete.call_count == 6
+        assert provider.complete.call_count == 7  # 1 MapAnalyst + 6 role agents
         assert result.plan.role == "orchestrator"
-        assert loop._parse_successes == 6
+        assert loop._parse_successes == 7
         assert loop._parse_failures == 0
 
     async def test_spoke_messages_routed_after_tick(self) -> None:
@@ -472,9 +481,9 @@ class TestParallelDeliberation:
             loop = RLEGameLoop(config, client, agents, parallel=False)
             result = await loop.run_tick()
 
-        assert provider.complete.call_count == 6
+        assert provider.complete.call_count == 7  # 1 MapAnalyst + 6 role agents
         assert result.plan.role == "orchestrator"
-        assert loop._parse_successes == 6
+        assert loop._parse_successes == 7
 
     async def test_sequential_3_ticks(self) -> None:
         provider = _make_mock_provider()
@@ -489,7 +498,7 @@ class TestParallelDeliberation:
             results = await loop.run(max_ticks=3)
 
         assert len(results) == 3
-        assert provider.complete.call_count == 18
+        assert provider.complete.call_count == 21  # 7 agents * 3 ticks
 
 
 # ------------------------------------------------------------------
@@ -526,7 +535,7 @@ class TestHubSpokeCommunication:
             loop = RLEGameLoop(config, client, agents)
             await loop.run_tick()
 
-        # 6 agents sent TASK_COMPLETE messages
+        # 7 agents sent TASK_COMPLETE messages
         assert loop._hub.message_queue_size >= 0  # may have been processed
         assert loop._hub.total_messages_processed >= 0
         # Each agent's spoke should have sent at least 1 message

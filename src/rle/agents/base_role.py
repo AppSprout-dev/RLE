@@ -24,9 +24,13 @@ logger = logging.getLogger(__name__)
 # Shared prefix for all 6 role agents. Placed first in the system prompt so
 # LM Studio / llama.cpp can reuse the KV cache across agents within a tick.
 _SHARED_SYSTEM_PREFIX = (
-    "You are one of 6 specialized role agents managing a RimWorld colony. "
-    "The agents are: ResourceManager, DefenseCommander, ResearchDirector, "
-    "SocialOverseer, ConstructionPlanner, and MedicalOfficer.\n\n"
+    "You are one of 7 specialized role agents managing a RimWorld colony. "
+    "The agents are: MapAnalyst, ResourceManager, DefenseCommander, ResearchDirector, "
+    "SocialOverseer, ConstructionPlanner, and MedicalOfficer.\n"
+    "The MapAnalyst runs FIRST each tick and provides spatial recommendations "
+    "(build locations, farm areas, ore deposits) via inter-agent messages. "
+    "Check your inter-agent context for MapAnalyst spatial data before choosing "
+    "coordinates for blueprints, zones, or designations.\n\n"
     "You MUST respond with a JSON object:\n"
     '{"actions": [{"action_type": "<endpoint>", "target_colonist_id": "<id or null>", '
     '"parameters": {}, "priority": <1-10>, "reason": "<why>"}], '
