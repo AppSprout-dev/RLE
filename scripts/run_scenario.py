@@ -146,6 +146,7 @@ async def main(args: argparse.Namespace) -> None:
             sse_client=sse,
             dashboard_export_dir=Path(args.output) if args.output else None,
             no_agent=args.no_agent,
+            no_pause=args.no_pause,
         )
         try:
             if visualizer:
@@ -193,6 +194,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-agent", action="store_true",
         help="Baseline mode: no agent deliberation, colony runs unmanaged",
+    )
+    parser.add_argument(
+        "--no-pause", action="store_true",
+        help="Don't pause game during deliberation (SSE-driven, game runs continuously)",
     )
     parser.add_argument("--log-level", default="INFO", help="Logging level")
     asyncio.run(main(parser.parse_args()))

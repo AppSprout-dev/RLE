@@ -59,11 +59,13 @@ class RLEGameLoop:
         sse_client: RimAPISSEClient | None = None,
         dashboard_export_dir: Path | None = None,
         no_agent: bool = False,
+        no_pause: bool = False,
     ) -> None:
         self._config = config
         self._client = client
         self._agents = agents
         self._no_agent = no_agent
+        self._no_pause = no_pause
         self._state_manager = GameStateManager(client, expected_duration_days, sse_client)
         self._executor = ActionExecutor(client)
         self._resolver = ActionResolver()
@@ -266,9 +268,14 @@ class RLEGameLoop:
             self._last_phase = phase
 
     async def run_tick(self) -> TickResult:
-        """Execute one turn."""
-        # 1. Pause
-        await self._client.pause_game()
+        """Execute one turn.
+
+        In pause mode (default): pause → read → deliberate → execute → unpause.
+        In no-pause mode: read → fire deliberation + sleep concurrently → execute.
+        """
+        # 1. Pause (skip in no-pause mode — game keeps running)
+        if not self._no_pause:
+            await self._client.pause_game()
 
         # 2. Read state
         state = await self._state_manager.refresh()
@@ -354,8 +361,9 @@ class RLEGameLoop:
             state.colony.tick, state.colony.day, current_time,
         )
 
-        # 12. Unpause
-        await self._client.unpause_game()
+        # 12. Unpause (skip in no-pause mode — game was never paused)
+        if not self._no_pause:
+            await self._client.unpause_game()
 
         result = TickResult(
             tick=state.colony.tick,

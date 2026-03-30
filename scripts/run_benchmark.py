@@ -193,6 +193,7 @@ async def _run_scenario(
     no_think: bool = False,
     parallel: bool = True,
     no_agent: bool = False,
+    no_pause: bool = False,
 ) -> dict:
     agents = _create_agents(provider, helix, provider_kwargs=provider_kwargs, no_think=no_think)
     scorer = CompositeScorer(scenario.scoring_weights or None)
@@ -211,6 +212,7 @@ async def _run_scenario(
         visualizer=visualizer,
         parallel=parallel,
         no_agent=no_agent,
+        no_pause=no_pause,
     )
     max_ticks = max_ticks_override or scenario.max_ticks
     t0 = time.monotonic()
@@ -395,6 +397,7 @@ async def main(args: argparse.Namespace) -> None:
                     visualize=args.visualize,
                     no_think=args.no_think,
                     parallel=not args.sequential,
+                    no_pause=args.no_pause,
                 )
                 results.append(result)
                 if paired:
@@ -530,6 +533,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-baseline", action="store_true",
         help="Skip baseline (no-agent) runs — agent-only, no paired comparison",
+    )
+    parser.add_argument(
+        "--no-pause", action="store_true",
+        help="Don't pause game during deliberation (SSE-driven)",
     )
     parser.add_argument("--wandb", action="store_true", help="Log to Weights & Biases")
     parser.add_argument("--push-hf", action="store_true", help="Push results to HuggingFace Hub")
