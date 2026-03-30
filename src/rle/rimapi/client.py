@@ -312,59 +312,90 @@ class RimAPIClient:
         )
 
     async def get_zones(self, map_id: int = 0) -> list[ZoneData]:
-        """Fetch all zones (growing, stockpile, dumping) from the map."""
+        """Fetch all zones (growing, stockpile, dumping) from the map.
+
+        RIMAPI returns: {zones: [...], areas: [...]}
+        Zones are player-created (growing, stockpile). Areas are system (Home, NoRoof).
+        We return both merged, with type distinguishing them.
+        """
         try:
             data = await self._get(f"/api/v1/map/zones?map_id={map_id}")
-            zones_list = data if isinstance(data, list) else data.get("zones", [])
+            if not isinstance(data, dict):
+                return []
             result: list[ZoneData] = []
-            for z in zones_list:
+            for z in data.get("zones", []):
                 result.append(ZoneData(
-                    zone_id=str(z.get("id", z.get("zone_id", ""))),
+                    zone_id=str(z.get("id", "")),
                     zone_type=z.get("zone_type", z.get("type", "unknown")),
-                    label=z.get("label", z.get("name", "")),
-                    cell_count=int(z.get("cell_count", z.get("cells", 0))),
+                    label=z.get("label", ""),
+                    cell_count=int(z.get("cells_count", z.get("cell_count", 0))),
                     plant_def=z.get("plant_def"),
+                ))
+            for a in data.get("areas", []):
+                cells = int(a.get("cells_count", 0))
+                if cells == 0:
+                    continue  # Skip empty system areas
+                result.append(ZoneData(
+                    zone_id=str(a.get("id", "")),
+                    zone_type=a.get("type", "area"),
+                    label=a.get("label", ""),
+                    cell_count=cells,
                 ))
             return result
         except (RimAPIResponseError, RimAPIConnectionError):
             return []
 
     async def get_rooms(self, map_id: int = 0) -> list[RoomData]:
-        """Fetch all rooms detected on the map."""
+        """Fetch all rooms detected on the map.
+
+        RIMAPI returns: {rooms: [{id, role_label, temperature, cells_count,
+        touches_map_edge, is_prison_cell, is_doorway, open_roof_count,
+        contained_beds_ids}, ...]}
+        Skip the outdoor "room" (touches_map_edge=true) and doorways.
+        """
         try:
             data = await self._get(f"/api/v1/map/rooms?map_id={map_id}")
-            rooms_list = data if isinstance(data, list) else data.get("rooms", [])
+            rooms_list = data.get("rooms", []) if isinstance(data, dict) else data
             result: list[RoomData] = []
             for r in rooms_list:
+                if r.get("touches_map_edge") or r.get("is_doorway"):
+                    continue  # Skip outdoor and doorway "rooms"
+                beds = r.get("contained_beds_ids", [])
                 result.append(RoomData(
-                    room_id=str(r.get("id", r.get("room_id", ""))),
-                    role=r.get("role", r.get("type", "none")),
-                    size=int(r.get("size", r.get("cell_count", 0))),
-                    temperature=float(r.get("temperature", r.get("avg_temperature", 15.0))),
+                    room_id=str(r.get("id", "")),
+                    role=r.get("role_label", r.get("role", "none")),
+                    size=int(r.get("cells_count", r.get("cell_count", 0))),
+                    temperature=float(r.get("temperature", 15.0)),
                     impressiveness=float(r.get("impressiveness", 0.0)),
-                    bed_count=int(r.get("bed_count", r.get("beds", 0))),
+                    bed_count=len(beds) if isinstance(beds, list) else int(beds),
                 ))
             return result
         except (RimAPIResponseError, RimAPIConnectionError):
             return []
 
     async def get_ore(self, map_id: int = 0) -> list[OreDeposit]:
-        """Fetch ore deposit data from the map."""
+        """Fetch ore deposit data from the map.
+
+        RIMAPI returns: {ores: {name: {max_hp, cells: [flat_index, ...]}}}
+        where flat_index = x + z * map_width.
+        """
         try:
             data = await self._get(f"/api/v1/map/ore?map_id={map_id}")
-            ore_list = data if isinstance(data, list) else data.get("ores", [])
+            ores_dict = data.get("ores", {}) if isinstance(data, dict) else {}
+            map_width = int(data.get("map_width", 250)) if isinstance(data, dict) else 250
             result: list[OreDeposit] = []
-            for o in ore_list:
-                raw_positions = o.get("positions", [])[:10]  # Cap sample positions
+            for ore_name, ore_data in ores_dict.items():
+                if not isinstance(ore_data, dict):
+                    continue
+                cells = ore_data.get("cells", [])
+                # Convert flat indices to (x, z) — sample first 10
                 positions: list[tuple[int, int]] = []
-                for p in raw_positions:
-                    if isinstance(p, dict):
-                        positions.append((p.get("x", 0), p.get("z", 0)))
-                    elif isinstance(p, (list, tuple)) and len(p) >= 2:
-                        positions.append((p[0], p[1]))
+                for cell in cells[:10]:
+                    if isinstance(cell, int):
+                        positions.append((cell % map_width, cell // map_width))
                 result.append(OreDeposit(
-                    def_name=o.get("def_name", o.get("label", "Unknown")),
-                    count=int(o.get("count", o.get("total", 0))),
+                    def_name=ore_name,
+                    count=len(cells),
                     positions=positions,
                 ))
             return result
@@ -372,17 +403,28 @@ class RimAPIClient:
             return []
 
     async def get_farm_summary(self, map_id: int = 0) -> FarmSummary | None:
-        """Fetch farming production summary from the map."""
+        """Fetch farming production summary from the map.
+
+        RIMAPI returns: {total_growing_zones, total_plants, total_expected_yield,
+        total_infected_plants, growth_progress_average, crop_types: [...]}
+        """
         try:
             data = await self._get(f"/api/v1/map/farm/summary?map_id={map_id}")
+            if not isinstance(data, dict):
+                return None
+            # crop_types may be a list of dicts or strings
+            crops: dict[str, int] = {}
+            for crop in data.get("crop_types", []):
+                if isinstance(crop, dict):
+                    name = crop.get("def_name", crop.get("label", "unknown"))
+                    crops[name] = int(crop.get("count", crop.get("total", 1)))
+                elif isinstance(crop, str):
+                    crops[crop] = crops.get(crop, 0) + 1
             return FarmSummary(
-                total_growing_zones=int(data.get("total_growing_zones", data.get("zone_count", 0))),
-                planted_cells=int(data.get("planted_cells", data.get("planted", 0))),
-                harvestable_cells=int(data.get("harvestable_cells", data.get("harvestable", 0))),
-                crops={
-                    str(k): int(v)
-                    for k, v in data.get("crops", {}).items()
-                },
+                total_growing_zones=int(data.get("total_growing_zones", 0)),
+                planted_cells=int(data.get("total_plants", data.get("planted_cells", 0))),
+                harvestable_cells=int(data.get("total_expected_yield", data.get("harvestable_cells", 0))),
+                crops=crops,
             )
         except (RimAPIResponseError, RimAPIConnectionError):
             return None
