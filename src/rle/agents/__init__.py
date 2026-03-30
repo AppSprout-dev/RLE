@@ -2,7 +2,7 @@
 
 from felix_agent_sdk import AgentFactory
 
-from rle.agents.actions import Action, ActionPlan, ActionPlanParseError, ActionType
+from rle.agents.actions import Action, ActionPlan, ActionPlanParseError, resolve_endpoint
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
@@ -41,7 +41,7 @@ __all__ = [
     "Action",
     "ActionPlan",
     "ActionPlanParseError",
-    "ActionType",
+    "resolve_endpoint",
     "ConstructionPlanner",
     "DefenseCommander",
     "MedicalOfficer",

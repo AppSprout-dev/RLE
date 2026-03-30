@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock
 
-from rle.agents.actions import Action, ActionPlan, ActionType
+from rle.agents.actions import Action, ActionPlan
 from rle.orchestration.action_executor import ActionExecutor
 
 
@@ -16,7 +16,7 @@ class TestExecute:
     async def test_no_action_excluded_from_totals(self) -> None:
         client = AsyncMock()
         executor = ActionExecutor(client)
-        plan = _make_plan(Action(action_type=ActionType.NO_ACTION))
+        plan = _make_plan(Action(action_type="no_action"))
         result = await executor.execute(plan)
         assert result.executed == 0
         assert result.failed == 0
@@ -28,7 +28,7 @@ class TestExecute:
         executor = ActionExecutor(client)
         plan = _make_plan(
             Action(
-                action_type=ActionType.SET_RESEARCH_TARGET,
+                action_type="set_research_target",
                 parameters={"project": "electricity"},
             )
         )
@@ -43,12 +43,12 @@ class TestExecute:
         client.set_research_target = AsyncMock(side_effect=NotImplementedError)
         executor = ActionExecutor(client)
         plan = _make_plan(
-            Action(action_type=ActionType.NO_ACTION),
+            Action(action_type="no_action"),
             Action(
-                action_type=ActionType.SET_RESEARCH_TARGET,
+                action_type="set_research_target",
                 parameters={"project": "electricity"},
             ),
-            Action(action_type=ActionType.NO_ACTION),
+            Action(action_type="no_action"),
         )
         result = await executor.execute(plan)
         assert result.executed == 0
@@ -68,7 +68,7 @@ class TestExecute:
         """Actions pending upstream PRs pass through without error."""
         client = AsyncMock()
         executor = ActionExecutor(client)
-        plan = _make_plan(Action(action_type=ActionType.HAUL_RESOURCE))
+        plan = _make_plan(Action(action_type="haul_resource"))
         result = await executor.execute(plan)
         assert result.executed == 1
         assert result.failed == 0
@@ -80,7 +80,7 @@ class TestDispatch:
         executor = ActionExecutor(client)
         plan = _make_plan(
             Action(
-                action_type=ActionType.SET_WORK_PRIORITY,
+                action_type="set_work_priority",
                 target_colonist_id="12345",
                 parameters={"Growing": 1},
             )
@@ -92,7 +92,7 @@ class TestDispatch:
         client = AsyncMock()
         executor = ActionExecutor(client)
         plan = _make_plan(
-            Action(action_type=ActionType.DRAFT_COLONIST, target_colonist_id="12345")
+            Action(action_type="draft_colonist", target_colonist_id="12345")
         )
         await executor.execute(plan)
         client.draft_colonist.assert_awaited_once_with("12345", True)
@@ -101,7 +101,11 @@ class TestDispatch:
         client = AsyncMock()
         executor = ActionExecutor(client)
         plan = _make_plan(
-            Action(action_type=ActionType.UNDRAFT_COLONIST, target_colonist_id="12345")
+            Action(
+                action_type="undraft_colonist",
+                target_colonist_id="12345",
+                parameters={"is_drafted": False},
+            )
         )
         await executor.execute(plan)
         client.draft_colonist.assert_awaited_once_with("12345", False)
@@ -111,7 +115,7 @@ class TestDispatch:
         executor = ActionExecutor(client)
         plan = _make_plan(
             Action(
-                action_type=ActionType.PLACE_BLUEPRINT,
+                action_type="place_blueprint",
                 parameters={"def_name": "Wall", "x": 10, "z": 20, "map_id": 0},
             )
         )
@@ -126,7 +130,7 @@ class TestDispatch:
         executor = ActionExecutor(client)
         plan = _make_plan(
             Action(
-                action_type=ActionType.PLACE_BLUEPRINT,
+                action_type="place_blueprint",
                 parameters={"def_name": "Wall"},
             )
         )
@@ -138,7 +142,7 @@ class TestDispatch:
         executor = ActionExecutor(client)
         plan = _make_plan(
             Action(
-                action_type=ActionType.MOVE_COLONIST,
+                action_type="move_colonist",
                 target_colonist_id="12345",
                 parameters={"x": 10, "z": 20},
             )
@@ -151,9 +155,9 @@ class TestDispatch:
         executor = ActionExecutor(client)
         plan = _make_plan(
             Action(
-                action_type=ActionType.ASSIGN_RESEARCHER,
+                action_type="assign_researcher",
                 target_colonist_id="12345",
-                parameters={"priority": 1},
+                parameters={"Research": 1},
             )
         )
         await executor.execute(plan)
@@ -164,7 +168,7 @@ class TestDispatch:
         executor = ActionExecutor(client)
         plan = _make_plan(
             Action(
-                action_type=ActionType.SET_RECREATION_POLICY,
+                action_type="set_recreation_policy",
                 target_colonist_id="12345",
                 parameters={"hours": [18, 19, 20], "assignment": "Joy"},
             )
@@ -180,9 +184,9 @@ class TestDispatch:
         executor = ActionExecutor(client)
         plan = _make_plan(
             Action(
-                action_type=ActionType.SET_RESEARCH_TARGET,
+                action_type="set_research_target",
                 parameters={"project": "electricity"},
             )
         )
         await executor.execute(plan)
-        client.set_research_target.assert_awaited_once_with("electricity")
+        client.set_research_target.assert_awaited_once_with("electricity", force=False)

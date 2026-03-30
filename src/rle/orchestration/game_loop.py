@@ -174,7 +174,7 @@ class RLEGameLoop:
             "status": "success", "confidence": plan.confidence,
             "num_actions": len(plan.actions),
             "actions": [
-                {"type": a.action_type.value, "target": a.target_colonist_id,
+                {"type": a.action_type, "target": a.target_colonist_id,
                  "priority": a.priority, "reason": a.reason[:200]}
                 for a in plan.actions
             ],
@@ -204,7 +204,7 @@ class RLEGameLoop:
                     "num_actions": len(p.actions),
                     "actions": [
                         {
-                            "action_type": a.action_type.value,
+                            "action_type": a.action_type,
                             "target": a.target_colonist_id,
                             "priority": a.priority,
                             "reason": a.reason,
@@ -219,7 +219,7 @@ class RLEGameLoop:
                 "num_actions": len(resolved.actions),
                 "actions": [
                     {
-                        "action_type": a.action_type.value,
+                        "action_type": a.action_type,
                         "target": a.target_colonist_id,
                         "priority": a.priority,
                     }
@@ -314,7 +314,7 @@ class RLEGameLoop:
                             "confidence": plan.confidence,
                             "num_actions": len(plan.actions),
                             "action_types": [
-                                a.action_type.value for a in plan.actions
+                                a.action_type for a in plan.actions
                             ],
                         },
                     )

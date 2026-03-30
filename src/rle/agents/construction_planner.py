@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from rle.agents.actions import ActionType
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.rimapi.schemas import GameState
 
@@ -13,11 +12,11 @@ class ConstructionPlanner(RimWorldRoleAgent):
     """Plans colony infrastructure, buildings, and repairs."""
 
     ROLE_NAME: ClassVar[str] = "construction_planner"
-    ALLOWED_ACTIONS: ClassVar[set[ActionType]] = {
-        ActionType.PLACE_BLUEPRINT,
-        ActionType.CANCEL_BLUEPRINT,
-        ActionType.DESIGNATE_AREA,
-        ActionType.NO_ACTION,
+    ALLOWED_ACTIONS: ClassVar[set[str]] = {
+        "place_blueprint",
+        "cancel_blueprint",
+        "designate_area",
+        "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.2, 0.6)
 

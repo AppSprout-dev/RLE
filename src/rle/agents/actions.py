@@ -2,49 +2,21 @@
 
 from __future__ import annotations
 
-from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 
-class ActionType(str, Enum):
-    """All possible action types across all role agents."""
-
-    # Resource
-    SET_WORK_PRIORITY = "set_work_priority"
-    HAUL_RESOURCE = "haul_resource"
-    SET_GROWING_ZONE = "set_growing_zone"
-    TOGGLE_POWER = "toggle_power"
-    CREATE_STOCKPILE = "create_stockpile"
-    JOB_ASSIGN = "job_assign"
-    DESIGNATE_AREA = "designate_area"
-    # Defense
-    DRAFT_COLONIST = "draft_colonist"
-    UNDRAFT_COLONIST = "undraft_colonist"
-    MOVE_COLONIST = "move_colonist"
-    # Research
-    SET_RESEARCH_TARGET = "set_research_target"
-    ASSIGN_RESEARCHER = "assign_researcher"
-    # Social
-    SET_RECREATION_POLICY = "set_recreation_policy"
-    ASSIGN_SOCIAL_ACTIVITY = "assign_social_activity"
-    # Construction
-    PLACE_BLUEPRINT = "place_blueprint"
-    CANCEL_BLUEPRINT = "cancel_blueprint"
-    # Medical
-    ASSIGN_BED_REST = "assign_bed_rest"
-    ADMINISTER_MEDICINE = "administer_medicine"
-    # General
-    NO_ACTION = "no_action"
-
-
 class Action(BaseModel):
-    """A single proposed action from a role agent."""
+    """A single proposed action from a role agent.
+
+    action_type maps to a key in WRITE_CATALOG (api_catalog.py).
+    Agents can use any RIMAPI write endpoint by name.
+    """
 
     model_config = ConfigDict(frozen=True)
 
-    action_type: ActionType
+    action_type: str  # Key from WRITE_CATALOG (e.g. "work_priority", "blueprint")
     target_colonist_id: str | None = None
     parameters: dict[str, Any] = {}
     priority: int = 5  # 1 (highest) to 10 (lowest)
@@ -70,3 +42,33 @@ class ActionPlanParseError(Exception):
         self.raw_content = raw_content
         self.reason = reason
         super().__init__(f"Failed to parse action plan: {reason}")
+
+
+# Legacy ActionType names → WRITE_CATALOG keys for backward compat during transition.
+# Agents can use either the old names or the new catalog keys.
+ACTION_TYPE_ALIASES: dict[str, str] = {
+    "set_work_priority": "work_priority",
+    "haul_resource": "work_priority",  # haul = set Hauling priority to 1
+    "set_growing_zone": "growing_zone",
+    "toggle_power": "toggle_power",
+    "create_stockpile": "stockpile_zone",
+    "job_assign": "job_assign",
+    "designate_area": "designate_area",
+    "draft_colonist": "draft",
+    "undraft_colonist": "draft",
+    "move_colonist": "move",
+    "set_research_target": "research_target",
+    "assign_researcher": "work_priority",  # assign = set Research priority to 1
+    "set_recreation_policy": "time_assignment",
+    "assign_social_activity": "time_assignment",
+    "place_blueprint": "blueprint",
+    "cancel_blueprint": "designate_area",  # cancel = deconstruct designation
+    "assign_bed_rest": "bed_rest",
+    "administer_medicine": "tend",
+    "no_action": "no_action",
+}
+
+
+def resolve_endpoint(action_type: str) -> str:
+    """Map an action_type string to a WRITE_CATALOG key."""
+    return ACTION_TYPE_ALIASES.get(action_type, action_type)

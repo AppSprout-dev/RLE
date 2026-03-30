@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from rle.agents.actions import ActionType
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.rimapi.schemas import GameState
 
@@ -13,10 +12,10 @@ class MedicalOfficer(RimWorldRoleAgent):
     """Manages colony health care, triage, and medicine allocation."""
 
     ROLE_NAME: ClassVar[str] = "medical_officer"
-    ALLOWED_ACTIONS: ClassVar[set[ActionType]] = {
-        ActionType.ASSIGN_BED_REST,
-        ActionType.ADMINISTER_MEDICINE,
-        ActionType.NO_ACTION,
+    ALLOWED_ACTIONS: ClassVar[set[str]] = {
+        "assign_bed_rest",
+        "administer_medicine",
+        "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.1, 0.5)
 

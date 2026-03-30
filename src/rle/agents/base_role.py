@@ -14,7 +14,7 @@ from felix_agent_sdk.providers.base import BaseProvider
 from felix_agent_sdk.providers.types import ChatMessage, CompletionResult, MessageRole
 from felix_agent_sdk.tokens.budget import TokenBudget
 
-from rle.agents.actions import Action, ActionPlan, ActionPlanParseError, ActionType
+from rle.agents.actions import Action, ActionPlan, ActionPlanParseError
 from rle.agents.json_repair import repair_json
 from rle.rimapi.schemas import GameState
 from rle.rimapi.sse_client import RimAPIEvent
@@ -65,7 +65,7 @@ class RimWorldRoleAgent(LLMAgent):
     """
 
     ROLE_NAME: ClassVar[str] = "base"
-    ALLOWED_ACTIONS: ClassVar[set[ActionType]] = set()
+    ALLOWED_ACTIONS: ClassVar[set[str]] = set()
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.2, 0.8)
 
     def __init__(
@@ -197,7 +197,7 @@ class RimWorldRoleAgent(LLMAgent):
                 "role": self.ROLE_NAME,
                 "tick": state.colony.tick,
                 "day": state.colony.day,
-                "allowed_actions": [a.value for a in self.ALLOWED_ACTIONS],
+                "allowed_actions": sorted(self.ALLOWED_ACTIONS),
             },
             context_history=context_history or [],
         )
@@ -290,15 +290,14 @@ class RimWorldRoleAgent(LLMAgent):
 
         actions: list[Action] = []
         for raw_action in data.get("actions", []):
-            try:
-                action_type = ActionType(raw_action["action_type"])
-            except (KeyError, ValueError) as e:
-                logger.warning("Skipping invalid action: %s", e)
+            action_type = raw_action.get("action_type", "")
+            if not action_type:
+                logger.warning("Skipping action with no action_type")
                 continue
             if action_type not in self.ALLOWED_ACTIONS:
                 logger.warning(
                     "Skipping disallowed action %s for role %s",
-                    action_type.value,
+                    action_type,
                     self.ROLE_NAME,
                 )
                 continue

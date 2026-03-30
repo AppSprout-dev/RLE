@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from rle.agents.actions import ActionType
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.rimapi.schemas import GameState
 
@@ -13,11 +12,11 @@ class DefenseCommander(RimWorldRoleAgent):
     """Manages colony defense against external threats."""
 
     ROLE_NAME: ClassVar[str] = "defense_commander"
-    ALLOWED_ACTIONS: ClassVar[set[ActionType]] = {
-        ActionType.DRAFT_COLONIST,
-        ActionType.UNDRAFT_COLONIST,
-        ActionType.MOVE_COLONIST,
-        ActionType.NO_ACTION,
+    ALLOWED_ACTIONS: ClassVar[set[str]] = {
+        "draft_colonist",
+        "undraft_colonist",
+        "move_colonist",
+        "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.1, 0.6)
 

@@ -10,7 +10,7 @@ import pytest
 from felix_agent_sdk import LLMResult
 from felix_agent_sdk.core import HelixGeometry
 from felix_agent_sdk.providers.types import CompletionResult
-from rle.agents.actions import ActionPlan, ActionPlanParseError, ActionType
+from rle.agents.actions import ActionPlan, ActionPlanParseError
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.rimapi.schemas import GameState
 
@@ -21,9 +21,9 @@ from rle.rimapi.schemas import GameState
 
 class _DummyRoleAgent(RimWorldRoleAgent):
     ROLE_NAME: ClassVar[str] = "dummy"
-    ALLOWED_ACTIONS: ClassVar[set[ActionType]] = {
-        ActionType.SET_WORK_PRIORITY,
-        ActionType.NO_ACTION,
+    ALLOWED_ACTIONS: ClassVar[set[str]] = {
+        "set_work_priority",
+        "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.3, 0.8)
 
@@ -225,7 +225,7 @@ class TestParseActionPlan:
         assert plan.role == "dummy"
         assert plan.tick == 720000
         assert len(plan.actions) == 1
-        assert plan.actions[0].action_type == ActionType.SET_WORK_PRIORITY
+        assert plan.actions[0].action_type == "set_work_priority"
         assert plan.summary == "Prioritizing food production due to low food_days."
 
     def test_markdown_fences_stripped(
@@ -261,7 +261,7 @@ class TestParseActionPlan:
         result = self._make_result(json.dumps(data))
         plan = agent.parse_action_plan(result, tick=1)
         assert len(plan.actions) == 1
-        assert plan.actions[0].action_type == ActionType.SET_WORK_PRIORITY
+        assert plan.actions[0].action_type == "set_work_priority"
 
     def test_disallowed_action_filtered(
         self, mock_provider: MagicMock, helix: HelixGeometry,

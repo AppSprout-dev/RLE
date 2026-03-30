@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from rle.agents.actions import ActionType
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.rimapi.schemas import GameState
 
@@ -13,10 +12,10 @@ class SocialOverseer(RimWorldRoleAgent):
     """Oversees colony social health, morale, and recreation."""
 
     ROLE_NAME: ClassVar[str] = "social_overseer"
-    ALLOWED_ACTIONS: ClassVar[set[ActionType]] = {
-        ActionType.SET_RECREATION_POLICY,
-        ActionType.ASSIGN_SOCIAL_ACTIVITY,
-        ActionType.NO_ACTION,
+    ALLOWED_ACTIONS: ClassVar[set[str]] = {
+        "set_recreation_policy",
+        "assign_social_activity",
+        "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.3, 0.7)
 

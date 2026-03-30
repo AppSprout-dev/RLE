@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from rle.agents.actions import Action, ActionPlan, ActionType
+from rle.agents.actions import Action, ActionPlan
 from rle.orchestration.action_resolver import (
     ActionResolver,
 )
@@ -67,11 +67,11 @@ class TestNoConflicts:
         resolver = ActionResolver()
         plans = [
             _plan("resource_manager", [
-                Action(action_type=ActionType.SET_WORK_PRIORITY,
+                Action(action_type="set_work_priority",
                        target_colonist_id="col_01", priority=3),
             ]),
             _plan("defense_commander", [
-                Action(action_type=ActionType.DRAFT_COLONIST,
+                Action(action_type="draft_colonist",
                        target_colonist_id="col_02", priority=2),
             ]),
         ]
@@ -98,28 +98,28 @@ class TestSamePawnConflicts:
         resolver = ActionResolver()
         plans = [
             _plan("resource_manager", [
-                Action(action_type=ActionType.SET_WORK_PRIORITY,
+                Action(action_type="set_work_priority",
                        target_colonist_id="col_01", priority=5),
             ]),
             _plan("defense_commander", [
-                Action(action_type=ActionType.DRAFT_COLONIST,
+                Action(action_type="draft_colonist",
                        target_colonist_id="col_01", priority=1),
             ]),
         ]
         state = _make_state()
         result = resolver.resolve(plans, state)
         assert len(result.actions) == 1
-        assert result.actions[0].action_type == ActionType.DRAFT_COLONIST
+        assert result.actions[0].action_type == "draft_colonist"
 
     def test_confidence_tiebreak(self) -> None:
         resolver = ActionResolver()
         plans = [
             _plan("resource_manager", [
-                Action(action_type=ActionType.SET_WORK_PRIORITY,
+                Action(action_type="set_work_priority",
                        target_colonist_id="col_01", priority=3),
             ], confidence=0.9),
             _plan("social_overseer", [
-                Action(action_type=ActionType.ASSIGN_SOCIAL_ACTIVITY,
+                Action(action_type="assign_social_activity",
                        target_colonist_id="col_01", priority=3),
             ], confidence=0.4),
         ]
@@ -128,7 +128,7 @@ class TestSamePawnConflicts:
         assert len(result.actions) == 1
         # Same action.priority (3), same role_priority (3 vs 5), RM wins on role
         # Actually RM has role_priority=3, SO has 5, so RM wins
-        assert result.actions[0].action_type == ActionType.SET_WORK_PRIORITY
+        assert result.actions[0].action_type == "set_work_priority"
 
 
 # ------------------------------------------------------------------
@@ -145,11 +145,11 @@ class TestEmergencyPriority:
         )
         plans = [
             _plan("resource_manager", [
-                Action(action_type=ActionType.SET_WORK_PRIORITY,
+                Action(action_type="set_work_priority",
                        target_colonist_id="col_01", priority=1),
             ], confidence=0.9),
             _plan("defense_commander", [
-                Action(action_type=ActionType.DRAFT_COLONIST,
+                Action(action_type="draft_colonist",
                        target_colonist_id="col_01", priority=1),
             ], confidence=0.5),
         ]
@@ -157,7 +157,7 @@ class TestEmergencyPriority:
         result = resolver.resolve(plans, state)
         assert len(result.actions) == 1
         # DC gets role_priority=1 during raid, RM stays at 3
-        assert result.actions[0].action_type == ActionType.DRAFT_COLONIST
+        assert result.actions[0].action_type == "draft_colonist"
 
     def test_disease_promotes_medical_officer(self) -> None:
         resolver = ActionResolver()
@@ -167,35 +167,35 @@ class TestEmergencyPriority:
         )
         plans = [
             _plan("social_overseer", [
-                Action(action_type=ActionType.ASSIGN_SOCIAL_ACTIVITY,
+                Action(action_type="assign_social_activity",
                        target_colonist_id="col_01", priority=2),
             ]),
             _plan("medical_officer", [
-                Action(action_type=ActionType.ASSIGN_BED_REST,
+                Action(action_type="assign_bed_rest",
                        target_colonist_id="col_01", priority=2),
             ]),
         ]
         state = _make_state(threats=[disease])
         result = resolver.resolve(plans, state)
         assert len(result.actions) == 1
-        assert result.actions[0].action_type == ActionType.ASSIGN_BED_REST
+        assert result.actions[0].action_type == "assign_bed_rest"
 
     def test_low_health_triggers_medical_emergency(self) -> None:
         resolver = ActionResolver()
         plans = [
             _plan("resource_manager", [
-                Action(action_type=ActionType.SET_WORK_PRIORITY,
+                Action(action_type="set_work_priority",
                        target_colonist_id="col_01", priority=2),
             ]),
             _plan("medical_officer", [
-                Action(action_type=ActionType.ASSIGN_BED_REST,
+                Action(action_type="assign_bed_rest",
                        target_colonist_id="col_01", priority=2),
             ]),
         ]
         state = _make_state(colonist_health=0.3)
         result = resolver.resolve(plans, state)
         assert len(result.actions) == 1
-        assert result.actions[0].action_type == ActionType.ASSIGN_BED_REST
+        assert result.actions[0].action_type == "assign_bed_rest"
 
 
 # ------------------------------------------------------------------
@@ -208,11 +208,11 @@ class TestColonyActions:
         resolver = ActionResolver()
         plans = [
             _plan("research_director", [
-                Action(action_type=ActionType.SET_RESEARCH_TARGET,
+                Action(action_type="set_research_target",
                        parameters={"project": "electricity"}),
             ], confidence=0.8),
             _plan("resource_manager", [
-                Action(action_type=ActionType.SET_RESEARCH_TARGET,
+                Action(action_type="set_research_target",
                        parameters={"project": "battery"}),
             ], confidence=0.5),
         ]
@@ -220,7 +220,7 @@ class TestColonyActions:
         result = resolver.resolve(plans, state)
         research_actions = [
             a for a in result.actions
-            if a.action_type == ActionType.SET_RESEARCH_TARGET
+            if a.action_type == "set_research_target"
         ]
         assert len(research_actions) == 1
 
@@ -273,11 +273,11 @@ class TestPeacetimeNoAction:
         resolver = ActionResolver()
         plans = [
             _plan("resource_manager", [
-                Action(action_type=ActionType.SET_WORK_PRIORITY,
+                Action(action_type="set_work_priority",
                        target_colonist_id="col_01", priority=3),
             ], confidence=0.9),
             _plan("social_overseer", [
-                Action(action_type=ActionType.NO_ACTION,
+                Action(action_type="no_action",
                        target_colonist_id="col_01", priority=5),
             ], confidence=0.5),
         ]
@@ -285,7 +285,7 @@ class TestPeacetimeNoAction:
         result = resolver.resolve(plans, state)
         pawn_actions = [a for a in result.actions if a.target_colonist_id == "col_01"]
         assert len(pawn_actions) == 1
-        assert pawn_actions[0].action_type == ActionType.NO_ACTION
+        assert pawn_actions[0].action_type == "no_action"
 
     def test_real_action_wins_during_raid(self) -> None:
         """During a raid, regular actions beat NO_ACTION."""
@@ -296,11 +296,11 @@ class TestPeacetimeNoAction:
         )
         plans = [
             _plan("defense_commander", [
-                Action(action_type=ActionType.DRAFT_COLONIST,
+                Action(action_type="draft_colonist",
                        target_colonist_id="col_01", priority=1),
             ]),
             _plan("resource_manager", [
-                Action(action_type=ActionType.NO_ACTION,
+                Action(action_type="no_action",
                        target_colonist_id="col_01", priority=5),
             ]),
         ]
@@ -308,18 +308,18 @@ class TestPeacetimeNoAction:
         result = resolver.resolve(plans, state)
         pawn_actions = [a for a in result.actions if a.target_colonist_id == "col_01"]
         assert len(pawn_actions) == 1
-        assert pawn_actions[0].action_type == ActionType.DRAFT_COLONIST
+        assert pawn_actions[0].action_type == "draft_colonist"
 
     def test_real_action_wins_during_medical_emergency(self) -> None:
         """During a medical emergency, regular actions beat NO_ACTION."""
         resolver = ActionResolver()
         plans = [
             _plan("medical_officer", [
-                Action(action_type=ActionType.ASSIGN_BED_REST,
+                Action(action_type="assign_bed_rest",
                        target_colonist_id="col_01", priority=2),
             ]),
             _plan("resource_manager", [
-                Action(action_type=ActionType.NO_ACTION,
+                Action(action_type="no_action",
                        target_colonist_id="col_01", priority=5),
             ]),
         ]
@@ -327,7 +327,7 @@ class TestPeacetimeNoAction:
         result = resolver.resolve(plans, state)
         pawn_actions = [a for a in result.actions if a.target_colonist_id == "col_01"]
         assert len(pawn_actions) == 1
-        assert pawn_actions[0].action_type == ActionType.ASSIGN_BED_REST
+        assert pawn_actions[0].action_type == "assign_bed_rest"
 
 
 # ------------------------------------------------------------------
@@ -339,7 +339,7 @@ class TestMergedPlan:
     def test_role_is_orchestrator(self) -> None:
         resolver = ActionResolver()
         plans = [_plan("resource_manager", [
-            Action(action_type=ActionType.NO_ACTION),
+            Action(action_type="no_action"),
         ])]
         state = _make_state()
         result = resolver.resolve(plans, state)

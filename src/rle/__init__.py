@@ -9,7 +9,6 @@ from rle.agents import (
     Action,
     ActionPlan,
     ActionPlanParseError,
-    ActionType,
     ConstructionPlanner,
     DefenseCommander,
     MedicalOfficer,
@@ -18,6 +17,7 @@ from rle.agents import (
     RimWorldRoleAgent,
     SocialOverseer,
     register_rle_agents,
+    resolve_endpoint,
 )
 from rle.config import RLEConfig
 from rle.orchestration import (
@@ -63,7 +63,7 @@ __all__ = [
     "ActionPlan",
     "ActionPlanParseError",
     "ActionResolver",
-    "ActionType",
+    "resolve_endpoint",
     "ColonistData",
     "ColonyData",
     "CompositeScorer",

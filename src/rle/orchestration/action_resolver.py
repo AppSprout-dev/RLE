@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ConfigDict
 
-from rle.agents.actions import Action, ActionPlan, ActionType
+from rle.agents.actions import Action, ActionPlan
 from rle.rimapi.schemas import GameState
 
 logger = logging.getLogger(__name__)
@@ -159,7 +159,7 @@ class ActionResolver:
                 candidates,
                 key=lambda ta: (
                     # Peacetime: prefer NO_ACTION (do no harm)
-                    0 if peacetime and ta.action.action_type == ActionType.NO_ACTION else 1,
+                    0 if peacetime and ta.action.action_type == "no_action" else 1,
                     ta.action.priority,   # Rule 2: lower priority number wins
                     ta.role_priority,     # Rule 1/3: role priority
                     -ta.plan_confidence,  # Rule 4: higher confidence wins (negate)
@@ -167,12 +167,12 @@ class ActionResolver:
             )
             if len(candidates) > 1:
                 losers = [
-                    f"{ta.role}:{ta.action.action_type.value}" for ta in candidates
+                    f"{ta.role}:{ta.action.action_type}" for ta in candidates
                     if ta is not winner
                 ]
                 logger.info(
                     "Pawn %s conflict: %s wins over %s",
-                    cid, f"{winner.role}:{winner.action.action_type.value}",
+                    cid, f"{winner.role}:{winner.action.action_type}",
                     ", ".join(losers),
                 )
             resolved.append(winner.action)
@@ -182,7 +182,7 @@ class ActionResolver:
         """Deduplicate colony-level actions by type, highest role priority wins."""
         by_type: dict[str, list[_TaggedAction]] = {}
         for ta in actions:
-            by_type.setdefault(ta.action.action_type.value, []).append(ta)
+            by_type.setdefault(ta.action.action_type, []).append(ta)
 
         resolved: list[Action] = []
         for action_type, candidates in by_type.items():

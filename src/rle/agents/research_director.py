@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from rle.agents.actions import ActionType
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.rimapi.schemas import GameState
 
@@ -13,10 +12,10 @@ class ResearchDirector(RimWorldRoleAgent):
     """Directs colony technology advancement and researcher allocation."""
 
     ROLE_NAME: ClassVar[str] = "research_director"
-    ALLOWED_ACTIONS: ClassVar[set[ActionType]] = {
-        ActionType.SET_RESEARCH_TARGET,
-        ActionType.ASSIGN_RESEARCHER,
-        ActionType.NO_ACTION,
+    ALLOWED_ACTIONS: ClassVar[set[str]] = {
+        "set_research_target",
+        "assign_researcher",
+        "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.3, 0.8)
 

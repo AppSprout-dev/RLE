@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 from felix_agent_sdk import AgentFactory
 from felix_agent_sdk.core import HelixConfig, HelixGeometry
 from rle.agents import register_rle_agents
-from rle.agents.actions import ActionPlan, ActionType
+from rle.agents.actions import ActionPlan
 from rle.agents.base_role import _SHARED_SYSTEM_PREFIX
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
@@ -28,14 +28,14 @@ class TestResourceManagerClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            ActionType.SET_WORK_PRIORITY,
-            ActionType.HAUL_RESOURCE,
-            ActionType.SET_GROWING_ZONE,
-            ActionType.TOGGLE_POWER,
-            ActionType.CREATE_STOCKPILE,
-            ActionType.JOB_ASSIGN,
-            ActionType.DESIGNATE_AREA,
-            ActionType.NO_ACTION,
+            "set_work_priority",
+            "haul_resource",
+            "set_growing_zone",
+            "toggle_power",
+            "create_stockpile",
+            "job_assign",
+            "designate_area",
+            "no_action",
         }
         assert ResourceManager.ALLOWED_ACTIONS == expected
 
@@ -102,10 +102,10 @@ class TestDefenseCommanderClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            ActionType.DRAFT_COLONIST,
-            ActionType.UNDRAFT_COLONIST,
-            ActionType.MOVE_COLONIST,
-            ActionType.NO_ACTION,
+            "draft_colonist",
+            "undraft_colonist",
+            "move_colonist",
+            "no_action",
         }
         assert DefenseCommander.ALLOWED_ACTIONS == expected
 
@@ -162,9 +162,9 @@ class TestResearchDirectorClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            ActionType.SET_RESEARCH_TARGET,
-            ActionType.ASSIGN_RESEARCHER,
-            ActionType.NO_ACTION,
+            "set_research_target",
+            "assign_researcher",
+            "no_action",
         }
         assert ResearchDirector.ALLOWED_ACTIONS == expected
 
@@ -209,9 +209,9 @@ class TestSocialOverseerClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            ActionType.SET_RECREATION_POLICY,
-            ActionType.ASSIGN_SOCIAL_ACTIVITY,
-            ActionType.NO_ACTION,
+            "set_recreation_policy",
+            "assign_social_activity",
+            "no_action",
         }
         assert SocialOverseer.ALLOWED_ACTIONS == expected
 
@@ -256,10 +256,10 @@ class TestConstructionPlannerClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            ActionType.PLACE_BLUEPRINT,
-            ActionType.CANCEL_BLUEPRINT,
-            ActionType.DESIGNATE_AREA,
-            ActionType.NO_ACTION,
+            "place_blueprint",
+            "cancel_blueprint",
+            "designate_area",
+            "no_action",
         }
         assert ConstructionPlanner.ALLOWED_ACTIONS == expected
 
@@ -304,9 +304,9 @@ class TestMedicalOfficerClassVars:
 
     def test_allowed_actions(self) -> None:
         expected = {
-            ActionType.ASSIGN_BED_REST,
-            ActionType.ADMINISTER_MEDICINE,
-            ActionType.NO_ACTION,
+            "assign_bed_rest",
+            "administer_medicine",
+            "no_action",
         }
         assert MedicalOfficer.ALLOWED_ACTIONS == expected
 

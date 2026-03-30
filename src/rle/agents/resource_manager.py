@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from rle.agents.actions import ActionType
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.rimapi.schemas import GameState
 
@@ -13,15 +12,15 @@ class ResourceManager(RimWorldRoleAgent):
     """Manages the colony's economy: food, raw materials, power, and hauling."""
 
     ROLE_NAME: ClassVar[str] = "resource_manager"
-    ALLOWED_ACTIONS: ClassVar[set[ActionType]] = {
-        ActionType.SET_WORK_PRIORITY,
-        ActionType.HAUL_RESOURCE,
-        ActionType.SET_GROWING_ZONE,
-        ActionType.TOGGLE_POWER,
-        ActionType.CREATE_STOCKPILE,
-        ActionType.JOB_ASSIGN,
-        ActionType.DESIGNATE_AREA,
-        ActionType.NO_ACTION,
+    ALLOWED_ACTIONS: ClassVar[set[str]] = {
+        "set_work_priority",
+        "haul_resource",
+        "set_growing_zone",
+        "toggle_power",
+        "create_stockpile",
+        "job_assign",
+        "designate_area",
+        "no_action",
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.2, 0.7)
 

@@ -91,6 +91,12 @@ class RimAPIClient:
             return body["data"]
         return body
 
+    async def call(self, method: str, path: str, json: dict | None = None) -> dict:
+        """Generic endpoint call — used by the dynamic action dispatcher."""
+        if method.upper() == "GET":
+            return await self._get(path)
+        return await self._post(path, json=json)
+
     async def _post(self, path: str, json: dict | None = None) -> dict:
         """Perform a POST request and return parsed JSON."""
         try:
