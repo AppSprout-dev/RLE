@@ -16,6 +16,7 @@ class ConstructionPlanner(RimWorldRoleAgent):
     ALLOWED_ACTIONS: ClassVar[set[ActionType]] = {
         ActionType.PLACE_BLUEPRINT,
         ActionType.CANCEL_BLUEPRINT,
+        ActionType.DESIGNATE_AREA,
         ActionType.NO_ACTION,
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.2, 0.6)

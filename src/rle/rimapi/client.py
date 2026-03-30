@@ -412,7 +412,47 @@ class RimAPIClient:
         return last_result
 
     async def place_blueprint(self, blueprint: dict) -> dict:
+        """Place a blueprint using the full PasteAreaRequestDto format.
+
+        The blueprint dict must contain: map_id, position, blueprint (with
+        width, height, and buildings list). Use place_building() for simple
+        single-building placement.
+        """
         return await self._post("/api/v1/builder/blueprint", json=blueprint)
+
+    async def place_building(
+        self,
+        def_name: str,
+        x: int,
+        z: int,
+        *,
+        stuff_def: str = "WoodLog",
+        rotation: int = 0,
+        map_id: int = 0,
+    ) -> dict:
+        """Place a single building blueprint at (x, z).
+
+        Wraps the PasteAreaRequestDto with a 1x1 blueprint grid.
+        """
+        return await self.place_blueprint({
+            "map_id": map_id,
+            "position": {"x": x, "y": 0, "z": z},
+            "blueprint": {
+                "width": 1,
+                "height": 1,
+                "floors": [],
+                "buildings": [
+                    {
+                        "def_name": def_name,
+                        "stuff_def_name": stuff_def,
+                        "rel_x": 0,
+                        "rel_z": 0,
+                        "rotation": rotation,
+                    },
+                ],
+            },
+            "clear_obstacles": True,
+        })
 
     async def move_colonist(self, colonist_id: str, x: int, z: int) -> dict:
         return await self._post(
@@ -508,6 +548,34 @@ class RimAPIClient:
                 "point_b": {"x": x2, "y": 0, "z": z2},
             },
         )
+
+    async def create_stockpile_zone(
+        self,
+        map_id: int,
+        x1: int,
+        z1: int,
+        x2: int,
+        z2: int,
+        name: str = "",
+        priority: int = 3,
+        allowed_item_defs: list[str] | None = None,
+        allowed_item_categories: list[str] | None = None,
+    ) -> dict:
+        """Create a stockpile zone with optional item filtering."""
+        body: dict = {
+            "map_id": map_id,
+            "point_a": {"x": x1, "y": 0, "z": z1},
+            "point_b": {"x": x2, "y": 0, "z": z2},
+        }
+        if name:
+            body["name"] = name
+        if priority != 3:
+            body["priority"] = priority
+        if allowed_item_defs:
+            body["allowed_item_defs"] = allowed_item_defs
+        if allowed_item_categories:
+            body["allowed_item_categories"] = allowed_item_categories
+        return await self._post("/api/v1/map/zone/stockpile", json=body)
 
     async def assign_bed_rest(
         self, patient_id: str, bed_building_id: int | None = None,

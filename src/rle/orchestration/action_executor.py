@@ -79,6 +79,7 @@ class ActionExecutor:
         ActionType.SET_RECREATION_POLICY,
         ActionType.ASSIGN_BED_REST,
         ActionType.ADMINISTER_MEDICINE,
+        ActionType.JOB_ASSIGN,
     })
 
     async def _dispatch(self, action: Action) -> None:
@@ -125,21 +126,22 @@ class ActionExecutor:
     async def _do_place_blueprint(
         self, cid: str, params: dict[str, Any],
     ) -> None:
-        # Agent provides simple params (def_name, x, z, x2, z2).
-        # Use designate_area for zone-type placements, or place_blueprint for buildings.
-        if "x" in params and "z" in params:
-            x1 = params.get("x", 0)
-            z1 = params.get("z", 0)
-            x2 = params.get("x2", x1)
-            z2 = params.get("z2", z1)
-            def_name = params.get("def_name", "Wall")
-            await self._client.designate_area(
-                map_id=params.get("map_id", 0),
-                designation_type=def_name,
-                x1=x1, z1=z1, x2=x2, z2=z2,
-            )
-        else:
-            raise ValueError("place_blueprint requires x, z coordinates in parameters")
+        """Place a building blueprint.
+
+        Agent provides: def_name, x, z (required), stuff_def, rotation (optional).
+        Uses the PasteAreaRequestDto with a 1x1 blueprint grid.
+        """
+        if "x" not in params or "z" not in params:
+            logger.info("Skipping place_blueprint: no x, z coordinates")
+            return
+        await self._client.place_building(
+            def_name=params.get("def_name", "Wall"),
+            x=int(params["x"]),
+            z=int(params["z"]),
+            stuff_def=params.get("stuff_def", "WoodLog"),
+            rotation=int(params.get("rotation", 0)),
+            map_id=int(params.get("map_id", 0)),
+        )
 
     async def _do_move(self, cid: str, params: dict[str, Any]) -> None:
         await self._client.move_colonist(cid, params.get("x", 0), params.get("z", 0))
@@ -174,8 +176,12 @@ class ActionExecutor:
         )
 
     async def _do_toggle_power(self, cid: str, params: dict[str, Any]) -> None:
+        building_id = params.get("building_id")
+        if not building_id:
+            logger.info("Skipping toggle_power: no building_id provided")
+            return
         await self._client.toggle_power(
-            building_id=params.get("building_id", 0),
+            building_id=int(building_id),
             power_on=params.get("power_on", True),
         )
 
@@ -187,6 +193,39 @@ class ActionExecutor:
     async def _do_administer_medicine(self, cid: str, params: dict[str, Any]) -> None:
         await self._client.administer_medicine(
             cid, doctor_id=params.get("doctor_id"),
+        )
+
+    async def _do_create_stockpile(self, cid: str, params: dict[str, Any]) -> None:
+        x1 = params.get("x1", params.get("x", 0))
+        z1 = params.get("z1", params.get("z", 0))
+        x2 = params.get("x2", x1 + 5)
+        z2 = params.get("z2", z1 + 5)
+        await self._client.create_stockpile_zone(
+            map_id=int(params.get("map_id", 0)),
+            x1=x1, z1=z1, x2=x2, z2=z2,
+            name=params.get("name", ""),
+            priority=int(params.get("priority", 3)),
+            allowed_item_defs=params.get("allowed_item_defs"),
+            allowed_item_categories=params.get("allowed_item_categories"),
+        )
+
+    async def _do_job_assign(self, cid: str, params: dict[str, Any]) -> None:
+        await self._client.set_colonist_job(
+            cid,
+            job=params.get("job_def", ""),
+            target_thing_id=params.get("target_thing_id"),
+            target_position=params.get("target_position"),
+        )
+
+    async def _do_designate_area(self, cid: str, params: dict[str, Any]) -> None:
+        x1 = params.get("x1", params.get("x", 0))
+        z1 = params.get("z1", params.get("z", 0))
+        x2 = params.get("x2", x1)
+        z2 = params.get("z2", z1)
+        await self._client.designate_area(
+            map_id=int(params.get("map_id", 0)),
+            designation_type=params.get("designation_type", "Mine"),
+            x1=x1, z1=z1, x2=x2, z2=z2,
         )
 
     _handlers: dict[ActionType, Any] = {
@@ -203,4 +242,7 @@ class ActionExecutor:
         ActionType.TOGGLE_POWER: _do_toggle_power,
         ActionType.ASSIGN_BED_REST: _do_bed_rest,
         ActionType.ADMINISTER_MEDICINE: _do_administer_medicine,
+        ActionType.CREATE_STOCKPILE: _do_create_stockpile,
+        ActionType.JOB_ASSIGN: _do_job_assign,
+        ActionType.DESIGNATE_AREA: _do_designate_area,
     }

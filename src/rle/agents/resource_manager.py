@@ -18,6 +18,9 @@ class ResourceManager(RimWorldRoleAgent):
         ActionType.HAUL_RESOURCE,
         ActionType.SET_GROWING_ZONE,
         ActionType.TOGGLE_POWER,
+        ActionType.CREATE_STOCKPILE,
+        ActionType.JOB_ASSIGN,
+        ActionType.DESIGNATE_AREA,
         ActionType.NO_ACTION,
     }
     TEMPERATURE_RANGE: ClassVar[tuple[float, float]] = (0.2, 0.7)

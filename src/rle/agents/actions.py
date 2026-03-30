@@ -16,6 +16,9 @@ class ActionType(str, Enum):
     HAUL_RESOURCE = "haul_resource"
     SET_GROWING_ZONE = "set_growing_zone"
     TOGGLE_POWER = "toggle_power"
+    CREATE_STOCKPILE = "create_stockpile"
+    JOB_ASSIGN = "job_assign"
+    DESIGNATE_AREA = "designate_area"
     # Defense
     DRAFT_COLONIST = "draft_colonist"
     UNDRAFT_COLONIST = "undraft_colonist"

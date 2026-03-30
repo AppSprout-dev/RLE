@@ -32,6 +32,9 @@ class TestResourceManagerClassVars:
             ActionType.HAUL_RESOURCE,
             ActionType.SET_GROWING_ZONE,
             ActionType.TOGGLE_POWER,
+            ActionType.CREATE_STOCKPILE,
+            ActionType.JOB_ASSIGN,
+            ActionType.DESIGNATE_AREA,
             ActionType.NO_ACTION,
         }
         assert ResourceManager.ALLOWED_ACTIONS == expected
@@ -255,6 +258,7 @@ class TestConstructionPlannerClassVars:
         expected = {
             ActionType.PLACE_BLUEPRINT,
             ActionType.CANCEL_BLUEPRINT,
+            ActionType.DESIGNATE_AREA,
             ActionType.NO_ACTION,
         }
         assert ConstructionPlanner.ALLOWED_ACTIONS == expected
