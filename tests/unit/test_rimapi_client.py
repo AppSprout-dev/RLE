@@ -119,6 +119,12 @@ def all_routes(
             "total_growing_zones": 0, "planted_cells": 0,
             "harvestable_cells": 0, "crops": {},
         },
+        "/api/v1/map/terrain?map_id=0": {
+            "width": 10, "height": 10,
+            "palette": ["Soil", "WaterMovingShallow", "SoilRich", "Granite_Rough"],
+            "grid": [100, 0],
+            "floor_palette": [], "floor_grid": [100, 0],
+        },
     }
 
 

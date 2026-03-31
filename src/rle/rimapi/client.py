@@ -8,6 +8,7 @@ from types import TracebackType
 import httpx
 
 from rle.rimapi.schemas import (
+    AreaRect,
     ColonistData,
     ColonyData,
     FarmSummary,
@@ -18,6 +19,7 @@ from rle.rimapi.schemas import (
     ResourceData,
     RoomData,
     StructureData,
+    TerrainSummary,
     ThreatData,
     WeatherData,
     ZoneData,
@@ -423,8 +425,137 @@ class RimAPIClient:
             return FarmSummary(
                 total_growing_zones=int(data.get("total_growing_zones", 0)),
                 planted_cells=int(data.get("total_plants", data.get("planted_cells", 0))),
-                harvestable_cells=int(data.get("total_expected_yield", data.get("harvestable_cells", 0))),
+                harvestable_cells=int(
+                    data.get("total_expected_yield", data.get("harvestable_cells", 0)),
+                ),
                 crops=crops,
+            )
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return None
+
+    async def get_terrain_summary(
+        self,
+        colonist_positions: list[tuple[int, int]] | None = None,
+        map_id: int = 0,
+    ) -> TerrainSummary | None:
+        """Fetch terrain and compute a deterministic spatial summary.
+
+        Decodes the RLE terrain grid, classifies tiles, and finds the best
+        areas for building, farming, and stockpiling near the colony center.
+        """
+        try:
+            data = await self._get(f"/api/v1/map/terrain?map_id={map_id}")
+            if not isinstance(data, dict):
+                return None
+            width = int(data.get("width", 250))
+            height = int(data.get("height", 250))
+            palette: list[str] = data.get("palette", [])
+            rle_grid: list[int] = data.get("grid", [])
+
+            # Classify palette indices
+            water_indices: set[int] = set()
+            fertile_indices: set[int] = set()
+            rock_indices: set[int] = set()
+            for i, name in enumerate(palette):
+                low = name.lower()
+                if "water" in low or "marsh" in low:
+                    water_indices.add(i)
+                elif "rich" in low or low == "soil":
+                    fertile_indices.add(i)
+                elif "rough" in low:
+                    rock_indices.add(i)
+
+            # Decode RLE into a 2D classification grid
+            # 0=other, 1=water, 2=fertile, 3=rock
+            flat: list[int] = []
+            for i in range(0, len(rle_grid) - 1, 2):
+                count = rle_grid[i]
+                idx = rle_grid[i + 1]
+                if idx in water_indices:
+                    flat.extend([1] * count)
+                elif idx in fertile_indices:
+                    flat.extend([2] * count)
+                elif idx in rock_indices:
+                    flat.extend([3] * count)
+                else:
+                    flat.extend([0] * count)
+
+            # Compute colony center from colonist positions
+            if colonist_positions and len(colonist_positions) > 0:
+                cx = sum(p[0] for p in colonist_positions) // len(colonist_positions)
+                cz = sum(p[1] for p in colonist_positions) // len(colonist_positions)
+            else:
+                cx, cz = width // 2, height // 2
+
+            def _cell(x: int, z: int) -> int:
+                if 0 <= x < width and 0 <= z < height:
+                    idx = x + z * width
+                    return flat[idx] if idx < len(flat) else 0
+                return 1  # Out of bounds = water (unbuildable)
+
+            def _is_buildable(x: int, z: int) -> bool:
+                return _cell(x, z) in (0, 2)  # Not water, not rock
+
+            def _is_fertile(x: int, z: int) -> bool:
+                return _cell(x, z) == 2
+
+            # Find best rectangular areas near colony center using expanding search
+            def _find_clear_rect(
+                center_x: int, center_z: int, min_size: int, check_fn: callable,
+            ) -> AreaRect | None:
+                """Search outward from center for a clear rectangle."""
+                for radius in range(0, 60, 3):
+                    for dx in range(-radius, radius + 1, 3):
+                        for dz in range(-radius, radius + 1, 3):
+                            x1 = center_x + dx
+                            z1 = center_z + dz
+                            x2 = x1 + min_size - 1
+                            z2 = z1 + min_size - 1
+                            if x2 >= width or z2 >= height or x1 < 0 or z1 < 0:
+                                continue
+                            if all(
+                                check_fn(x, z)
+                                for x in range(x1, x2 + 1)
+                                for z in range(z1, z2 + 1)
+                            ):
+                                return AreaRect(x1=x1, z1=z1, x2=x2, z2=z2)
+                return None
+
+            # Find water areas near center (for avoidance)
+            water_areas: list[AreaRect] = []
+            scan_range = 40
+            water_x_min = water_x_max = water_z_min = water_z_max = None
+            for dz in range(-scan_range, scan_range + 1):
+                for dx in range(-scan_range, scan_range + 1):
+                    x, z = cx + dx, cz + dz
+                    if _cell(x, z) == 1:
+                        if water_x_min is None:
+                            water_x_min = water_x_max = x
+                            water_z_min = water_z_max = z
+                        else:
+                            water_x_min = min(water_x_min, x)
+                            water_x_max = max(water_x_max, x)
+                            water_z_min = min(water_z_min, z)
+                            water_z_max = max(water_z_max, z)
+            if water_x_min is not None:
+                water_areas.append(AreaRect(
+                    x1=water_x_min, z1=water_z_min,
+                    x2=water_x_max, z2=water_z_max,
+                    label="water",
+                ))
+
+            # Find recommended areas
+            shelter = _find_clear_rect(cx, cz, 7, _is_buildable)
+            farm = _find_clear_rect(cx, cz, 8, _is_fertile)
+            # Stockpile: buildable 5x5 near center
+            stockpile = _find_clear_rect(cx, cz, 5, _is_buildable)
+
+            return TerrainSummary(
+                colony_center=(cx, cz),
+                water_areas=water_areas,
+                recommended_shelter=shelter,
+                recommended_farm=farm,
+                recommended_stockpile=stockpile,
             )
         except (RimAPIResponseError, RimAPIConnectionError):
             return None
@@ -471,6 +602,17 @@ class RimAPIClient:
         colonists = await self.get_colonists()
         resources = await self.get_resources()
         map_data = await self.get_map()
+        # Compute terrain summary using colonist positions for colony center
+        col_positions = [(c.position[0], c.position[1]) for c in colonists]
+        terrain = await self.get_terrain_summary(col_positions)
+        if terrain is not None:
+            map_data = MapData(
+                size=map_data.size, biome=map_data.biome, season=map_data.season,
+                temperature=map_data.temperature, structures=map_data.structures,
+                zones=map_data.zones, rooms=map_data.rooms,
+                ore_deposits=map_data.ore_deposits, farm_summary=map_data.farm_summary,
+                terrain=terrain,
+            )
         research = await self.get_research()
         threats = await self.get_threats()
         weather = await self.get_weather()

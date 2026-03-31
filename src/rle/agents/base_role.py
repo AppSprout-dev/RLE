@@ -67,6 +67,12 @@ _SHARED_SYSTEM_PREFIX = (
     "\"power_on\": true}.\n"
     "- no_action: Do nothing (use when colonists are already productive).\n\n"
     "RULES:\n"
+    "- SPATIAL CONSTRAINT: The game state includes SPATIAL_CONSTRAINTS with "
+    "verified terrain data. SHELTER_SITE, FARM_SITE, STOCKPILE_SITE are "
+    "coordinates on solid, buildable ground. WATER_ZONES are areas you MUST "
+    "NEVER build on. When placing blueprints, growing_zone, stockpile_zone, "
+    "or designate_area, you MUST use coordinates from SPATIAL_CONSTRAINTS. "
+    "Do NOT invent your own coordinates — they will land in water or rock.\n"
     "- target_colonist_id MUST be a valid colonist_id from the state.\n"
     "- CRITICAL: Propose work_priority actions for EVERY colonist, not just one. "
     "Each colonist needs their own work_priority action with their colonist_id. "
@@ -224,6 +230,30 @@ class RimWorldRoleAgent(LLMAgent):
     # Task building
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _format_terrain_constraints(state: GameState) -> dict[str, Any] | None:
+        """Format terrain summary as hard spatial constraints for the LLM."""
+        terrain = state.map.terrain
+        if terrain is None:
+            return None
+        constraints: dict[str, Any] = {
+            "colony_center": terrain.colony_center,
+        }
+        if terrain.recommended_shelter:
+            s = terrain.recommended_shelter
+            constraints["SHELTER_SITE"] = f"({s.x1},{s.z1})-({s.x2},{s.z2})"
+        if terrain.recommended_farm:
+            f = terrain.recommended_farm
+            constraints["FARM_SITE"] = f"({f.x1},{f.z1})-({f.x2},{f.z2})"
+        if terrain.recommended_stockpile:
+            sp = terrain.recommended_stockpile
+            constraints["STOCKPILE_SITE"] = f"({sp.x1},{sp.z1})-({sp.x2},{sp.z2})"
+        if terrain.water_areas:
+            constraints["WATER_ZONES"] = [
+                f"({w.x1},{w.z1})-({w.x2},{w.z2})" for w in terrain.water_areas
+            ]
+        return constraints
+
     def build_task(
         self,
         state: GameState,
@@ -231,6 +261,10 @@ class RimWorldRoleAgent(LLMAgent):
     ) -> LLMTask:
         """Construct an LLMTask from filtered game state."""
         filtered = self.filter_game_state(state)
+        # Inject deterministic terrain constraints into every agent's context
+        terrain_constraints = self._format_terrain_constraints(state)
+        if terrain_constraints:
+            filtered["SPATIAL_CONSTRAINTS"] = terrain_constraints
         return LLMTask(
             task_id=f"{self.ROLE_NAME}-tick-{state.colony.tick}",
             description=self._get_task_description(),

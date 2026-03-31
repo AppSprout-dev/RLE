@@ -96,6 +96,33 @@ class FarmSummary(BaseModel):
     crops: dict[str, int] = {}
 
 
+class AreaRect(BaseModel):
+    """A rectangular area on the map."""
+
+    model_config = ConfigDict(frozen=True)
+
+    x1: int
+    z1: int
+    x2: int
+    z2: int
+    label: str = ""
+
+
+class TerrainSummary(BaseModel):
+    """Deterministic spatial analysis computed from terrain data."""
+
+    model_config = ConfigDict(frozen=True)
+
+    colony_center: tuple[int, int] = (125, 125)
+    build_areas: list[AreaRect] = []
+    farm_areas: list[AreaRect] = []
+    water_areas: list[AreaRect] = []
+    rock_areas: list[AreaRect] = []
+    recommended_stockpile: AreaRect | None = None
+    recommended_shelter: AreaRect | None = None
+    recommended_farm: AreaRect | None = None
+
+
 class MapData(BaseModel):
     """Map metadata and structures."""
 
@@ -110,6 +137,7 @@ class MapData(BaseModel):
     rooms: list[RoomData] = []
     ore_deposits: list[OreDeposit] = []
     farm_summary: FarmSummary | None = None
+    terrain: TerrainSummary | None = None
 
 
 class ResearchData(BaseModel):
