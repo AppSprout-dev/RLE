@@ -141,7 +141,16 @@ async def main(args: argparse.Namespace) -> None:
             print(f"Loading save: {scenario.save_name}")
             try:
                 await client.load_game(scenario.save_name)
-                await asyncio.sleep(2)  # Wait for game to load
+                # Wait for game to fully load — poll until colonists are available
+                for _ in range(15):
+                    await asyncio.sleep(2)
+                    try:
+                        state = await client._get("/api/v1/game/state")
+                        if state.get("colonist_count", 0) > 0:
+                            break
+                    except Exception:
+                        pass
+                print("Save loaded, game ready.")
             except Exception as e:
                 print(f"Warning: Could not load save '{scenario.save_name}': {e}")
                 print("Continuing with current game state...")
