@@ -67,12 +67,12 @@ _SHARED_SYSTEM_PREFIX = (
     "\"power_on\": true}.\n"
     "- no_action: Do nothing (use when colonists are already productive).\n\n"
     "RULES:\n"
-    "- SPATIAL CONSTRAINT: The game state includes SPATIAL_CONSTRAINTS with "
-    "verified terrain data. SHELTER_SITE, FARM_SITE, STOCKPILE_SITE are "
-    "coordinates on solid, buildable ground. WATER_ZONES are areas you MUST "
-    "NEVER build on. When placing blueprints, growing_zone, stockpile_zone, "
-    "or designate_area, you MUST use coordinates from SPATIAL_CONSTRAINTS. "
-    "Do NOT invent your own coordinates — they will land in water or rock.\n"
+    "- MAP SUMMARY: The game state includes MAP_SUMMARY with verified terrain "
+    "analysis. It contains SHELTER SITE, FARM SITE, STOCKPILE SITE with exact "
+    "coordinates on solid ground, and WATER areas to avoid. You MUST use the "
+    "coordinates from MAP_SUMMARY for all blueprint, growing_zone, "
+    "stockpile_zone, and designate_area actions. Do NOT invent coordinates — "
+    "they WILL land in water or rock. Copy the x,z values exactly.\n"
     "- target_colonist_id MUST be a valid colonist_id from the state.\n"
     "- CRITICAL: Propose work_priority actions for EVERY colonist, not just one. "
     "Each colonist needs their own work_priority action with their colonist_id. "
@@ -87,19 +87,33 @@ _SHARED_SYSTEM_PREFIX = (
     "- Respond ONLY with valid JSON.\n\n"
 )
 
-# Early-game directive injected when day < 5.
-_EARLY_GAME_DIRECTIVE = (
-    "EARLY GAME ALERT: The colony has just started. Colonists wandering or "
-    "doing GotoWander/Wait_Wander are IDLE — they need direction NOW.\n"
-    "Priority actions for day 0-3:\n"
-    "1. Create a stockpile_zone near the drop pods for supplies\n"
-    "2. Create a growing_zone for food (Plant_Potato or Plant_Rice)\n"
-    "3. Set work_priority: best grower→Growing=1, best builder→Construction=1, "
-    "best researcher→Research=1\n"
-    "4. Place blueprint for shelter (walls + door = enclosed room)\n"
-    "5. Set research_target to a useful early tech\n"
-    "6. designate_area for mining steel/components nearby\n"
-    "Do NOT propose no_action in early game. The colony needs everything.\n\n"
+# Tick-specific bootstrap playbook injected when day < 3.
+# Uses MAP_SUMMARY coordinates — agents must copy them exactly.
+_BOOTSTRAP_PLAYBOOK = (
+    "BOOTSTRAP PLAYBOOK — colony just started, follow this EXACT priority:\n\n"
+    "TICK 1 (IMMEDIATE — do ALL of these):\n"
+    "- stockpile_zone: use STOCKPILE SITE coordinates from MAP_SUMMARY\n"
+    "- work_priority for EVERY colonist: best Plants→Growing=1, "
+    "best Construction→Construction=1, best Intellectual→Research=1\n"
+    "- growing_zone: use FARM SITE coordinates from MAP_SUMMARY, "
+    "plant_def=Plant_Rice (fastest food)\n\n"
+    "TICK 2 (SHELTER — most critical):\n"
+    "- blueprint Wall: place 5x5 rectangle using SHELTER SITE from MAP_SUMMARY. "
+    "Use stuff_def=WoodLog. Leave one gap for a Door.\n"
+    "- blueprint Door: in the gap of the wall rectangle\n"
+    "- blueprint Bed: inside the shelter for EACH colonist (3 beds)\n\n"
+    "TICK 3 (COOKING + RESEARCH):\n"
+    "- blueprint Campfire or FueledStove: inside shelter for cooking\n"
+    "- blueprint ResearchBench: inside shelter\n"
+    "- research_target: set to Electricity or Smithing\n\n"
+    "TICK 4+ (EXPAND):\n"
+    "- designate_area Mine: target ore from MAP_SUMMARY\n"
+    "- Additional beds, storage, defenses as needed\n\n"
+    "CRITICAL RULES:\n"
+    "- Use EXACT coordinates from MAP_SUMMARY. Do NOT make up coordinates.\n"
+    "- Do NOT propose no_action — the colony needs EVERYTHING.\n"
+    "- Beds and cooking are SURVIVAL CRITICAL — colonists will have "
+    "mental breaks without them.\n\n"
 )
 
 
@@ -231,28 +245,96 @@ class RimWorldRoleAgent(LLMAgent):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _format_terrain_constraints(state: GameState) -> dict[str, Any] | None:
-        """Format terrain summary as hard spatial constraints for the LLM."""
+    def _build_map_summary(state: GameState) -> str | None:
+        """Build a compact ~500 token map summary from terrain + zone + room data.
+
+        This text is injected into every agent's context so they share a
+        common spatial understanding without needing to parse raw data.
+        """
         terrain = state.map.terrain
         if terrain is None:
             return None
-        constraints: dict[str, Any] = {
-            "colony_center": terrain.colony_center,
-        }
+
+        lines: list[str] = []
+        cx, cz = terrain.colony_center
+        lines.append(f"Colony center: ({cx}, {cz}).")
+
+        # Verified build/farm/stockpile sites
         if terrain.recommended_shelter:
             s = terrain.recommended_shelter
-            constraints["SHELTER_SITE"] = f"({s.x1},{s.z1})-({s.x2},{s.z2})"
+            lines.append(
+                f"SHELTER SITE (verified solid ground): "
+                f"place walls/doors/beds at ({s.x1},{s.z1})-({s.x2},{s.z2}). "
+                f"ALL blueprint actions MUST use x,z within this rectangle."
+            )
         if terrain.recommended_farm:
             f = terrain.recommended_farm
-            constraints["FARM_SITE"] = f"({f.x1},{f.z1})-({f.x2},{f.z2})"
+            lines.append(
+                f"FARM SITE (verified fertile soil): "
+                f"place growing_zone at x1={f.x1},z1={f.z1},x2={f.x2},z2={f.z2}. "
+                f"ALL growing_zone actions MUST use these exact coordinates."
+            )
         if terrain.recommended_stockpile:
             sp = terrain.recommended_stockpile
-            constraints["STOCKPILE_SITE"] = f"({sp.x1},{sp.z1})-({sp.x2},{sp.z2})"
+            lines.append(
+                f"STOCKPILE SITE (verified solid ground): "
+                f"place stockpile_zone at x1={sp.x1},z1={sp.z1},"
+                f"x2={sp.x2},z2={sp.z2}."
+            )
+
+        # Water avoidance
         if terrain.water_areas:
-            constraints["WATER_ZONES"] = [
-                f"({w.x1},{w.z1})-({w.x2},{w.z2})" for w in terrain.water_areas
+            water_strs = [
+                f"({w.x1},{w.z1})-({w.x2},{w.z2})"
+                for w in terrain.water_areas
             ]
-        return constraints
+            lines.append(f"WATER (do NOT build here): {', '.join(water_strs)}.")
+
+        # Existing zones
+        if state.map.zones:
+            zone_strs = [
+                f"{z.label} ({z.zone_type}, {z.cell_count} cells)"
+                for z in state.map.zones[:8]
+            ]
+            lines.append(f"Zones: {'; '.join(zone_strs)}.")
+        else:
+            lines.append("Zones: NONE — create stockpile and growing zone NOW.")
+
+        # Existing rooms
+        real_rooms = [r for r in state.map.rooms if r.size > 1]
+        if real_rooms:
+            room_strs = [
+                f"{r.role} ({r.size} cells, {r.bed_count} beds)"
+                for r in real_rooms[:6]
+            ]
+            lines.append(f"Rooms: {'; '.join(room_strs)}.")
+        else:
+            lines.append(
+                "Rooms: NONE — colonists sleeping outside. "
+                "Build shelter IMMEDIATELY."
+            )
+
+        # Ore
+        if state.map.ore_deposits:
+            ore_strs = [
+                f"{o.def_name} ({o.count} cells"
+                + (f", near ({o.positions[0][0]},{o.positions[0][1]})"
+                   if o.positions else "")
+                + ")"
+                for o in state.map.ore_deposits[:5]
+            ]
+            lines.append(f"Ore: {'; '.join(ore_strs)}.")
+
+        # Farm summary
+        fs = state.map.farm_summary
+        if fs and fs.total_growing_zones > 0:
+            lines.append(
+                f"Farms: {fs.total_growing_zones} zones, "
+                f"{fs.planted_cells} planted, "
+                f"{fs.harvestable_cells} harvestable."
+            )
+
+        return "\n".join(lines)
 
     def build_task(
         self,
@@ -261,10 +343,10 @@ class RimWorldRoleAgent(LLMAgent):
     ) -> LLMTask:
         """Construct an LLMTask from filtered game state."""
         filtered = self.filter_game_state(state)
-        # Inject deterministic terrain constraints into every agent's context
-        terrain_constraints = self._format_terrain_constraints(state)
-        if terrain_constraints:
-            filtered["SPATIAL_CONSTRAINTS"] = terrain_constraints
+        # Inject compact map summary into every agent's context
+        map_summary = self._build_map_summary(state)
+        if map_summary:
+            filtered["MAP_SUMMARY"] = map_summary
         return LLMTask(
             task_id=f"{self.ROLE_NAME}-tick-{state.colony.tick}",
             description=self._get_task_description(),
@@ -329,7 +411,7 @@ class RimWorldRoleAgent(LLMAgent):
 
         # Early game: override passive behavior with bootstrap directive
         day = task.metadata.get("day", 999)
-        early_game = _EARLY_GAME_DIRECTIVE if day < 5 else ""
+        early_game = _BOOTSTRAP_PLAYBOOK if day < 3 else ""
 
         system_prompt = _SHARED_SYSTEM_PREFIX + early_game + phase_block + role_block
 
