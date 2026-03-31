@@ -136,6 +136,16 @@ async def main(args: argparse.Namespace) -> None:
     sse_task = asyncio.create_task(sse.listen())
 
     async with RimAPIClient(config.rimapi_url) as client:
+        # Load the scenario's save file for a consistent starting state
+        if scenario.save_name:
+            print(f"Loading save: {scenario.save_name}")
+            try:
+                await client.load_game(scenario.save_name)
+                await asyncio.sleep(2)  # Wait for game to load
+            except Exception as e:
+                print(f"Warning: Could not load save '{scenario.save_name}': {e}")
+                print("Continuing with current game state...")
+
         loop = RLEGameLoop(
             config, client, agents,
             expected_duration_days=scenario.expected_duration_days,

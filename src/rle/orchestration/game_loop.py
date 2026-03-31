@@ -424,6 +424,8 @@ class RLEGameLoop:
     async def run(self, max_ticks: int | None = None) -> list[TickResult]:
         """Run the game loop for N ticks or until stopped."""
         self._running = True
+        if self._no_pause:
+            await self._client.unpause_game()
         tick_count = 0
         while self._running:
             result = await self.run_tick()
