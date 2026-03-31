@@ -150,6 +150,10 @@ async def main(args: argparse.Namespace) -> None:
                             break
                     except Exception:
                         pass
+                # Unforbid all starting items so colonists can use them
+                unforbid_count = await client.unforbid_all_items()
+                if unforbid_count:
+                    print(f"Unforbid {unforbid_count} items.")
                 print("Save loaded, game ready.")
             except Exception as e:
                 print(f"Warning: Could not load save '{scenario.save_name}': {e}")

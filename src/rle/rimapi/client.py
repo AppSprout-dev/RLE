@@ -638,6 +638,25 @@ class RimAPIClient:
             timestamp=time.time(),
         )
 
+    async def unforbid_all_items(self, map_id: int = 0) -> int:
+        """Unforbid all forbidden items on the map. Returns count unforbidden."""
+        try:
+            data = await self._get(f"/api/v1/map/things?map_id={map_id}")
+            things = data if isinstance(data, list) else []
+            forbidden_ids = [
+                t["thing_id"] for t in things
+                if t.get("is_forbidden", False)
+            ]
+            if not forbidden_ids:
+                return 0
+            await self._post(
+                "/api/v1/things/set-forbidden",
+                json={"thing_ids": forbidden_ids, "map_id": map_id, "forbidden": False},
+            )
+            return len(forbidden_ids)
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return 0
+
     # ------------------------------------------------------------------
     # Write endpoints — upstream RIMAPI v1.8.2+
     # ------------------------------------------------------------------
