@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from felix_agent_sdk.core import HelixConfig
 from felix_agent_sdk.providers import (
     AnthropicProvider,
@@ -33,10 +35,16 @@ class RLEConfig(BaseSettings):
     provider: str = "anthropic"
     model: str = "claude-sonnet-4-5"
     provider_base_url: str | None = None
+    openrouter_api_key: str | None = None
     tick_interval: float = 1.0
     helix_preset: str = "default"
-    max_agents: int = 6
+    max_agents: int = 7
     log_level: str = "INFO"
+
+    def model_post_init(self, __context: object) -> None:
+        """If OPENROUTER_API_KEY is set but OPENAI_API_KEY isn't, bridge them."""
+        if self.openrouter_api_key and not os.environ.get("OPENAI_API_KEY"):
+            os.environ["OPENAI_API_KEY"] = self.openrouter_api_key
 
     def get_helix_config(self) -> HelixConfig:
         """Return the HelixConfig preset matching ``helix_preset``."""
