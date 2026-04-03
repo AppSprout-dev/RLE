@@ -328,9 +328,9 @@ scripts/
 
 ## RIMAPI Fork Status
 
-We contribute upstream to IlyaChichkov/RIMAPI. PRs #52-54, #60, #63 all merged. Pending: PR #65 (set-forbidden).
+We contribute upstream to IlyaChichkov/RIMAPI. PRs #52-54, #60, #63, #65 all merged.
 
-The `rle-testing` branch on our fork stays ≤1 commit ahead of upstream develop. Once Ilya cuts a Workshop release (v1.9.0), we can stop deploying custom DLLs and use the Workshop version directly.
+The `rle-testing` branch tracks upstream develop. We always build from `rle-testing` and deploy the DLL to the Workshop folder — this is our active development workflow.
 
 To restore the original Workshop DLL: rename `RIMAPI.dll.upstream-backup` back to `RIMAPI.dll` in `C:\Steam\steamapps\workshop\content\294100\3593423732\1.6\Assemblies\`.
 ```
