@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 
 from felix_agent_sdk.communication import CentralPost, MessageType, SpokeManager
+from felix_agent_sdk.providers import ProviderError
 from felix_agent_sdk.visualization import HelixVisualizer
 from pydantic import BaseModel, ConfigDict
 
@@ -176,6 +177,17 @@ class RLEGameLoop:
                 "tick": tick_num, "agent": agent.ROLE_NAME,
                 "status": "parse_failure", "reason": e.reason,
                 "raw": e.raw_content[:500] if e.raw_content else None,
+            })
+            return agent, None
+        except ProviderError as e:
+            logger.warning(
+                "Agent %s provider error (tick %d): %s",
+                agent.ROLE_NAME, tick_num, e,
+            )
+            self._parse_failures += 1
+            self._deliberation_log.append({
+                "tick": tick_num, "agent": agent.ROLE_NAME,
+                "status": "provider_error", "reason": str(e),
             })
             return agent, None
         self._parse_successes += 1

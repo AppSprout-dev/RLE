@@ -18,7 +18,7 @@ from rle.agents.medical_officer import MedicalOfficer
 from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
 from rle.agents.social_overseer import SocialOverseer
-from rle.config import RLEConfig
+from rle.config import RLEConfig, bridge_openrouter_key
 from rle.orchestration.game_loop import RLEGameLoop
 from rle.rimapi.client import RimAPIClient
 from rle.rimapi.sse_client import RimAPISSEClient
@@ -109,6 +109,7 @@ async def main(args: argparse.Namespace) -> None:
     if args.tick_interval is not None:
         overrides["tick_interval"] = str(args.tick_interval)
     config = RLEConfig(**overrides) if overrides else RLEConfig()
+    bridge_openrouter_key(config)
     provider = config.get_provider()
     helix = HelixConfig.default().to_geometry()
     agents = _create_agents(provider, helix)

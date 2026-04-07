@@ -6,13 +6,20 @@ Compressed RimWorld save files used by the benchmark scenarios.
 
 Extract to your RimWorld saves folder:
 
-```bash
-# Windows
-gunzip -k rle_crashlanded_v1.rws.gz
-cp rle_crashlanded_v1.rws "%LOCALAPPDATA%\..\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves\"
+### Windows (PowerShell)
 
-# Or manually: extract the .gz, copy the .rws file to:
-# C:\Users\<you>\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves\
+```powershell
+# From the saves/ directory
+tar -xzf rle_crashlanded_v1.rws.gz
+Copy-Item rle_crashlanded_v1.rws "$env:LOCALAPPDATA\..\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves\"
+```
+
+### Linux / macOS
+
+```bash
+# From the saves/ directory
+gunzip -k rle_crashlanded_v1.rws.gz
+cp rle_crashlanded_v1.rws ~/.config/unity3d/Ludeon\ Studios/RimWorld\ by\ Ludeon\ Studios/Saves/
 ```
 
 `run_scenario.py` auto-loads the save by name — just make sure the `.rws` file exists in the saves folder.

@@ -41,11 +41,6 @@ class RLEConfig(BaseSettings):
     max_agents: int = 7
     log_level: str = "INFO"
 
-    def model_post_init(self, __context: object) -> None:
-        """If OPENROUTER_API_KEY is set but OPENAI_API_KEY isn't, bridge them."""
-        if self.openrouter_api_key and not os.environ.get("OPENAI_API_KEY"):
-            os.environ["OPENAI_API_KEY"] = self.openrouter_api_key
-
     def get_helix_config(self) -> HelixConfig:
         """Return the HelixConfig preset matching ``helix_preset``."""
         try:
@@ -68,3 +63,9 @@ class RLEConfig(BaseSettings):
         if self.provider_base_url:
             kwargs["base_url"] = self.provider_base_url
         return cls(**kwargs)
+
+
+def bridge_openrouter_key(config: RLEConfig) -> None:
+    """If OPENROUTER_API_KEY is set but OPENAI_API_KEY isn't, bridge them."""
+    if config.openrouter_api_key and not os.environ.get("OPENAI_API_KEY"):
+        os.environ["OPENAI_API_KEY"] = config.openrouter_api_key
