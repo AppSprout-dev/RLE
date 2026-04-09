@@ -20,6 +20,8 @@ from rle.rimapi.schemas import (
 )
 from rle.scoring.metrics import (
     MetricContext,
+    communication_efficiency,
+    coordination,
     efficiency,
     food_security,
     mood,
@@ -226,3 +228,51 @@ class TestEfficiency:
     def test_empty_plan(self) -> None:
         ctx = _ctx(tick_results=[_tick_result(0, 0)])
         assert efficiency(_state(), ctx) == pytest.approx(1.0)
+
+
+class TestCoordination:
+    def test_no_conflicts(self) -> None:
+        ctx = _ctx()
+        assert coordination(_state(), ctx) == pytest.approx(1.0)
+
+    def test_all_resolved(self) -> None:
+        ctx = _ctx()
+        ctx.conflicts_total = 10
+        ctx.conflicts_resolved = 10
+        assert coordination(_state(), ctx) == pytest.approx(1.0)
+
+    def test_half_resolved(self) -> None:
+        ctx = _ctx()
+        ctx.conflicts_total = 8
+        ctx.conflicts_resolved = 4
+        assert coordination(_state(), ctx) == pytest.approx(0.5)
+
+    def test_none_resolved(self) -> None:
+        ctx = _ctx()
+        ctx.conflicts_total = 5
+        ctx.conflicts_resolved = 0
+        assert coordination(_state(), ctx) == pytest.approx(0.0)
+
+
+class TestCommunicationEfficiency:
+    def test_no_messages(self) -> None:
+        ctx = _ctx()
+        assert communication_efficiency(_state(), ctx) == pytest.approx(1.0)
+
+    def test_all_acted_on(self) -> None:
+        ctx = _ctx()
+        ctx.messages_sent = 12
+        ctx.messages_acted_on = 12
+        assert communication_efficiency(_state(), ctx) == pytest.approx(1.0)
+
+    def test_half_acted_on(self) -> None:
+        ctx = _ctx()
+        ctx.messages_sent = 10
+        ctx.messages_acted_on = 5
+        assert communication_efficiency(_state(), ctx) == pytest.approx(0.5)
+
+    def test_none_acted_on(self) -> None:
+        ctx = _ctx()
+        ctx.messages_sent = 7
+        ctx.messages_acted_on = 0
+        assert communication_efficiency(_state(), ctx) == pytest.approx(0.0)
