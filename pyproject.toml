@@ -28,6 +28,7 @@ dev = [
     "pytest-cov>=4.0",
     "ruff>=0.1.0",
     "mypy>=1.0",
+    "types-PyYAML>=6.0",
 ]
 viz = [
     "matplotlib>=3.5",
@@ -54,3 +55,7 @@ select = ["E", "F", "I", "W"]
 [tool.mypy]
 python_version = "3.13"
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["wandb", "huggingface_hub"]
+ignore_missing_imports = true

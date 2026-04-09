@@ -90,7 +90,7 @@ class RimAPISSEClient:
     def drain_by_type(self, *event_types: str) -> list[RimAPIEvent]:
         """Drain only events matching the given types, leave others buffered."""
         matched = []
-        remaining = deque(maxlen=self._buffer.maxlen)
+        remaining: deque[RimAPIEvent] = deque(maxlen=self._buffer.maxlen)
         for event in self._buffer:
             if event.event_type in event_types:
                 matched.append(event)

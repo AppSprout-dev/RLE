@@ -62,7 +62,7 @@ class RLEConfig(BaseSettings):
         kwargs: dict[str, str] = {"model": self.model}
         if self.provider_base_url:
             kwargs["base_url"] = self.provider_base_url
-        return cls(**kwargs)
+        return cls(**kwargs)  # type: ignore[arg-type]  # subclasses accept kwargs
 
 
 def bridge_openrouter_key(config: RLEConfig) -> None:

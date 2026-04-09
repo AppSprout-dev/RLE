@@ -98,4 +98,4 @@ class ScenarioEvaluator:
         comparator = _OPERATORS.get(cond.operator)
         if comparator is None:
             return False
-        return comparator(actual, cond.value)  # type: ignore[operator]
+        return comparator(actual, cond.value)  # type: ignore[no-any-return]

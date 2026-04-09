@@ -77,7 +77,7 @@ class PairedResult:
             return "*"
         return ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return {
             "scenario": self.scenario,
             "agent_mean": round(self.agent_mean, 4),
