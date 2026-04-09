@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [master, "feature/**"]
+  pull_request:
+    branches: [master, "feature/**"]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v4
+      - run: uv pip install -e ".[dev]" --system
+      - name: Lint
+        run: ruff check src/ tests/ scripts/
+      - name: Type check
+        run: mypy src/
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v4
+      - run: uv pip install -e ".[dev]" --system
+      - name: Run tests
+        run: pytest --tb=short -q
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v4
+      - run: uv pip install -e ".[dev]" --system
+      - name: Smoke test benchmark
+        run: python scripts/run_benchmark.py --dry-run --ticks 5
