@@ -143,9 +143,17 @@ async def main(args: argparse.Namespace) -> None:
             print(f"Loading save: {scenario.save_name}")
             try:
                 await client.load_game(scenario.save_name)
-                # Wait for game to fully load
+                # Wait for RIMAPI to respond, then poll until colonists are loaded
                 from rle.docker import wait_for_rimapi
                 await wait_for_rimapi(config.rimapi_url, timeout=30.0)
+                for _ in range(15):
+                    await asyncio.sleep(2)
+                    try:
+                        state = await client._get("/api/v1/game/state")
+                        if state.get("colonist_count", 0) > 0:
+                            break
+                    except Exception:
+                        pass
                 # Unforbid all starting items so colonists can use them
                 unforbid_count = await client.unforbid_all_items()
                 if unforbid_count:

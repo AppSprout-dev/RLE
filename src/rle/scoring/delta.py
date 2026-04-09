@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from functools import cached_property
 
 from rle.scoring.bootstrap import BootstrapCI, bootstrap_ci, bootstrap_paired_delta
 
@@ -79,16 +80,16 @@ class PairedResult:
             return "*"
         return ""
 
-    @property
+    @cached_property
     def agent_ci(self) -> BootstrapCI | None:
-        """Bootstrap 95% CI for agent scores."""
+        """Bootstrap 95% CI for agent scores. Cached after first access."""
         if len(self.agent_scores) < 2:
             return None
         return bootstrap_ci(self.agent_scores)
 
-    @property
+    @cached_property
     def delta_ci(self) -> BootstrapCI | None:
-        """Bootstrap CI for agent-baseline delta."""
+        """Bootstrap CI for agent-baseline delta. Cached after first access."""
         if len(self.agent_scores) < 2 or len(self.baseline_scores) < 2:
             return None
         return bootstrap_paired_delta(self.agent_scores, self.baseline_scores)

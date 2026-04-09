@@ -17,6 +17,17 @@ ENV DISPLAY=:99 \
 
 RUN mkdir -p /opt/mods/HeadlessRimPatch /opt/mods/RIMAPI /opt/saves
 
+# Download HeadlessRimPatch v1.0.0 prebuilt DLL from GitHub Releases
+ARG HEADLESS_PATCH_VERSION=1.0.0
+RUN curl -fsSL \
+    "https://github.com/IlyaChichkov/HeadlessRimPatch/releases/download/v${HEADLESS_PATCH_VERSION}/HeadlessRimPatch-${HEADLESS_PATCH_VERSION}.zip" \
+    -o /tmp/patch.zip \
+    && apt-get update && apt-get install -y --no-install-recommends unzip \
+    && unzip /tmp/patch.zip -d /opt/mods/HeadlessRimPatch \
+    && rm /tmp/patch.zip \
+    && apt-get purge -y unzip && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

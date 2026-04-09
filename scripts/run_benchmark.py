@@ -548,9 +548,12 @@ async def main(args: argparse.Namespace) -> None:
             )
             print("Results pushed to HuggingFace Hub")
 
-    # Docker cleanup
+    # Docker cleanup (always runs, even on error)
     if docker_server:
-        await docker_server.stop()
+        try:
+            await docker_server.stop()
+        except Exception:
+            logger.warning("Failed to stop Docker container", exc_info=True)
 
 
 if __name__ == "__main__":
