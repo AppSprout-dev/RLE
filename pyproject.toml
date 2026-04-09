@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "rimworld-learning-environment"
@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Multi-agent benchmark where Felix Agent SDK agents play RimWorld"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 dependencies = [
     "felix-agent-sdk>=0.2.1",
     "httpx>=0.24",
@@ -37,8 +37,8 @@ tracking = [
     "huggingface-hub>=0.20",
 ]
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/rle"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -46,11 +46,11 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.13"
 strict = true

@@ -53,7 +53,7 @@ curl http://localhost:1234/v1/models
 
 ## Commands
 
-- Install: `pip install -e ".[dev]"`
+- Install: `uv sync --extra dev`
 - Test: `pytest`
 - Lint: `ruff check src/ tests/ scripts/`
 - Type check: `mypy src/`

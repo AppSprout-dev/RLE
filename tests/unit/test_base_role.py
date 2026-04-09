@@ -10,6 +10,7 @@ import pytest
 from felix_agent_sdk import LLMResult
 from felix_agent_sdk.core import HelixGeometry
 from felix_agent_sdk.providers.types import CompletionResult
+
 from rle.agents.actions import ActionPlan, ActionPlanParseError
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.rimapi.schemas import GameState

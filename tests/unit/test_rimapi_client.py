@@ -7,6 +7,7 @@ from collections.abc import AsyncGenerator
 
 import httpx
 import pytest
+
 from rle.rimapi.client import (
     RimAPIClient,
     RimAPIConnectionError,

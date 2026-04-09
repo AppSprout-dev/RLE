@@ -10,6 +10,7 @@ from pathlib import Path
 
 from felix_agent_sdk.core import HelixConfig
 from felix_agent_sdk.visualization import HelixVisualizer
+
 from rle.agents import AGENT_DISPLAY
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander

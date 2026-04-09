@@ -114,7 +114,7 @@ def plot_history(runs: list[dict]) -> None:
     try:
         import matplotlib.pyplot as plt
     except ImportError:
-        print("matplotlib not installed. Run: pip install matplotlib")
+        print("matplotlib not installed. Run: uv sync --extra viz")
         return
 
     if not runs:

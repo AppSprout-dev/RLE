@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from felix_agent_sdk.core import HelixConfig
 from felix_agent_sdk.visualization import HelixVisualizer
+
 from rle.agents import AGENT_DISPLAY
 
 

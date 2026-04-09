@@ -5,7 +5,7 @@
 ```bash
 git clone https://github.com/AppSprout-dev/RLE.git
 cd RLE
-pip install -e ".[dev]"
+uv sync --extra dev
 pytest  # should pass 262+ tests
 ```
 

@@ -43,7 +43,7 @@ You need four things set up:
 
 1. **RimWorld** (Steam) with **Harmony** and **[RIMAPI](https://github.com/IlyaChichkov/RIMAPI)** mods subscribed and **enabled** in the Mods menu. Load order: Harmony → Core → (DLCs) → RIMAPI.
 2. **LLM provider** — [LM Studio](https://lmstudio.ai/) (local, free) or [OpenRouter](https://openrouter.ai/) (cloud)
-3. **Python 3.10+** with pip
+3. **Python 3.13+** with [uv](https://docs.astral.sh/uv/)
 4. **Save file** — `rle_crashlanded_v1` in RimWorld's save folder (the scenario auto-loads it)
 
 > **RIMAPI note:** The Workshop version may not have our contributed endpoints yet. See [CLAUDE.md](CLAUDE.md) for instructions on building and deploying our fork DLL.
@@ -63,7 +63,7 @@ curl http://localhost:1234/v1/models            # LM Studio (if using local)
 ```bash
 git clone https://github.com/AppSprout-dev/RLE.git
 cd RLE
-pip install -e ".[dev]"
+uv sync --extra dev
 ```
 
 ### Configure `.env`
