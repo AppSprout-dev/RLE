@@ -43,7 +43,7 @@ You need four things set up:
 
 1. **RimWorld** (Steam) with **Harmony** and **[RIMAPI](https://github.com/IlyaChichkov/RIMAPI)** mods subscribed and **enabled** in the Mods menu. Load order: Harmony → Core → (DLCs) → RIMAPI.
 2. **LLM provider** — [LM Studio](https://lmstudio.ai/) (local, free) or [OpenRouter](https://openrouter.ai/) (cloud)
-3. **Python 3.13+** with [uv](https://docs.astral.sh/uv/)
+3. **Python 3.14+** with [uv](https://docs.astral.sh/uv/)
 4. **Save file** — `rle_crashlanded_v1` in RimWorld's save folder (the scenario auto-loads it)
 
 > **RIMAPI note:** The Workshop version may not have our contributed endpoints yet. See [CLAUDE.md](CLAUDE.md) for instructions on building and deploying our fork DLL.
@@ -182,7 +182,7 @@ All colonists alive, buildings on solid ground, no water placement.
 
 ## Scoring
 
-8 metrics, weighted composite (scenarios can override weights):
+10 metrics, weighted composite (scenarios can override weights):
 
 | Metric | Default Weight | What it measures |
 |--------|---------------|------------------|
@@ -194,6 +194,10 @@ All colonists alive, buildings on solid ground, no water placement.
 | research | 0.10 | % research tree completed |
 | self_sufficiency | 0.10 | power + food + population stability |
 | efficiency | 0.05 | action execution rate |
+| coordination | 0.00* | conflicts resolved / total conflicts |
+| communication_efficiency | 0.00* | messages acted on / total messages |
+
+*Process metrics weighted 0.0 until game loop wires MetricContext counters.
 
 ## Development
 
