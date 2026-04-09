@@ -40,6 +40,8 @@ class RLEConfig(BaseSettings):
     helix_preset: str = "default"
     max_agents: int = 7
     log_level: str = "INFO"
+    docker_image: str = "rle-headless:latest"
+    docker_port: int = 8765
 
     def get_helix_config(self) -> HelixConfig:
         """Return the HelixConfig preset matching ``helix_preset``."""

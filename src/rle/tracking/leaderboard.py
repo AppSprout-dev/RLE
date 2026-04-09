@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from rle.scoring.delta import _std, _t_to_p
+from rle.scoring.delta import _std
 
 
 class LeaderboardEntry(BaseModel):

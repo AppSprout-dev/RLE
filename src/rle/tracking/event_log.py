@@ -7,7 +7,6 @@ with no dependencies. W&B Weave provides optional rich visualization on top.
 
 from __future__ import annotations
 
-import json
 import time
 from collections import Counter
 from enum import Enum

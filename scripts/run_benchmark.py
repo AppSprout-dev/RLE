@@ -346,9 +346,25 @@ async def main(args: argparse.Namespace) -> None:
     helix = HelixConfig.default().to_geometry()
     scenarios = list_scenarios()
     provider, config = _build_provider(args)
-    if args.tick_interval is not None and not args.dry_run:
+    is_smoke_test = args.smoke_test or args.dry_run
+    if args.dry_run:
+        logger.warning("--dry-run is deprecated, use --smoke-test")
+    if args.tick_interval is not None and not is_smoke_test:
         config = RLEConfig(**{**config.model_dump(), "tick_interval": args.tick_interval})
-    use_mock_rimapi = args.dry_run or args.provider is not None
+    use_mock_rimapi = (is_smoke_test or args.provider is not None) and not args.docker
+
+    num_runs = getattr(args, "runs", 1) or 1
+
+    if args.ablation:
+        print("Ablation study not yet implemented.")
+        return
+
+    # N >= 4 enforcement
+    if args.push_hf and num_runs < 4:
+        print("ERROR: Leaderboard submission requires --runs 4 or higher.")
+        return
+    if num_runs < 4 and not use_mock_rimapi:
+        print(f"WARNING: N={num_runs} runs is below minimum (4) for statistical validity.")
     ticks_override = _resolve_ticks(args, use_mock_rimapi)
 
     output_dir = None
@@ -378,12 +394,24 @@ async def main(args: argparse.Namespace) -> None:
             "ticks_per_scenario": ticks_override,
         })
 
-    num_runs = getattr(args, "runs", 1) or 1
     no_baseline = getattr(args, "no_baseline", False)
     is_paired = not use_mock_rimapi and not no_baseline
 
     results = []
     paired_results: list[PairedResult] = []
+
+    # Docker lifecycle (optional)
+    docker_server = None
+    if args.docker:
+        from rle.docker import DockerGameServer
+        docker_server = DockerGameServer(
+            image=config.docker_image, port=config.docker_port,
+        )
+        await docker_server.start()
+        config = RLEConfig(**{
+            **config.model_dump(),
+            "rimapi_url": docker_server.url,
+        })
 
     async with RimAPIClient(config.rimapi_url) as client:
         if use_mock_rimapi:
@@ -392,6 +420,8 @@ async def main(args: argparse.Namespace) -> None:
             )
 
         for scenario in scenarios:
+            if docker_server:
+                await docker_server.restart()
             paired = PairedResult(scenario=scenario.name) if is_paired else None
 
             for run_id in range(num_runs):
@@ -518,13 +548,29 @@ async def main(args: argparse.Namespace) -> None:
             )
             print("Results pushed to HuggingFace Hub")
 
+    # Docker cleanup
+    if docker_server:
+        await docker_server.stop()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run all RLE benchmark scenarios")
     parser.add_argument("--output", help="Output directory for CSV results")
     parser.add_argument(
-        "--dry-run", action="store_true",
+        "--smoke-test", action="store_true",
         help="Use mock RIMAPI (combine with --provider for real LLM + fake game)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="(Deprecated, use --smoke-test) Use mock RIMAPI",
+    )
+    parser.add_argument(
+        "--docker", action="store_true",
+        help="Use Docker container for headless RimWorld (requires docker/Dockerfile built)",
+    )
+    parser.add_argument(
+        "--ablation", action="store_true",
+        help="Run ablation study: full benchmark + 7 single-agent-removed runs",
     )
     parser.add_argument(
         "--provider", choices=["anthropic", "openai", "local"],
