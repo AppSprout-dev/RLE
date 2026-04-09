@@ -82,8 +82,10 @@ class DockerGameServer:
     async def start(self) -> None:
         """Start container and wait for RIMAPI healthcheck."""
         logger.info("Starting %s from image %s", self._container_name, self._image)
+        # Remove stale container with same name if it exists
+        await _run("rm", "-f", self._container_name, check=False)
         await _run(
-            "run", "-d",
+            "run", "-d", "--rm",
             "-p", f"{self._port}:8765",
             "--name", self._container_name,
             "--shm-size=1g",
@@ -92,10 +94,9 @@ class DockerGameServer:
         await wait_for_rimapi(self.url)
 
     async def stop(self) -> None:
-        """Stop and remove container. Ignores errors if already stopped."""
+        """Stop container. --rm flag auto-removes it after stop."""
         logger.info("Stopping %s", self._container_name)
         await _run("stop", self._container_name, check=False)
-        await _run("rm", self._container_name, check=False)
 
     async def restart(self) -> None:
         """Restart for clean game state between scenarios."""

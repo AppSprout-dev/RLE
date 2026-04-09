@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from rle.scoring.delta import _std
+from rle.scoring.bootstrap import bootstrap_ci
 
 
 class LeaderboardEntry(BaseModel):
@@ -82,11 +82,8 @@ class Leaderboard:
 
             ci: tuple[float, float] | None = None
             if len(composites) >= 2:
-                std = _std(composites)
-                se = std / len(composites) ** 0.5
-                # 95% CI via t-approximation
-                t_crit = 1.96 if len(composites) > 30 else 2.0
-                ci = (composite - t_crit * se, composite + t_crit * se)
+                bci = bootstrap_ci(composites)
+                ci = (bci.ci_lower, bci.ci_upper)
 
             cost = float(latest.get("cost", {}).get("estimated_cost_usd", 0.0))
             tokens = int(latest.get("cost", {}).get("total_tokens", 0))

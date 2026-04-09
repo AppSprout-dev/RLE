@@ -15,7 +15,9 @@ ENV DISPLAY=:99 \
     AUDIODEV=null \
     PULSE_SERVER=
 
-RUN mkdir -p /opt/mods/HeadlessRimPatch /opt/mods/RIMAPI /opt/saves
+RUN useradd -m -s /bin/bash rimworld \
+    && mkdir -p /opt/mods/HeadlessRimPatch /opt/mods/RIMAPI /opt/saves /opt/mods-merged \
+    && chown -R rimworld:rimworld /opt/mods /opt/saves /opt/mods-merged
 
 # Download HeadlessRimPatch v1.0.0 prebuilt DLL from GitHub Releases
 ARG HEADLESS_PATCH_VERSION=1.0.0
@@ -30,6 +32,8 @@ RUN curl -fsSL \
 
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
+
+USER rimworld
 
 EXPOSE 8765
 

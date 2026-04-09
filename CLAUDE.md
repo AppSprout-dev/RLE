@@ -211,7 +211,7 @@ Agents communicate through Felix SDK's CentralPost, not through the orchestrator
 - **Before deliberation**: `process_all_messages()` routes previous tick's messages to agent spoke inbound queues. Agents read via `_get_spoke_context()`.
 - **MapAnalyst first**: Deliberates, sends TASK_COMPLETE with spatial analysis. Messages routed immediately so role agents see it.
 - **After deliberation**: Each role agent sends `TASK_COMPLETE` with role, summary, confidence, action types.
-- **After scoring**: Hub broadcasts `STATUS_UPDATE` with composite score + all 8 metrics.
+- **After scoring**: Hub broadcasts `STATUS_UPDATE` with composite score + all 10 metrics.
 - **On phase change**: Hub broadcasts `PHASE_ANNOUNCE` when macro_time crosses 0.4 (exploration→analysis) or 0.7 (analysis→synthesis).
 
 ## SSE Events
@@ -236,7 +236,7 @@ Macro helix: `t = min(1.0, game_day / expected_duration_days)` drives agent beha
 - **Analysis** (0.4 <= t < 0.7): Medium temp, evaluate trade-offs
 - **Synthesis** (t >= 0.7): Low temperature, decisive actions
 
-## Scoring (8 metrics, weighted composite)
+## Scoring (10 metrics, weighted composite)
 
 | Metric | Default Weight | Source |
 |--------|---------------|--------|
@@ -248,6 +248,10 @@ Macro helix: `t = min(1.0, game_day / expected_duration_days)` drives agent beha
 | research | 0.10 | % research tree completed |
 | self_sufficiency | 0.10 | power + food + population stability |
 | efficiency | 0.05 | action execution rate |
+| coordination | 0.00* | conflicts resolved / total conflicts |
+| communication_efficiency | 0.00* | messages acted on / total messages |
+
+*Process metrics have 0.0 weight until game loop wires MetricContext counters. Target: coordination=0.12, communication_efficiency=0.08.
 
 Scenarios can override weights. TimeSeriesRecorder exports per-tick CSV.
 
@@ -312,7 +316,7 @@ src/rle/
 │   ├── state_manager.py   # GameStateManager (SSE drain, macro time, history)
 │   ├── action_executor.py # Routes actions to RIMAPI write endpoints
 │   └── action_resolver.py # 4-rule conflict resolution
-├── scoring/               # 8 metrics, composite scorer, CSV recorder
+├── scoring/               # 10 metrics, composite scorer, bootstrap CIs, CSV recorder
 └── scenarios/             # YAML schema, loader, evaluator, 6 definitions
 scripts/
 ├── run_scenario.py        # Single scenario CLI (auto-loads save, unforbids items)

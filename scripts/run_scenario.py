@@ -20,6 +20,7 @@ from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
 from rle.agents.social_overseer import SocialOverseer
 from rle.config import RLEConfig, bridge_openrouter_key
+from rle.docker import wait_for_rimapi
 from rle.orchestration.game_loop import RLEGameLoop
 from rle.rimapi.client import RimAPIClient
 from rle.rimapi.sse_client import RimAPISSEClient
@@ -144,7 +145,6 @@ async def main(args: argparse.Namespace) -> None:
             try:
                 await client.load_game(scenario.save_name)
                 # Wait for RIMAPI to respond, then poll until colonists are loaded
-                from rle.docker import wait_for_rimapi
                 await wait_for_rimapi(config.rimapi_url, timeout=30.0)
                 for _ in range(15):
                     await asyncio.sleep(2)

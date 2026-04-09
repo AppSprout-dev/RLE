@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Multi-agent benchmark where Felix Agent SDK agents play RimWorld"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 dependencies = [
     "felix-agent-sdk>=0.2.1",
     "httpx>=0.24",
@@ -47,13 +47,13 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py313"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 strict = true
 
 [[tool.mypy.overrides]]

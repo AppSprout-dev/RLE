@@ -56,8 +56,8 @@ def bootstrap_ci(
             n_bootstrap=n_bootstrap,
         )
 
-    # Population std (ddof=0) — sufficient for CI estimation
-    std = math.sqrt(sum((x - mean) ** 2 for x in values) / n)
+    # Sample std (ddof=1) — consistent with PairedResult._std in delta.py
+    std = math.sqrt(sum((x - mean) ** 2 for x in values) / (n - 1))
 
     rng = random.Random(seed)
     boot_means = sorted(sum(rng.choices(values, k=n)) / n for _ in range(n_bootstrap))

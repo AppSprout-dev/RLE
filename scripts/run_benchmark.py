@@ -413,147 +413,145 @@ async def main(args: argparse.Namespace) -> None:
             "rimapi_url": docker_server.url,
         })
 
-    async with RimAPIClient(config.rimapi_url) as client:
-        if use_mock_rimapi:
-            client._client = httpx.AsyncClient(
-                transport=_make_mock_transport(), base_url="http://mock",
-            )
-
-        for scenario in scenarios:
-            if docker_server:
-                await docker_server.restart()
-            paired = PairedResult(scenario=scenario.name) if is_paired else None
-
-            for run_id in range(num_runs):
-                run_label = f" (run {run_id + 1}/{num_runs})" if num_runs > 1 else ""
-
-                # Load save if available (for reproducible initial conditions)
-                if scenario.save_name and not use_mock_rimapi:
-                    try:
-                        await client.load_game(scenario.save_name)
-                        await asyncio.sleep(GAME_LOAD_WAIT_SECONDS)  # Wait for game to load
-                    except Exception as e:
-                        logger.warning("Could not load save %s: %s", scenario.save_name, e)
-
-                # Agent run
-                print(f"\nRunning: {scenario.name} ({scenario.difficulty}){run_label}...")
-                result = await _run_scenario(
-                    scenario, config, client, provider, helix, output_dir,
-                    max_ticks_override=ticks_override,
-                    provider_kwargs=provider_kwargs or None,
-                    visualize=args.visualize,
-                    no_think=args.no_think,
-                    parallel=not args.sequential,
-                    no_pause=args.no_pause,
-                )
-                results.append(result)
-                if paired:
-                    paired.agent_scores.append(result["score"])
-                print(
-                    f"  -> agent: {result['outcome']} | score={result['score']:.3f} "
-                    f"| {result['ticks']} ticks | {result['elapsed_s']}s "
-                    f"| parse {result['parse_rate']:.0%} ({result['parse_failures']} fail)"
+    try:
+        async with RimAPIClient(config.rimapi_url) as client:
+            if use_mock_rimapi:
+                client._client = httpx.AsyncClient(
+                    transport=_make_mock_transport(), base_url="http://mock",
                 )
 
-                # Baseline run (reload same save, no agents)
-                if is_paired:
-                    if scenario.save_name:
+            for scenario in scenarios:
+                if docker_server:
+                    await docker_server.restart()
+                paired = PairedResult(scenario=scenario.name) if is_paired else None
+
+                for run_id in range(num_runs):
+                    run_label = f" (run {run_id + 1}/{num_runs})" if num_runs > 1 else ""
+
+                    # Load save if available (for reproducible initial conditions)
+                    if scenario.save_name and not use_mock_rimapi:
                         try:
                             await client.load_game(scenario.save_name)
                             await asyncio.sleep(GAME_LOAD_WAIT_SECONDS)
                         except Exception as e:
-                            logger.warning("Could not reload save: %s", e)
+                            logger.warning("Could not load save %s: %s", scenario.save_name, e)
 
-                    print(f"  baseline{run_label}...")
-                    baseline = await _run_scenario(
+                    # Agent run
+                    print(f"\nRunning: {scenario.name} ({scenario.difficulty}){run_label}...")
+                    result = await _run_scenario(
                         scenario, config, client, provider, helix, output_dir,
                         max_ticks_override=ticks_override,
-                        no_agent=True,
+                        provider_kwargs=provider_kwargs or None,
+                        visualize=args.visualize,
+                        no_think=args.no_think,
+                        parallel=not args.sequential,
+                        no_pause=args.no_pause,
                     )
-                    paired.baseline_scores.append(baseline["score"])
-                    print(f"  -> baseline: score={baseline['score']:.3f}")
+                    results.append(result)
+                    if paired:
+                        paired.agent_scores.append(result["score"])
+                    print(
+                        f"  -> agent: {result['outcome']} | score={result['score']:.3f} "
+                        f"| {result['ticks']} ticks | {result['elapsed_s']}s "
+                        f"| parse {result['parse_rate']:.0%} ({result['parse_failures']} fail)"
+                    )
 
-            if paired:
-                paired_results.append(paired)
+                    # Baseline run (reload same save, no agents)
+                    if is_paired:
+                        if scenario.save_name:
+                            try:
+                                await client.load_game(scenario.save_name)
+                                await asyncio.sleep(GAME_LOAD_WAIT_SECONDS)
+                            except Exception as e:
+                                logger.warning("Could not reload save: %s", e)
 
-    # Print results
-    if is_paired and paired_results:
-        from rle.scoring.delta import print_paired_leaderboard
-        print_paired_leaderboard(paired_results, model=args.model, num_runs=num_runs)
-    else:
-        _print_leaderboard(results, model=args.model)
+                        print(f"  baseline{run_label}...")
+                        baseline = await _run_scenario(
+                            scenario, config, client, provider, helix, output_dir,
+                            max_ticks_override=ticks_override,
+                            no_agent=True,
+                        )
+                        paired.baseline_scores.append(baseline["score"])
+                        print(f"  -> baseline: score={baseline['score']:.3f}")
 
-    # Build enriched summary with metadata
-    metadata = collect_metadata()
-    summary = {
-        **metadata,
-        "model": args.model or config.model,
-        "provider": args.provider or config.provider,
-        "base_url": args.base_url or None,
-        "no_think": args.no_think,
-        "parallel": not args.sequential,
-        "tick_interval": config.tick_interval,
-        "ticks_per_scenario": ticks_override,
-        "num_runs": num_runs,
-        "paired": is_paired,
-        "scenarios": results,
-    }
-    if is_paired and paired_results:
-        summary["paired_results"] = [p.to_dict() for p in paired_results]
+                if paired:
+                    paired_results.append(paired)
 
-    # Auto-generate run directory if --output not specified
-    output_dir = Path(args.output) if args.output else get_run_dir(args.model)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    summary_path = output_dir / "benchmark_summary.json"
-    summary_path.write_text(json.dumps(summary, indent=2, default=str))
-    print(f"\nResults exported to {output_dir}/")
+        # Print results
+        if is_paired and paired_results:
+            from rle.scoring.delta import print_paired_leaderboard
+            print_paired_leaderboard(paired_results, model=args.model, num_runs=num_runs)
+        else:
+            _print_leaderboard(results, model=args.model)
 
-    # Only track real benchmark runs (not mock/dry-run JSON compliance tests)
-    scores = [r.get("score", 0) for r in results]
-    avg = sum(scores) / len(scores) if scores else 0
-    if not use_mock_rimapi:
-        history_path = append_history(summary)
-        print(f"History appended to {history_path}")
+        # Build enriched summary with metadata
+        metadata = collect_metadata()
+        summary = {
+            **metadata,
+            "model": args.model or config.model,
+            "provider": args.provider or config.provider,
+            "base_url": args.base_url or None,
+            "no_think": args.no_think,
+            "parallel": not args.sequential,
+            "tick_interval": config.tick_interval,
+            "ticks_per_scenario": ticks_override,
+            "num_runs": num_runs,
+            "paired": is_paired,
+            "scenarios": results,
+        }
+        if is_paired and paired_results:
+            summary["paired_results"] = [p.to_dict() for p in paired_results]
 
-        is_new_best, prev_score = update_baseline(summary)
-        if is_new_best:
-            delta = f"+{avg - prev_score:.3f}" if prev_score else "first run"
-            print(f"NEW BASELINE: {avg:.3f} ({delta})")
-        elif prev_score is not None:
-            print(f"Baseline: {prev_score:.3f} (this run: {avg:.3f})")
-    else:
-        print("(dry-run: skipping history/baseline tracking)")
+        # Auto-generate run directory if --output not specified
+        output_dir = Path(args.output) if args.output else get_run_dir(args.model)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        summary_path = output_dir / "benchmark_summary.json"
+        summary_path.write_text(json.dumps(summary, indent=2, default=str))
+        print(f"\nResults exported to {output_dir}/")
 
-    # W&B logging (optional)
-    if wandb_logger.enabled:
-        wandb_logger.log_final_summary(
-            avg_score=avg,
-            parse_rate=sum(r.get("parse_successes", 0) for r in results)
-            / max(1, sum(r["parse_successes"] + r["parse_failures"] for r in results)),
-            total_time=sum(r.get("elapsed_s", 0) for r in results),
-        )
-        for r in results:
-            wandb_logger.log_scenario_result(r)
-        wandb_logger.finish()
-        print("W&B run logged")
+        # Only track real benchmark runs (not mock/dry-run JSON compliance tests)
+        scores = [r.get("score", 0) for r in results]
+        avg = sum(scores) / len(scores) if scores else 0
+        if not use_mock_rimapi:
+            history_path = append_history(summary)
+            print(f"History appended to {history_path}")
 
-    # HuggingFace Hub push (optional)
-    if args.push_hf:
-        hf = HFLogger(enabled=True)
-        if hf.enabled:
-            hf.push_results(
-                history_path=history_path,
-                baselines_dir=Path("results/baselines"),
-                run_dir=output_dir,
+            is_new_best, prev_score = update_baseline(summary)
+            if is_new_best:
+                delta = f"+{avg - prev_score:.3f}" if prev_score else "first run"
+                print(f"NEW BASELINE: {avg:.3f} ({delta})")
+            elif prev_score is not None:
+                print(f"Baseline: {prev_score:.3f} (this run: {avg:.3f})")
+        else:
+            print("(dry-run: skipping history/baseline tracking)")
+
+        # W&B logging (optional)
+        if wandb_logger.enabled:
+            wandb_logger.log_final_summary(
+                avg_score=avg,
+                parse_rate=sum(r.get("parse_successes", 0) for r in results)
+                / max(1, sum(r["parse_successes"] + r["parse_failures"] for r in results)),
+                total_time=sum(r.get("elapsed_s", 0) for r in results),
             )
-            print("Results pushed to HuggingFace Hub")
+            for r in results:
+                wandb_logger.log_scenario_result(r)
+            wandb_logger.finish()
+            print("W&B run logged")
 
-    # Docker cleanup (always runs, even on error)
-    if docker_server:
-        try:
+        # HuggingFace Hub push (optional)
+        if args.push_hf:
+            hf = HFLogger(enabled=True)
+            if hf.enabled:
+                hf.push_results(
+                    history_path=history_path,
+                    baselines_dir=Path("results/baselines"),
+                    run_dir=output_dir,
+                )
+                print("Results pushed to HuggingFace Hub")
+
+    finally:
+        if docker_server:
             await docker_server.stop()
-        except Exception:
-            logger.warning("Failed to stop Docker container", exc_info=True)
 
 
 if __name__ == "__main__":
@@ -573,7 +571,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--ablation", action="store_true",
-        help="Run ablation study: full benchmark + 7 single-agent-removed runs",
+        help="(WIP) Run ablation study: full benchmark + 7 single-agent-removed runs",
     )
     parser.add_argument(
         "--provider", choices=["anthropic", "openai", "local"],
