@@ -16,6 +16,10 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "research": 0.10,
     "self_sufficiency": 0.10,
     "efficiency": 0.05,
+    # Process metrics: weight 0.0 until game loop populates MetricContext counters.
+    # Target weights once wired: coordination=0.12, communication_efficiency=0.08.
+    "coordination": 0.0,
+    "communication_efficiency": 0.0,
 }
 
 

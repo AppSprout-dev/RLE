@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from rle.scenarios.loader import list_scenarios, load_scenario
 from rle.scenarios.schema import ScenarioConfig
 

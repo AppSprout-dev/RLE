@@ -1,6 +1,6 @@
 """Plot score timeseries from RLE benchmark CSV files.
 
-Requires: pip install rimworld-learning-environment[viz]
+Requires: uv sync --extra viz
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ def plot_scenario(csv_path: Path, output_path: Path | None = None) -> None:
     try:
         import matplotlib.pyplot as plt
     except ImportError:
-        print("matplotlib is required: pip install rimworld-learning-environment[viz]")
+        print("matplotlib is required: uv sync --extra viz")
         sys.exit(1)
 
     data = _load_csv(csv_path)
@@ -72,7 +72,7 @@ def plot_comparison(csv_dir: Path, output_path: Path | None = None) -> None:
     try:
         import matplotlib.pyplot as plt
     except ImportError:
-        print("matplotlib is required: pip install rimworld-learning-environment[viz]")
+        print("matplotlib is required: uv sync --extra viz")
         sys.exit(1)
 
     csv_files = sorted(csv_dir.glob("*.csv"))

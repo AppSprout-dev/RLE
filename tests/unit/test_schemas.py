@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from pydantic import ValidationError
+
 from rle.rimapi.schemas import (
     ColonistData,
     ColonyData,

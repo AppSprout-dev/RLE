@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from functools import cached_property
+
+from rle.scoring.bootstrap import BootstrapCI, bootstrap_ci, bootstrap_paired_delta
 
 
 @dataclass
@@ -77,14 +80,32 @@ class PairedResult:
             return "*"
         return ""
 
-    def to_dict(self) -> dict:
+    @cached_property
+    def agent_ci(self) -> BootstrapCI | None:
+        """Bootstrap 95% CI for agent scores. Cached after first access."""
+        if len(self.agent_scores) < 2:
+            return None
+        return bootstrap_ci(self.agent_scores)
+
+    @cached_property
+    def delta_ci(self) -> BootstrapCI | None:
+        """Bootstrap CI for agent-baseline delta. Cached after first access."""
+        if len(self.agent_scores) < 2 or len(self.baseline_scores) < 2:
+            return None
+        return bootstrap_paired_delta(self.agent_scores, self.baseline_scores)
+
+    def to_dict(self) -> dict[str, object]:
+        ci = self.agent_ci
+        dci = self.delta_ci
         return {
             "scenario": self.scenario,
             "agent_mean": round(self.agent_mean, 4),
             "agent_std": round(self.agent_std, 4),
+            "agent_ci": [round(ci.ci_lower, 4), round(ci.ci_upper, 4)] if ci else None,
             "baseline_mean": round(self.baseline_mean, 4),
             "baseline_std": round(self.baseline_std, 4),
             "delta": round(self.delta, 4),
+            "delta_ci": [round(dci.ci_lower, 4), round(dci.ci_upper, 4)] if dci else None,
             "effect_size": round(self.effect_size, 2),
             "p_value": round(self.p_value, 4) if self.p_value is not None else None,
             "n_agent": len(self.agent_scores),

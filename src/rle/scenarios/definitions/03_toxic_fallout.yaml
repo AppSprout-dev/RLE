@@ -31,3 +31,5 @@ scoring_weights:
   research: 0.05
   threat_response: 0.05
   efficiency: 0.05
+  coordination: 0.0
+  communication_efficiency: 0.0

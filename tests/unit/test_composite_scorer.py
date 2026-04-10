@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+
 from rle.rimapi.schemas import (
     ColonyData,
     GameState,
@@ -47,8 +48,8 @@ class TestDefaultWeights:
     def test_sum_to_one(self) -> None:
         assert sum(DEFAULT_WEIGHTS.values()) == pytest.approx(1.0)
 
-    def test_eight_metrics(self) -> None:
-        assert len(DEFAULT_WEIGHTS) == 8
+    def test_ten_metrics(self) -> None:
+        assert len(DEFAULT_WEIGHTS) == 10
 
 
 class TestCompositeScorer:
@@ -58,7 +59,7 @@ class TestCompositeScorer:
         assert isinstance(snap, ScoreSnapshot)
         assert snap.tick == 600000
         assert snap.day == 10
-        assert len(snap.metrics) == 8
+        assert len(snap.metrics) == 10
         assert 0.0 <= snap.composite <= 1.0
 
     def test_custom_weights(self) -> None:
@@ -87,14 +88,16 @@ class TestFinalScore:
                 tick=1, day=1,
                 metrics={"survival": 1.0, "mood": 0.8, "food_security": 0.6,
                          "wealth": 0.5, "research": 0.0, "threat_response": 1.0,
-                         "self_sufficiency": 0.5, "efficiency": 1.0},
+                         "self_sufficiency": 0.5, "efficiency": 1.0,
+                         "coordination": 0.9, "communication_efficiency": 0.8},
                 composite=0.7,
             ),
             ScoreSnapshot(
                 tick=2, day=2,
                 metrics={"survival": 0.5, "mood": 0.6, "food_security": 0.4,
                          "wealth": 0.3, "research": 0.5, "threat_response": 0.5,
-                         "self_sufficiency": 0.5, "efficiency": 0.5},
+                         "self_sufficiency": 0.5, "efficiency": 0.5,
+                         "coordination": 0.7, "communication_efficiency": 0.6},
                 composite=0.5,
             ),
         ]

@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+
 from rle.orchestration.state_manager import GameStateManager
 from rle.rimapi.schemas import GameState
 

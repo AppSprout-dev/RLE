@@ -46,7 +46,7 @@ def repair_json(raw: str) -> str:
         return raw
 
 
-def try_parse_json(raw: str) -> dict | None:
+def try_parse_json(raw: str) -> dict[str, object] | None:
     """Attempt to repair and parse JSON into a dict.
 
     Returns None if parsing fails after repair.

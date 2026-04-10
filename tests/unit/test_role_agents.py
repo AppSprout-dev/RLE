@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 
 from felix_agent_sdk import AgentFactory
 from felix_agent_sdk.core import HelixConfig, HelixGeometry
+
 from rle.agents import register_rle_agents
 from rle.agents.actions import ActionPlan
 from rle.agents.base_role import _SHARED_SYSTEM_PREFIX

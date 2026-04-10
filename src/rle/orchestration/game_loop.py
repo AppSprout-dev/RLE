@@ -19,6 +19,7 @@ from rle.orchestration.action_executor import ActionExecutor, ExecutionResult
 from rle.orchestration.action_resolver import ActionResolver
 from rle.orchestration.state_manager import GameStateManager
 from rle.rimapi.client import RimAPIClient
+from rle.rimapi.schemas import GameState
 from rle.rimapi.sse_client import RimAPISSEClient
 from rle.scenarios.evaluator import EvaluationResult, ScenarioEvaluator
 from rle.scoring.composite import CompositeScorer, ScoreSnapshot
@@ -91,7 +92,7 @@ class RLEGameLoop:
         self._parse_successes = 0
         self._parse_failures = 0
         self._log_dir: Path | None = None
-        self._deliberation_log: list[dict] = []
+        self._deliberation_log: list[dict[str, object]] = []
         self._parallel = parallel
         self._last_phase: str = ""
         self._dashboard_export_dir = dashboard_export_dir
@@ -262,11 +263,11 @@ class RLEGameLoop:
             json.dumps(data, indent=2),
         )
 
-    def _update_metric_context(self, result: TickResult, state: object) -> None:
+    def _update_metric_context(self, result: TickResult, state: GameState) -> None:
         """Append tick data to metric context for scoring history."""
         self._metric_context.tick_results.append(result)
         self._metric_context.state_history.append(state)
-        for threat in state.threats:  # type: ignore[attr-defined]
+        for threat in state.threats:
             seen_ids = {t.threat_id for t in self._metric_context.threats_seen}
             if threat.threat_id not in seen_ids:
                 self._metric_context.threats_seen.append(threat)

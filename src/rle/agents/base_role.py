@@ -158,6 +158,8 @@ class RimWorldRoleAgent(LLMAgent):
         self._no_think: bool = False
         self._spoke: Spoke | None = None
         self._pending_events: list[RimAPIEvent] = []
+        self._last_usage: dict[str, int] | None = None
+        self._last_raw_output: str | None = None
 
     def set_provider_kwargs(self, **kwargs: Any) -> None:
         """Set extra kwargs passed to provider.complete() (e.g. extra_body)."""
@@ -214,12 +216,15 @@ class RimWorldRoleAgent(LLMAgent):
             messages.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content="</think>"),
             )
-        return self.provider.complete(
+        result = self.provider.complete(
             messages,
             temperature=temperature,
             max_tokens=max_tokens,
             **self._provider_kwargs,
         )
+        self._last_raw_output = result.content
+        self._last_usage = result.usage if hasattr(result, "usage") else None
+        return result
 
     # ------------------------------------------------------------------
     # Abstract methods — subclasses must implement

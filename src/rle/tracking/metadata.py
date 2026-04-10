@@ -20,6 +20,8 @@ def collect_metadata() -> dict[str, object]:
         "felix_sdk_version": _version("felix-agent-sdk"),
         "platform": sys.platform,
         "python_version": platform.python_version(),
+        "docker_mode": False,
+        "random_seed": None,
     }
 
 

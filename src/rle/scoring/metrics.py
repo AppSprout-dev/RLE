@@ -21,6 +21,11 @@ class MetricContext:
     threats_seen: list[ThreatData] = field(default_factory=list)
     first_draft_tick: dict[str, int] = field(default_factory=dict)
     initial_wealth: float = 0.0
+    # Process metrics (populated by game loop after conflict resolution)
+    conflicts_total: int = 0
+    conflicts_resolved: int = 0
+    messages_sent: int = 0
+    messages_acted_on: int = 0
 
 
 def survival(state: GameState, ctx: MetricContext) -> float:
@@ -98,6 +103,20 @@ def efficiency(state: GameState, ctx: MetricContext) -> float:
     return sum(rates) / len(rates)
 
 
+def coordination(state: GameState, ctx: MetricContext) -> float:
+    """Ratio of conflicts resolved peacefully. 1.0 = no conflicts or all resolved."""
+    if ctx.conflicts_total == 0:
+        return 1.0
+    return min(1.0, ctx.conflicts_resolved / ctx.conflicts_total)
+
+
+def communication_efficiency(state: GameState, ctx: MetricContext) -> float:
+    """Ratio of inter-agent messages that led to action changes. 1.0 = all useful."""
+    if ctx.messages_sent == 0:
+        return 1.0
+    return min(1.0, ctx.messages_acted_on / ctx.messages_sent)
+
+
 ALL_METRICS = {
     "survival": survival,
     "threat_response": threat_response,
@@ -107,4 +126,6 @@ ALL_METRICS = {
     "research": research,
     "self_sufficiency": self_sufficiency,
     "efficiency": efficiency,
+    "coordination": coordination,
+    "communication_efficiency": communication_efficiency,
 }

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -92,7 +92,8 @@ class ActionExecutor:
             logger.debug("Unknown endpoint: %s", endpoint)
             return
 
-        await self._client.call(catalog_entry["method"], catalog_entry["path"], json=params)
+        entry = cast(dict[str, str], catalog_entry)
+        await self._client.call(entry["method"], entry["path"], json=params)
 
     # -- Specialized handlers (parameter mapping for complex DTOs) -----------
 

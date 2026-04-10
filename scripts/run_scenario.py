@@ -10,6 +10,7 @@ from pathlib import Path
 
 from felix_agent_sdk.core import HelixConfig
 from felix_agent_sdk.visualization import HelixVisualizer
+
 from rle.agents import AGENT_DISPLAY
 from rle.agents.construction_planner import ConstructionPlanner
 from rle.agents.defense_commander import DefenseCommander
@@ -19,6 +20,7 @@ from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
 from rle.agents.social_overseer import SocialOverseer
 from rle.config import RLEConfig, bridge_openrouter_key
+from rle.docker import wait_for_rimapi
 from rle.orchestration.game_loop import RLEGameLoop
 from rle.rimapi.client import RimAPIClient
 from rle.rimapi.sse_client import RimAPISSEClient
@@ -142,7 +144,8 @@ async def main(args: argparse.Namespace) -> None:
             print(f"Loading save: {scenario.save_name}")
             try:
                 await client.load_game(scenario.save_name)
-                # Wait for game to fully load — poll until colonists are available
+                # Wait for RIMAPI to respond, then poll until colonists are loaded
+                await wait_for_rimapi(config.rimapi_url, timeout=30.0)
                 for _ in range(15):
                     await asyncio.sleep(2)
                     try:

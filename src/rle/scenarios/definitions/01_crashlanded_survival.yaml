@@ -28,3 +28,5 @@ scoring_weights:
   research: 0.05
   self_sufficiency: 0.15
   efficiency: 0.05
+  coordination: 0.0
+  communication_efficiency: 0.0

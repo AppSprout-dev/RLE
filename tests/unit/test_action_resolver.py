@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+
 from rle.agents.actions import Action, ActionPlan
 from rle.orchestration.action_resolver import (
     ActionResolver,

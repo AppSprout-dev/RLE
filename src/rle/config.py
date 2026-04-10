@@ -40,6 +40,8 @@ class RLEConfig(BaseSettings):
     helix_preset: str = "default"
     max_agents: int = 7
     log_level: str = "INFO"
+    docker_image: str = "rle-headless:latest"
+    docker_port: int = 8765
 
     def get_helix_config(self) -> HelixConfig:
         """Return the HelixConfig preset matching ``helix_preset``."""
@@ -62,7 +64,7 @@ class RLEConfig(BaseSettings):
         kwargs: dict[str, str] = {"model": self.model}
         if self.provider_base_url:
             kwargs["base_url"] = self.provider_base_url
-        return cls(**kwargs)
+        return cls(**kwargs)  # type: ignore[arg-type]  # subclasses accept kwargs
 
 
 def bridge_openrouter_key(config: RLEConfig) -> None:

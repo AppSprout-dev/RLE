@@ -6,6 +6,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 RESULTS_DIR = Path("results")
 HISTORY_PATH = RESULTS_DIR / "benchmark_history.jsonl"
@@ -21,7 +22,7 @@ def get_run_dir(model: str | None = None) -> Path:
     return run_dir
 
 
-def append_history(summary: dict) -> Path:
+def append_history(summary: dict[str, object]) -> Path:
     """Append a benchmark summary as one JSONL line. Returns the history path."""
     HISTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(HISTORY_PATH, "a") as f:
@@ -29,7 +30,7 @@ def append_history(summary: dict) -> Path:
     return HISTORY_PATH
 
 
-def load_history() -> list[dict]:
+def load_history() -> list[dict[str, object]]:
     """Load all historical benchmark runs from JSONL."""
     if not HISTORY_PATH.exists():
         return []
@@ -41,7 +42,7 @@ def load_history() -> list[dict]:
     return runs
 
 
-def update_baseline(summary: dict) -> tuple[bool, float | None]:
+def update_baseline(summary: dict[str, Any]) -> tuple[bool, float | None]:
     """Update baseline if this run's avg score is a new best for the model.
 
     Returns (is_new_best, previous_score_or_None).

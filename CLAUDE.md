@@ -53,11 +53,13 @@ curl http://localhost:1234/v1/models
 
 ## Commands
 
-- Install: `pip install -e ".[dev]"`
+- Install: `uv sync --extra dev`
 - Test: `pytest`
 - Lint: `ruff check src/ tests/ scripts/`
 - Type check: `mypy src/`
 - List scenarios: `python scripts/run_scenario.py --list`
+- Smoke test: `python scripts/run_benchmark.py --smoke-test --ticks 5`
+- Compare runs: `python scripts/compare_benchmarks.py results/run1 results/run2`
 
 ### Configure `.env`
 
@@ -127,11 +129,33 @@ cd ../rimapi-dashboard && bun run start
 # Open http://localhost:3000
 ```
 
-### Mock benchmark (no game needed)
+### Smoke test (no game needed)
 
 ```bash
-python scripts/run_benchmark.py --dry-run --ticks 10
+python scripts/run_benchmark.py --smoke-test --ticks 10
 ```
+
+### Docker benchmark (no display needed)
+
+```bash
+# Build the headless image (see docker/README.md for prerequisites)
+docker compose -f docker/docker-compose.yml up -d
+
+# Run benchmark against containerized game
+python scripts/run_benchmark.py --docker --provider openai \
+  --model nvidia/nemotron-3-super-120b-a12b:free \
+  --base-url https://openrouter.ai/api/v1 \
+  --no-think --runs 4 --output results/docker/
+```
+
+**Benchmark flags:**
+- `--smoke-test` — Mock RIMAPI (replaces deprecated `--dry-run`)
+- `--docker` — Use Docker container for headless RimWorld
+- `--runs N` — Paired runs per scenario (N≥4 for statistical validity)
+- `--no-baseline` — Skip baseline (no-agent) comparison runs
+- `--ablation` — (WIP) Run with each agent removed to measure contribution
+- `--wandb` — Log to Weights & Biases
+- `--push-hf` — Push results to HuggingFace Hub (requires `--runs 4+`)
 
 ## Architecture
 
@@ -211,7 +235,7 @@ Agents communicate through Felix SDK's CentralPost, not through the orchestrator
 - **Before deliberation**: `process_all_messages()` routes previous tick's messages to agent spoke inbound queues. Agents read via `_get_spoke_context()`.
 - **MapAnalyst first**: Deliberates, sends TASK_COMPLETE with spatial analysis. Messages routed immediately so role agents see it.
 - **After deliberation**: Each role agent sends `TASK_COMPLETE` with role, summary, confidence, action types.
-- **After scoring**: Hub broadcasts `STATUS_UPDATE` with composite score + all 8 metrics.
+- **After scoring**: Hub broadcasts `STATUS_UPDATE` with composite score + all 10 metrics.
 - **On phase change**: Hub broadcasts `PHASE_ANNOUNCE` when macro_time crosses 0.4 (exploration→analysis) or 0.7 (analysis→synthesis).
 
 ## SSE Events
@@ -236,7 +260,7 @@ Macro helix: `t = min(1.0, game_day / expected_duration_days)` drives agent beha
 - **Analysis** (0.4 <= t < 0.7): Medium temp, evaluate trade-offs
 - **Synthesis** (t >= 0.7): Low temperature, decisive actions
 
-## Scoring (8 metrics, weighted composite)
+## Scoring (10 metrics, weighted composite)
 
 | Metric | Default Weight | Source |
 |--------|---------------|--------|
@@ -248,6 +272,10 @@ Macro helix: `t = min(1.0, game_day / expected_duration_days)` drives agent beha
 | research | 0.10 | % research tree completed |
 | self_sufficiency | 0.10 | power + food + population stability |
 | efficiency | 0.05 | action execution rate |
+| coordination | 0.00* | conflicts resolved / total conflicts |
+| communication_efficiency | 0.00* | messages acted on / total messages |
+
+*Process metrics have 0.0 weight until game loop wires MetricContext counters. Target: coordination=0.12, communication_efficiency=0.08.
 
 Scenarios can override weights. TimeSeriesRecorder exports per-tick CSV.
 
@@ -279,13 +307,23 @@ Use `--no-think` for thinking models (Qwen3.5, Nemotron) — injects `</think>` 
 
 ## Conventions
 
+- Python 3.14+, `uv` for package management, `hatchling` build backend
 - Async-first (httpx AsyncClient, async game loop)
 - Parallel-first: MapAnalyst runs first (sequential), then 6 role agents deliberate concurrently via `asyncio.to_thread` + `asyncio.gather` (`--sequential` to disable)
 - Pydantic v2 models with frozen=True for game state and results
+- mypy strict mode — all code must pass `mypy src/` with `strict = true`
+- No scipy/numpy — stdlib only for statistics (random, math). See ADR-003 for rationale
 - Felix Agent SDK for providers, agents, helix geometry, CentralPost communication
 - JSON repair + parse retry for LLM output resilience (strips think tags, trailing commas, extracts first JSON object)
 - Real RIMAPI data via state adapters + deterministic terrain analysis
 - Tests use pytest-asyncio with auto mode
+
+## CI/CD
+
+GitHub Actions workflows in `.github/workflows/`:
+
+- **ci.yml** — On every push/PR: ruff lint, mypy strict, pytest, smoke-test
+- **benchmark.yml** — Manual dispatch + weekly schedule: Docker benchmark template (requires self-hosted runner with game files)
 
 ## Package Structure
 
@@ -312,13 +350,33 @@ src/rle/
 │   ├── state_manager.py   # GameStateManager (SSE drain, macro time, history)
 │   ├── action_executor.py # Routes actions to RIMAPI write endpoints
 │   └── action_resolver.py # 4-rule conflict resolution
-├── scoring/               # 8 metrics, composite scorer, CSV recorder
+├── scoring/               # 10 metrics, composite scorer, bootstrap CIs, CSV recorder
+│   ├── metrics.py         # 10 individual metric functions (8 colony + 2 process)
+│   ├── composite.py       # CompositeScorer (weighted aggregation)
+│   ├── bootstrap.py       # BootstrapCI, bootstrap_ci(), bootstrap_paired_delta()
+│   ├── delta.py           # PairedResult (agent vs baseline stats, Welch's t-test)
+│   └── recorder.py        # TimeSeriesRecorder (per-tick CSV export)
+├── tracking/              # Benchmark history, cost tracking, observability
+│   ├── cost_tracker.py    # CostTracker + OpenRouter pricing API
+│   ├── event_log.py       # Structured JSONL event log (deliberations, actions, errors)
+│   ├── leaderboard.py     # Model×scenario matrix, Pareto frontier
+│   ├── history.py         # JSONL run history + per-model baselines
+│   ├── metadata.py        # Git commit, versions, reproducibility metadata
+│   ├── wandb_logger.py    # Weights & Biases integration (optional)
+│   └── hf_logger.py       # HuggingFace Hub export (optional)
+├── docker.py              # DockerGameServer lifecycle + wait_for_rimapi()
 └── scenarios/             # YAML schema, loader, evaluator, 6 definitions
 scripts/
 ├── run_scenario.py        # Single scenario CLI (auto-loads save, unforbids items)
-├── run_benchmark.py       # Full benchmark suite CLI
+├── run_benchmark.py       # Full benchmark suite CLI (--docker, --smoke-test, --runs)
+├── compare_benchmarks.py  # Paired statistical comparison of benchmark runs
 ├── visualize_results.py   # Matplotlib CSV plotter
 └── serve_dashboard.py     # CORS-enabled file server for dashboard
+docker/
+├── Dockerfile             # HeadlessRim + Xvfb (debian:bookworm-slim)
+├── docker-compose.yml     # Volume mounts for game files, mods, saves
+├── entrypoint.sh          # Xvfb → RimWorld → RIMAPI healthcheck
+└── README.md              # Docker setup prerequisites and troubleshooting
 
 ## Related Repos
 

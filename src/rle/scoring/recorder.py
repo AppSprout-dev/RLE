@@ -33,7 +33,7 @@ class TimeSeriesRecorder:
                 row["composite"] = round(snap.composite, 4)
                 writer.writerow(row)
 
-    def to_dicts(self) -> list[dict]:
+    def to_dicts(self) -> list[dict[str, object]]:
         """Return list of dicts for programmatic access."""
         return [
             {"tick": s.tick, "day": s.day, **s.metrics, "composite": s.composite}
