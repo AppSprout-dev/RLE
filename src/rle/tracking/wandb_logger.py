@@ -23,6 +23,7 @@ class WandBLogger:
     ) -> None:
         self._run = None
         self._wandb = None
+        self._weave = None
         self._step = 0
         if not enabled:
             return
@@ -41,9 +42,25 @@ class WandBLogger:
         except Exception:
             logger.warning("wandb init failed — tracking disabled", exc_info=True)
 
+        # Optional Weave tracing (graceful if not installed)
+        try:
+            import weave  # type: ignore[import-not-found]
+            weave.init(f"rle-{project}")
+            self._weave = weave
+            logger.info("Weave tracing enabled")
+        except ImportError:
+            pass
+        except Exception:
+            logger.warning("Weave init failed — tracing disabled", exc_info=True)
+
     @property
     def enabled(self) -> bool:
         return self._run is not None
+
+    @property
+    def weave(self) -> Any:
+        """Return the weave module if available, else None."""
+        return self._weave
 
     def log_config(self, config: dict[str, Any]) -> None:
         """Log run configuration (model, provider, git commit, etc.)."""

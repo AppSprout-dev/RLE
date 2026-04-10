@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time as _time
 from pathlib import Path
 
 from felix_agent_sdk.communication import CentralPost, MessageType, SpokeManager
@@ -25,6 +26,8 @@ from rle.scenarios.evaluator import EvaluationResult, ScenarioEvaluator
 from rle.scoring.composite import CompositeScorer, ScoreSnapshot
 from rle.scoring.metrics import MetricContext
 from rle.scoring.recorder import TimeSeriesRecorder
+from rle.tracking.cost_tracker import CostTracker
+from rle.tracking.event_log import EventLog, EventType
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +65,8 @@ class RLEGameLoop:
         dashboard_export_dir: Path | None = None,
         no_agent: bool = False,
         no_pause: bool = False,
+        event_log: EventLog | None = None,
+        cost_tracker: CostTracker | None = None,
     ) -> None:
         self._config = config
         self._client = client
@@ -98,6 +103,8 @@ class RLEGameLoop:
         self._dashboard_export_dir = dashboard_export_dir
 
         self._visualizer = visualizer
+        self._event_log = event_log
+        self._cost_tracker = cost_tracker
 
         # Hub-spoke communication — agents read messages from their spokes
         self._hub = CentralPost(max_agents=len(agents))
@@ -105,6 +112,18 @@ class RLEGameLoop:
         for agent in agents:
             spoke = self._spoke_manager.create_spoke(agent.agent_id, agent=agent)
             agent.attach_spoke(spoke)
+
+    def _emit(
+        self, event_type: EventType, tick: int,
+        agent: str | None = None, **data: object,
+    ) -> None:
+        """Emit an event if EventLog is configured. Thread-safe."""
+        if self._event_log is not None:
+            self._event_log.emit(event_type, tick, agent=agent, **data)
+
+    @property
+    def cost_tracker(self) -> CostTracker | None:
+        return self._cost_tracker
 
     def _update_visualizer_agent(
         self, agent: RimWorldRoleAgent, plan: ActionPlan, macro_time: float,
@@ -166,9 +185,11 @@ class RLEGameLoop:
 
         Agents read inter-agent context from their CentralPost spoke internally.
         """
+        t0 = _time.monotonic()
         try:
             plan = agent.deliberate(state, current_time)  # type: ignore[arg-type]
         except ActionPlanParseError as e:
+            latency_ms = round((_time.monotonic() - t0) * 1000, 1)
             logger.warning(
                 "Agent %s parse failure (tick %d): %s",
                 agent.ROLE_NAME, tick_num, e.reason,
@@ -179,8 +200,13 @@ class RLEGameLoop:
                 "status": "parse_failure", "reason": e.reason,
                 "raw": e.raw_content[:500] if e.raw_content else None,
             })
+            self._emit(
+                EventType.ERROR, tick_num, agent=agent.ROLE_NAME,
+                error_type="parse_failure", reason=e.reason, latency_ms=latency_ms,
+            )
             return agent, None
         except ProviderError as e:
+            latency_ms = round((_time.monotonic() - t0) * 1000, 1)
             logger.warning(
                 "Agent %s provider error (tick %d): %s",
                 agent.ROLE_NAME, tick_num, e,
@@ -190,7 +216,13 @@ class RLEGameLoop:
                 "tick": tick_num, "agent": agent.ROLE_NAME,
                 "status": "provider_error", "reason": str(e),
             })
+            self._emit(
+                EventType.ERROR, tick_num, agent=agent.ROLE_NAME,
+                error_type="provider_error", reason=str(e), latency_ms=latency_ms,
+            )
             return agent, None
+
+        latency_ms = round((_time.monotonic() - t0) * 1000, 1)
         self._parse_successes += 1
         self._deliberation_log.append({
             "tick": tick_num, "agent": plan.role,
@@ -203,6 +235,25 @@ class RLEGameLoop:
             ],
             "summary": plan.summary[:300],
         })
+        self._emit(
+            EventType.DELIBERATION, tick_num, agent=plan.role,
+            latency_ms=latency_ms, confidence=plan.confidence,
+            num_actions=len(plan.actions),
+        )
+
+        # Record token usage for cost tracking and event log
+        usage = agent._last_usage
+        if usage and isinstance(usage, dict):
+            pt = usage.get("prompt_tokens", 0)
+            ct = usage.get("completion_tokens", 0)
+            if isinstance(pt, int) and isinstance(ct, int):
+                if self._cost_tracker:
+                    self._cost_tracker.record_raw(pt, ct)
+                self._emit(
+                    EventType.PROVIDER_CALL, tick_num, agent=plan.role,
+                    prompt_tokens=pt, completion_tokens=ct,
+                )
+
         return agent, plan
 
     def _export_tick_json(
@@ -294,15 +345,24 @@ class RLEGameLoop:
         In pause mode (default): pause → read → deliberate → execute → unpause.
         In no-pause mode: read → fire deliberation + sleep concurrently → execute.
         """
+        tick_num = len(self._tick_results)
+
         # 1. Pause (skip in no-pause mode — game keeps running)
         if not self._no_pause:
             await self._client.pause_game()
 
+        self._emit(EventType.TICK_START, tick_num)
+
         # 2. Read state
         state = await self._state_manager.refresh()
         current_time = self._state_manager.macro_time
+        self._emit(
+            EventType.STATE_REFRESH, tick_num,
+            day=state.colony.day, macro_time=current_time,
+        )
 
         # 3. Route previous tick's messages to agent spokes + broadcast phase changes
+        messages_before = self._hub.total_messages_processed
         self._spoke_manager.process_all_messages()
         self._broadcast_phase_if_changed(current_time)
 
@@ -318,8 +378,11 @@ class RLEGameLoop:
             pending_events = self._state_manager.pending_events
             for agent in self._agents:
                 agent.set_pending_events(pending_events)
-
-            tick_num = len(self._tick_results)
+            for evt in pending_events:
+                self._emit(
+                    EventType.SSE_EVENT, tick_num,
+                    sse_type=evt.event_type, sse_data=str(evt.data)[:200],
+                )
 
             # 4a. MapAnalyst deliberates FIRST (sequential)
             if self._map_analyst:
@@ -347,6 +410,13 @@ class RLEGameLoop:
                     self._spoke_manager.process_all_messages()
 
             # 4b. Role agents deliberate (parallel or sequential)
+            # Snapshot which agents have pending spoke messages (for messages_acted_on)
+            agents_with_messages: set[str] = set()
+            for ra in self._role_agents:
+                spoke = self._spoke_manager.get_spoke(ra.agent_id)
+                if spoke and spoke.has_pending_messages():
+                    agents_with_messages.add(ra.agent_id)
+
             if self._parallel:
                 results = await self._deliberate_parallel(state, current_time, tick_num)
             else:
@@ -357,6 +427,8 @@ class RLEGameLoop:
                 if plan is None:
                     continue
                 plans.append(plan)
+                if agent.agent_id in agents_with_messages:
+                    self._metric_context.messages_acted_on += 1
                 self._update_visualizer_agent(agent, plan, current_time)
                 spoke = self._spoke_manager.get_spoke(agent.agent_id)
                 if spoke and spoke.is_connected:
@@ -374,10 +446,32 @@ class RLEGameLoop:
                     )
 
             # Resolve conflicts
-            resolved = self._resolver.resolve(plans, state)
+            resolved, resolver_stats = self._resolver.resolve(plans, state)
+            self._metric_context.conflicts_total += resolver_stats.conflicts_total
+            self._metric_context.conflicts_resolved += resolver_stats.conflicts_resolved
+            self._emit(
+                EventType.CONFLICT, tick_num,
+                input_plans=len(plans),
+                output_actions=len(resolved.actions),
+                conflicts_detected=resolver_stats.conflicts_total,
+                conflicts_resolved=resolver_stats.conflicts_resolved,
+            )
+
+            # Track message effectiveness
+            messages_after = self._hub.total_messages_processed
+            new_messages = messages_after - messages_before
+            self._metric_context.messages_sent += new_messages
 
         # 7. Execute merged plan
         exec_result = await self._executor.execute(resolved)
+        for i, action in enumerate(resolved.actions):
+            success = i < exec_result.executed
+            self._emit(
+                EventType.ACTION_EXEC, tick_num,
+                action_type=action.action_type,
+                target=action.target_colonist_id,
+                success=success,
+            )
 
         # 8. Score this tick
         snapshot: ScoreSnapshot | None = None
@@ -385,6 +479,11 @@ class RLEGameLoop:
             snapshot = self._scorer.score(state, self._metric_context)
             if self._recorder:
                 self._recorder.record(snapshot)
+            if snapshot:
+                self._emit(
+                    EventType.SCORE, tick_num,
+                    composite=snapshot.composite, metrics=snapshot.metrics,
+                )
 
         # 9. Broadcast score to all agents via CentralPost
         if snapshot:

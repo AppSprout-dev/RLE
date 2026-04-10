@@ -23,13 +23,13 @@ failure_conditions:
     value: 0
 
 scoring_weights:
-  survival: 0.25
-  food_security: 0.20
-  self_sufficiency: 0.15
-  mood: 0.10
-  wealth: 0.10
-  research: 0.05
-  threat_response: 0.10
-  efficiency: 0.05
-  coordination: 0.0
-  communication_efficiency: 0.0
+  survival: 0.20
+  food_security: 0.16
+  self_sufficiency: 0.12
+  mood: 0.08
+  wealth: 0.08
+  research: 0.04
+  threat_response: 0.08
+  efficiency: 0.04
+  coordination: 0.12
+  communication_efficiency: 0.08

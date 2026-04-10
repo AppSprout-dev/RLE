@@ -46,9 +46,17 @@ python scripts/run_benchmark.py --docker --provider openai \
     --no-think --runs 4 --output results/docker/
 ```
 
+## Validated State
+
+- Image builds successfully on Docker Desktop (Windows + WSL2) and Docker CE (Linux)
+- HeadlessRimPatch v1.0.0 DLL downloaded and installed at `/opt/mods/HeadlessRimPatch/`
+- Entrypoint pre-seeds RIMAPI config to bind `0.0.0.0:8765` (fixes IPv6 loopback issue)
+- Windows CRLF line endings are stripped from `entrypoint.sh` during build
+- Runs as non-root `rimworld` user (uid 1000)
+- Full e2e requires Linux game files mounted at runtime
+
 ## Known Issues
 
-- **RIMAPI IPv6 binding**: RIMAPI binds to `[::1]:8765` inside the container. Docker port forwarding maps `0.0.0.0:8765` → container. If RIMAPI only listens on IPv6 loopback, the port forward won't reach it. May need RIMAPI config change.
 - **Startup time**: HeadlessRimPatch generates a throwaway map before we load our save. Feature request filed ([HeadlessRimPatch#5](https://github.com/IlyaChichkov/HeadlessRimPatch/issues/5)) for direct save loading via env var.
 
 ## References

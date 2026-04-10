@@ -34,6 +34,8 @@ from rle.scenarios.schema import ScenarioConfig
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.delta import PairedResult
 from rle.scoring.recorder import TimeSeriesRecorder
+from rle.tracking.cost_tracker import CostTracker, create_cost_tracker
+from rle.tracking.event_log import EventLog
 from rle.tracking.hf_logger import HFLogger
 from rle.tracking.history import append_history, get_run_dir, update_baseline
 from rle.tracking.metadata import collect_metadata
@@ -160,8 +162,11 @@ def _make_mock_provider() -> MagicMock:
     return provider
 
 
-def _create_agents(provider, helix, *, provider_kwargs=None, no_think=False):  # type: ignore[no-untyped-def]
-    agents = [
+def _create_agents(  # type: ignore[no-untyped-def]
+    provider, helix, *, provider_kwargs=None, no_think=False,
+    exclude_agent: str | None = None,
+):
+    all_agents = [
         MapAnalyst("map_analyst", provider, helix, spawn_time=0.0, velocity=1.0),
         ResourceManager("resource_manager", provider, helix, spawn_time=0.0, velocity=1.0),
         DefenseCommander(
@@ -176,6 +181,7 @@ def _create_agents(provider, helix, *, provider_kwargs=None, no_think=False):  #
         ),
         MedicalOfficer("medical_officer", provider, helix, spawn_time=0.0, velocity=1.0),
     ]
+    agents = [a for a in all_agents if a.agent_id != exclude_agent]
     if provider_kwargs:
         for agent in agents:
             agent.set_provider_kwargs(**provider_kwargs)
@@ -210,8 +216,14 @@ async def _run_scenario(
     parallel: bool = True,
     no_agent: bool = False,
     no_pause: bool = False,
+    event_log: EventLog | None = None,
+    cost_tracker: CostTracker | None = None,
+    weave_module: object | None = None,
 ) -> dict:
     agents = _create_agents(provider, helix, provider_kwargs=provider_kwargs, no_think=no_think)
+    if weave_module is not None:
+        for agent in agents:
+            agent.enable_weave(weave_module)
     scorer = CompositeScorer(scenario.scoring_weights or None)
     recorder = TimeSeriesRecorder()
     evaluator = ScenarioEvaluator(scenario)
@@ -229,6 +241,8 @@ async def _run_scenario(
         parallel=parallel,
         no_agent=no_agent,
         no_pause=no_pause,
+        event_log=event_log,
+        cost_tracker=cost_tracker,
     )
     max_ticks = max_ticks_override or scenario.max_ticks
     t0 = time.monotonic()
@@ -337,6 +351,138 @@ def _resolve_ticks(args: argparse.Namespace, use_mock_rimapi: bool) -> int | Non
     return None
 
 
+_ALL_AGENT_IDS = [
+    "map_analyst", "resource_manager", "defense_commander",
+    "research_director", "social_overseer", "construction_planner",
+    "medical_officer",
+]
+
+
+async def _run_ablation(
+    args: argparse.Namespace,
+    config: RLEConfig,
+    provider: object,
+    helix: object,
+    scenarios: list[ScenarioConfig],
+    use_mock_rimapi: bool,
+    num_runs: int,
+    ticks_override: int | None,
+    provider_kwargs: dict[str, Any] | None,
+) -> None:
+    """Run ablation study: full benchmark + 7 single-agent-removed benchmarks."""
+    output_dir = Path(args.output) if args.output else get_run_dir(args.model)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    async with RimAPIClient(config.rimapi_url) as client:
+        if use_mock_rimapi:
+            client._client = httpx.AsyncClient(
+                transport=_make_mock_transport(), base_url="http://mock",
+            )
+
+        # Pass 0: full benchmark (all agents)
+        passes: list[tuple[str, list[dict[str, Any]]]] = []
+        labels = ["all_agents", *_ALL_AGENT_IDS]
+
+        for label in labels:
+            exclude = label if label != "all_agents" else None
+            tag = f"without_{label}" if exclude else "all_agents"
+            print(f"\n{'=' * 60}")
+            print(f"ABLATION PASS: {tag}")
+            print(f"{'=' * 60}")
+
+            pass_results: list[dict[str, Any]] = []
+            for scenario in scenarios:
+                for run_id in range(num_runs):
+                    run_label = f" (run {run_id + 1}/{num_runs})" if num_runs > 1 else ""
+                    if scenario.save_name and not use_mock_rimapi:
+                        try:
+                            await client.load_game(scenario.save_name)
+                            await asyncio.sleep(GAME_LOAD_WAIT_SECONDS)
+                        except Exception as e:
+                            logger.warning("Could not load save %s: %s", scenario.save_name, e)
+
+                    print(f"  {scenario.name}{run_label} ({tag})...")
+                    agents = _create_agents(
+                        provider, helix,
+                        provider_kwargs=provider_kwargs,
+                        no_think=args.no_think,
+                        exclude_agent=exclude,
+                    )
+                    scorer = CompositeScorer(scenario.scoring_weights or None)
+                    recorder = TimeSeriesRecorder()
+                    evaluator = ScenarioEvaluator(scenario)
+                    loop = RLEGameLoop(
+                        config, client, agents,
+                        expected_duration_days=scenario.expected_duration_days,
+                        scorer=scorer, recorder=recorder, evaluator=evaluator,
+                        initial_population=scenario.initial_population,
+                        initial_wealth=8000.0,
+                        parallel=not args.sequential,
+                        no_pause=args.no_pause,
+                    )
+                    await loop.run(max_ticks=ticks_override or scenario.max_ticks)
+
+                    final_score = 0.0
+                    if recorder.snapshots:
+                        final_score = scorer.final_score(recorder.snapshots).composite
+                    pass_results.append({
+                        "scenario": scenario.name,
+                        "score": final_score,
+                    })
+                    print(f"    score={final_score:.3f}")
+
+            passes.append((tag, pass_results))
+
+    # Build ablation matrix
+    full_scores: dict[str, list[float]] = {}
+    for r in passes[0][1]:
+        full_scores.setdefault(r["scenario"], []).append(r["score"])
+
+    matrix: dict[str, dict[str, float]] = {}
+    for tag, pass_results in passes[1:]:
+        agent_name = tag.replace("without_", "")
+        matrix[agent_name] = {}
+        removed_scores: dict[str, list[float]] = {}
+        for r in pass_results:
+            removed_scores.setdefault(r["scenario"], []).append(r["score"])
+        for scenario_name in full_scores:
+            full_avg = sum(full_scores[scenario_name]) / len(full_scores[scenario_name])
+            rem_avg = sum(removed_scores.get(scenario_name, [0.0])) / max(
+                1, len(removed_scores.get(scenario_name, [])),
+            )
+            matrix[agent_name][scenario_name] = round(full_avg - rem_avg, 4)
+
+    # Print ablation table
+    scenario_names = list(full_scores.keys())
+    print(f"\n{'=' * 88}")
+    print("ABLATION MATRIX (score delta: positive = agent helps)")
+    print(f"{'=' * 88}")
+    header = f"{'Agent':<22}" + "".join(f"{s[:12]:>13}" for s in scenario_names) + f"{'Avg':>10}"
+    print(header)
+    print("-" * 88)
+    for agent_name, deltas in matrix.items():
+        vals = [deltas.get(s, 0.0) for s in scenario_names]
+        avg_delta = sum(vals) / len(vals) if vals else 0.0
+        row = f"{agent_name:<22}"
+        for v in vals:
+            sign = "+" if v >= 0 else ""
+            row += f"{sign}{v:>12.4f}"
+        row += f"{'+' if avg_delta >= 0 else ''}{avg_delta:>9.4f}"
+        print(row)
+    print(f"{'=' * 88}")
+
+    # Save results
+    ablation_data = {
+        "num_runs": num_runs,
+        "ticks_per_scenario": ticks_override,
+        "passes": [{"label": t, "results": r} for t, r in passes],
+        "matrix": matrix,
+    }
+    ablation_path = output_dir / "ablation_results.json"
+    ablation_path.write_text(json.dumps(ablation_data, indent=2))
+    print(f"\nAblation results saved to {ablation_path}")
+
+
 async def main(args: argparse.Namespace) -> None:
     logging.basicConfig(
         level=getattr(logging, args.log_level.upper(), logging.INFO),
@@ -356,7 +502,16 @@ async def main(args: argparse.Namespace) -> None:
     num_runs = getattr(args, "runs", 1) or 1
 
     if args.ablation:
-        print("Ablation study not yet implemented.")
+        ticks_override = _resolve_ticks(args, use_mock_rimapi)
+        provider_kwargs_abl: dict[str, Any] = {}
+        if args.no_think:
+            provider_kwargs_abl["extra_body"] = {
+                "chat_template_kwargs": {"enable_thinking": False},
+            }
+        await _run_ablation(
+            args, config, provider, helix, scenarios, use_mock_rimapi,
+            num_runs, ticks_override, provider_kwargs_abl or None,
+        )
         return
 
     # N >= 4 enforcement
@@ -393,6 +548,14 @@ async def main(args: argparse.Namespace) -> None:
             "parallel": not args.sequential,
             "ticks_per_scenario": ticks_override,
         })
+
+    # Initialize cost tracker (fetches OpenRouter pricing)
+    cost_tracker = await create_cost_tracker(args.model or config.model)
+
+    # Initialize event log
+    event_log: EventLog | None = None
+    if args.output:
+        event_log = EventLog(Path(args.output) / "events.jsonl")
 
     no_baseline = getattr(args, "no_baseline", False)
     is_paired = not use_mock_rimapi and not no_baseline
@@ -446,6 +609,9 @@ async def main(args: argparse.Namespace) -> None:
                         no_think=args.no_think,
                         parallel=not args.sequential,
                         no_pause=args.no_pause,
+                        event_log=event_log,
+                        cost_tracker=cost_tracker,
+                        weave_module=wandb_logger.weave,
                     )
                     results.append(result)
                     if paired:
@@ -486,7 +652,7 @@ async def main(args: argparse.Namespace) -> None:
 
         # Build enriched summary with metadata
         metadata = collect_metadata()
-        summary = {
+        summary: dict[str, Any] = {
             **metadata,
             "model": args.model or config.model,
             "provider": args.provider or config.provider,
@@ -498,7 +664,10 @@ async def main(args: argparse.Namespace) -> None:
             "num_runs": num_runs,
             "paired": is_paired,
             "scenarios": results,
+            "cost_snapshot": cost_tracker.snapshot().model_dump(),
         }
+        if event_log:
+            summary["event_summary"] = event_log.summary().model_dump()
         if is_paired and paired_results:
             summary["paired_results"] = [p.to_dict() for p in paired_results]
 
@@ -550,6 +719,8 @@ async def main(args: argparse.Namespace) -> None:
                 print("Results pushed to HuggingFace Hub")
 
     finally:
+        if event_log:
+            event_log.close()
         if docker_server:
             await docker_server.stop()
 

@@ -7,6 +7,7 @@ with no dependencies. W&B Weave provides optional rich visualization on top.
 
 from __future__ import annotations
 
+import threading
 import time
 from collections import Counter
 from enum import Enum
@@ -63,6 +64,7 @@ class EventLog:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._events: list[Event] = []
         self._file = open(path, "a", encoding="utf-8")  # noqa: SIM115
+        self._lock = threading.Lock()
 
     def emit(
         self,
@@ -71,7 +73,7 @@ class EventLog:
         agent: str | None = None,
         **data: Any,
     ) -> None:
-        """Record an event. Writes immediately to JSONL file."""
+        """Record an event. Thread-safe — writes immediately to JSONL file."""
         event = Event(
             timestamp=time.time(),
             tick=tick,
@@ -79,9 +81,10 @@ class EventLog:
             agent=agent,
             data=data,
         )
-        self._events.append(event)
-        self._file.write(event.model_dump_json() + "\n")
-        self._file.flush()
+        with self._lock:
+            self._events.append(event)
+            self._file.write(event.model_dump_json() + "\n")
+            self._file.flush()
 
     def summary(self) -> RunSummary:
         """Compute aggregate statistics from recorded events."""
