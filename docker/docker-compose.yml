@@ -6,7 +6,7 @@ services:
     ports:
       - "${RIMAPI_PORT:-8765}:8765"
     volumes:
-      - ${RIMWORLD_PATH:?Set RIMWORLD_PATH to Linux RimWorld install}:/opt/game:ro
+      - ${RIMWORLD_PATH:?Set RIMWORLD_PATH to Linux RimWorld install}:/opt/game
       - ${RIMAPI_MOD_PATH:?Set RIMAPI_MOD_PATH to RIMAPI mod directory}:/opt/mods/RIMAPI:ro
       - ./saves:/opt/saves:ro
     shm_size: 1gb
