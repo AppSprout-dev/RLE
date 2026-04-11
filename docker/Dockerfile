@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dbus libpulse0 alsa-utils openbox \
     libxcursor1 libxrandr2 libxinerama1 libxi6 libxss1 libxtst6 \
     libfontconfig1 libxrender1 libsdl2-2.0-0 \
-    curl netcat-openbsd procps ca-certificates \
+    curl netcat-openbsd procps ca-certificates socat \
     && rm -rf /var/lib/apt/lists/*
 
 RUN printf 'pcm.!default {\n  type null\n}\nctl.!default {\n  type null\n}\n' > /etc/asound.conf

@@ -117,21 +117,25 @@ su rimworld -c '/opt/game/RimWorldLinux \
 GAME_PID=$!
 
 # Wait for RIMAPI to become responsive.
-# HeadlessRimPatch generates a throwaway map (~30 min headless) before the game
-# loop starts and RIMAPI can process requests on Unity's main thread.
+# Wait for RIMAPI to become responsive on loopback
 RIMAPI_TIMEOUT=${RIMAPI_TIMEOUT:-120}
 echo "Waiting for RIMAPI on :8765 (timeout: ${RIMAPI_TIMEOUT}s)..."
 ELAPSED=0
 while ! curl -sf --max-time 5 http://localhost:8765/api/v1/game/state > /dev/null 2>&1; do
-    sleep 10
-    ELAPSED=$((ELAPSED + 10))
+    sleep 5
+    ELAPSED=$((ELAPSED + 5))
     if [ "$ELAPSED" -ge "$RIMAPI_TIMEOUT" ]; then
         echo "ERROR: RIMAPI not responsive after ${RIMAPI_TIMEOUT}s"
         tail -30 /tmp/rimworld_log.txt 2>/dev/null
         exit 1
     fi
 done
-echo "RIMAPI ready"
+echo "RIMAPI ready on loopback"
+
+# Mono HttpListener binds to [::1] (IPv6 loopback) regardless of config.
+# Bridge all interfaces on port 8765 so Docker port forwarding can reach it.
+socat TCP4-LISTEN:8765,fork,reuseaddr TCP6:[::1]:8765 &
+echo "socat bridge: 0.0.0.0:8765 -> [::1]:8765"
 
 # Keep container alive
 tail -f /tmp/rimworld_log.txt
