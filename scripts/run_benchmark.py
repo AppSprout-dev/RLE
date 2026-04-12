@@ -400,6 +400,8 @@ async def _run_ablation(
                             await asyncio.sleep(GAME_LOAD_WAIT_SECONDS)
                         except Exception as e:
                             logger.warning("Could not load save %s: %s", scenario.save_name, e)
+                            print(f"    SKIP {scenario.name}{run_label} ({tag}): save load failed")
+                            continue
 
                     print(f"  {scenario.name}{run_label} ({tag})...")
                     agents = _create_agents(
@@ -598,6 +600,8 @@ async def main(args: argparse.Namespace) -> None:
                             await asyncio.sleep(GAME_LOAD_WAIT_SECONDS)
                         except Exception as e:
                             logger.warning("Could not load save %s: %s", scenario.save_name, e)
+                            print(f"  SKIP {scenario.name}{run_label}: save load failed")
+                            continue
 
                     # Agent run
                     print(f"\nRunning: {scenario.name} ({scenario.difficulty}){run_label}...")

@@ -41,6 +41,23 @@ class TestLoadScenario:
             load_scenario("/nonexistent/scenario.yaml")
 
 
+class TestScoringWeights:
+    """Verify every scenario YAML's scoring_weights sum to 1.0."""
+
+    @pytest.mark.parametrize(
+        "yaml_file",
+        sorted(DEFINITIONS_DIR.glob("*.yaml")),
+        ids=lambda p: p.stem,
+    )
+    def test_weights_sum_to_one(self, yaml_file: Path) -> None:
+        scenario = load_scenario(yaml_file)
+        if scenario.scoring_weights:
+            total = sum(scenario.scoring_weights.values())
+            assert total == pytest.approx(1.0), (
+                f"{scenario.name}: weights sum to {total}, expected 1.0"
+            )
+
+
 class TestListScenarios:
     def test_loads_all_definitions(self) -> None:
         scenarios = list_scenarios(DEFINITIONS_DIR)

@@ -134,8 +134,28 @@ echo "RIMAPI ready on loopback"
 
 # Mono HttpListener binds to [::1] (IPv6 loopback) regardless of config.
 # Bridge all interfaces on port 8765 so Docker port forwarding can reach it.
-socat TCP4-LISTEN:8765,fork,reuseaddr TCP6:[::1]:8765 &
-echo "socat bridge: 0.0.0.0:8765 -> [::1]:8765"
+# Run as rimworld user, with PID tracking and error handling.
+su rimworld -c 'socat TCP4-LISTEN:8765,fork,reuseaddr TCP6:[::1]:8765' &
+SOCAT_PID=$!
+sleep 1
+if ! kill -0 "$SOCAT_PID" 2>/dev/null; then
+    echo "ERROR: socat bridge failed to start (port 8765 already in use?)"
+    exit 1
+fi
+echo "socat bridge: 0.0.0.0:8765 -> [::1]:8765 (pid=$SOCAT_PID)"
 
-# Keep container alive
-tail -f /tmp/rimworld_log.txt
+# Forward SIGTERM to child processes for clean shutdown
+cleanup() {
+    echo "Shutting down..."
+    kill "$TAIL_PID" 2>/dev/null
+    kill "$SOCAT_PID" 2>/dev/null
+    kill "$GAME_PID" 2>/dev/null
+    kill "$XVFB_PID" 2>/dev/null
+    wait
+}
+trap cleanup SIGTERM SIGINT
+
+# Keep container alive (as rimworld user)
+su rimworld -c 'tail -f /tmp/rimworld_log.txt' &
+TAIL_PID=$!
+wait
