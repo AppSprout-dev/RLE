@@ -396,6 +396,8 @@ def phase_b() -> None:
         )
 
         # -- 7. Write save (restore UTF-8 BOM) --
+        # Forbidden items are unforbidden at runtime by run_scenario.py
+        # via unforbid_all_items() → POST /api/v1/things/set-forbidden.
         out_path = SAVES_DIR / f"{save_name}.rws"
         out_path.write_bytes(b"\xef\xbb\xbf" + content.encode("utf-8"))
 
