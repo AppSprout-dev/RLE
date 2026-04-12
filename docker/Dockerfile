@@ -33,12 +33,9 @@ RUN curl -fsSL \
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
-# Keep root for entrypoint (drops to rimworld after setup)
-# USER rimworld
-
 EXPOSE 8765
 
-HEALTHCHECK --interval=30s --timeout=10s --retries=60 --start-period=120s \
+HEALTHCHECK --interval=30s --timeout=10s --retries=20 --start-period=120s \
     CMD curl -sf --max-time 5 http://localhost:8765/api/v1/game/state || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]
