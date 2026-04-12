@@ -5,7 +5,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     dbus libpulse0 alsa-utils openbox \
     libxcursor1 libxrandr2 libxinerama1 libxi6 libxss1 libxtst6 \
     libfontconfig1 libxrender1 libsdl2-2.0-0 \
-    curl netcat-openbsd procps ca-certificates \
+    curl netcat-openbsd procps ca-certificates socat \
     && rm -rf /var/lib/apt/lists/*
 
 RUN printf 'pcm.!default {\n  type null\n}\nctl.!default {\n  type null\n}\n' > /etc/asound.conf
@@ -31,13 +31,14 @@ RUN curl -fsSL \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
-USER rimworld
+# Keep root for entrypoint (drops to rimworld after setup)
+# USER rimworld
 
 EXPOSE 8765
 
-HEALTHCHECK --interval=10s --timeout=5s --retries=12 --start-period=60s \
-    CMD curl -sf http://localhost:8765/api/v1/game/state || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --retries=60 --start-period=120s \
+    CMD curl -sf --max-time 5 http://localhost:8765/api/v1/game/state || exit 1
 
 ENTRYPOINT ["/entrypoint.sh"]

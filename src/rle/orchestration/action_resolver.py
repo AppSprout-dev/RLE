@@ -49,13 +49,26 @@ class _TaggedAction:
     plan_confidence: float
 
 
+@dataclass(frozen=True)
+class ResolverStats:
+    """Conflict statistics from a single resolve() call."""
+
+    conflicts_total: int
+    conflicts_resolved: int
+
+
 class ActionResolver:
     """Merges multiple ActionPlans into a single conflict-free plan."""
 
-    def resolve(self, plans: list[ActionPlan], state: GameState) -> ActionPlan:
-        """Apply priority rules and return a merged ActionPlan."""
+    def resolve(
+        self, plans: list[ActionPlan], state: GameState,
+    ) -> tuple[ActionPlan, ResolverStats]:
+        """Apply priority rules and return a merged ActionPlan with conflict stats."""
         if not plans:
-            return ActionPlan(role="orchestrator", tick=state.colony.tick, actions=[])
+            return (
+                ActionPlan(role="orchestrator", tick=state.colony.tick, actions=[]),
+                ResolverStats(conflicts_total=0, conflicts_resolved=0),
+            )
 
         crisis = self._detect_crisis(state)
         tagged = self._tag_actions(plans, crisis)
@@ -69,21 +82,33 @@ class ActionResolver:
             else:
                 pawn_actions.append(ta)
 
+        resolved_colony, col_detected, col_resolved = self._resolve_colony_actions(
+            colony_actions,
+        )
+        resolved_pawn, pawn_detected, pawn_resolved = self._resolve_pawn_conflicts(
+            pawn_actions, crisis,
+        )
+
         resolved: list[Action] = []
-        resolved.extend(self._resolve_colony_actions(colony_actions))
-        resolved.extend(self._resolve_pawn_conflicts(pawn_actions, crisis))
+        resolved.extend(resolved_colony)
+        resolved.extend(resolved_pawn)
 
         avg_confidence = (
             sum(p.confidence for p in plans) / len(plans) if plans else 0.5
         )
 
-        return ActionPlan(
+        plan = ActionPlan(
             role="orchestrator",
             tick=state.colony.tick,
             actions=resolved,
             summary=f"Merged {len(plans)} agent plans ({len(resolved)} actions)",
             confidence=round(avg_confidence, 3),
         )
+        stats = ResolverStats(
+            conflicts_total=col_detected + pawn_detected,
+            conflicts_resolved=col_resolved + pawn_resolved,
+        )
+        return plan, stats
 
     # ------------------------------------------------------------------
     # Crisis detection
@@ -142,11 +167,13 @@ class ActionResolver:
 
     def _resolve_pawn_conflicts(
         self, actions: list[_TaggedAction], crisis: CrisisState,
-    ) -> list[Action]:
+    ) -> tuple[list[Action], int, int]:
         """Group by colonist, keep best action per pawn.
 
         During peacetime (no raid, no medical emergency), NO_ACTION is
         preferred over regular actions — this implements "do no harm".
+
+        Returns (resolved_actions, conflicts_detected, conflicts_resolved).
         """
         peacetime = not crisis.raid_active and not crisis.medical_emergency
         by_pawn: dict[str, list[_TaggedAction]] = {}
@@ -155,6 +182,8 @@ class ActionResolver:
             by_pawn.setdefault(cid, []).append(ta)
 
         resolved: list[Action] = []
+        detected = 0
+        resolved_count = 0
         for cid, candidates in by_pawn.items():
             winner = min(
                 candidates,
@@ -167,6 +196,8 @@ class ActionResolver:
                 ),
             )
             if len(candidates) > 1:
+                detected += 1
+                resolved_count += 1
                 losers = [
                     f"{ta.role}:{ta.action.action_type}" for ta in candidates
                     if ta is not winner
@@ -177,19 +208,29 @@ class ActionResolver:
                     ", ".join(losers),
                 )
             resolved.append(winner.action)
-        return resolved
+        return resolved, detected, resolved_count
 
-    def _resolve_colony_actions(self, actions: list[_TaggedAction]) -> list[Action]:
-        """Deduplicate colony-level actions by type, highest role priority wins."""
+    def _resolve_colony_actions(
+        self, actions: list[_TaggedAction],
+    ) -> tuple[list[Action], int, int]:
+        """Deduplicate colony-level actions by type, highest role priority wins.
+
+        Returns (resolved_actions, conflicts_detected, conflicts_resolved).
+        """
         by_type: dict[str, list[_TaggedAction]] = {}
         for ta in actions:
             by_type.setdefault(ta.action.action_type, []).append(ta)
 
         resolved: list[Action] = []
+        detected = 0
+        resolved_count = 0
         for action_type, candidates in by_type.items():
+            if len(candidates) > 1:
+                detected += 1
+                resolved_count += 1
             winner = min(
                 candidates,
                 key=lambda ta: (ta.role_priority, -ta.plan_confidence),
             )
             resolved.append(winner.action)
-        return resolved
+        return resolved, detected, resolved_count

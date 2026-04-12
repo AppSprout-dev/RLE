@@ -7,6 +7,7 @@ import pytest
 from rle.agents.actions import Action, ActionPlan
 from rle.orchestration.action_resolver import (
     ActionResolver,
+    ResolverStats,
 )
 from rle.rimapi.schemas import (
     ColonistData,
@@ -77,14 +78,14 @@ class TestNoConflicts:
             ]),
         ]
         state = _make_state()
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         assert result.role == "orchestrator"
         assert len(result.actions) == 2
 
     def test_empty_plans(self) -> None:
         resolver = ActionResolver()
         state = _make_state()
-        result = resolver.resolve([], state)
+        result, _stats = resolver.resolve([], state)
         assert result.actions == []
         assert result.role == "orchestrator"
 
@@ -108,7 +109,7 @@ class TestSamePawnConflicts:
             ]),
         ]
         state = _make_state()
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         assert len(result.actions) == 1
         assert result.actions[0].action_type == "draft_colonist"
 
@@ -125,7 +126,7 @@ class TestSamePawnConflicts:
             ], confidence=0.4),
         ]
         state = _make_state()
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         assert len(result.actions) == 1
         # Same action.priority (3), same role_priority (3 vs 5), RM wins on role
         # Actually RM has role_priority=3, SO has 5, so RM wins
@@ -155,7 +156,7 @@ class TestEmergencyPriority:
             ], confidence=0.5),
         ]
         state = _make_state(threats=[raid])
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         assert len(result.actions) == 1
         # DC gets role_priority=1 during raid, RM stays at 3
         assert result.actions[0].action_type == "draft_colonist"
@@ -177,7 +178,7 @@ class TestEmergencyPriority:
             ]),
         ]
         state = _make_state(threats=[disease])
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         assert len(result.actions) == 1
         assert result.actions[0].action_type == "assign_bed_rest"
 
@@ -194,7 +195,7 @@ class TestEmergencyPriority:
             ]),
         ]
         state = _make_state(colonist_health=0.3)
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         assert len(result.actions) == 1
         assert result.actions[0].action_type == "assign_bed_rest"
 
@@ -218,7 +219,7 @@ class TestColonyActions:
             ], confidence=0.5),
         ]
         state = _make_state()
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         research_actions = [
             a for a in result.actions
             if a.action_type == "set_research_target"
@@ -283,7 +284,7 @@ class TestPeacetimeNoAction:
             ], confidence=0.5),
         ]
         state = _make_state()  # No threats = peacetime
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         pawn_actions = [a for a in result.actions if a.target_colonist_id == "col_01"]
         assert len(pawn_actions) == 1
         assert pawn_actions[0].action_type == "no_action"
@@ -306,7 +307,7 @@ class TestPeacetimeNoAction:
             ]),
         ]
         state = _make_state(threats=[raid])
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         pawn_actions = [a for a in result.actions if a.target_colonist_id == "col_01"]
         assert len(pawn_actions) == 1
         assert pawn_actions[0].action_type == "draft_colonist"
@@ -325,7 +326,7 @@ class TestPeacetimeNoAction:
             ]),
         ]
         state = _make_state(colonist_health=0.3)  # medical emergency
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         pawn_actions = [a for a in result.actions if a.target_colonist_id == "col_01"]
         assert len(pawn_actions) == 1
         assert pawn_actions[0].action_type == "assign_bed_rest"
@@ -343,7 +344,7 @@ class TestMergedPlan:
             Action(action_type="no_action"),
         ])]
         state = _make_state()
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         assert result.role == "orchestrator"
 
     def test_confidence_is_average(self) -> None:
@@ -353,5 +354,90 @@ class TestMergedPlan:
             _plan("defense_commander", [], confidence=0.6),
         ]
         state = _make_state()
-        result = resolver.resolve(plans, state)
+        result, _stats = resolver.resolve(plans, state)
         assert result.confidence == pytest.approx(0.7)
+
+
+# ------------------------------------------------------------------
+# ResolverStats
+# ------------------------------------------------------------------
+
+
+class TestResolverStats:
+    def test_no_conflicts_zero_stats(self) -> None:
+        resolver = ActionResolver()
+        plans = [
+            _plan("resource_manager", [
+                Action(action_type="set_work_priority",
+                       target_colonist_id="col_01", priority=3),
+            ]),
+            _plan("defense_commander", [
+                Action(action_type="draft_colonist",
+                       target_colonist_id="col_02", priority=2),
+            ]),
+        ]
+        state = _make_state()
+        _result, stats = resolver.resolve(plans, state)
+        assert stats.conflicts_total == 0
+        assert stats.conflicts_resolved == 0
+
+    def test_empty_plans_zero_stats(self) -> None:
+        resolver = ActionResolver()
+        state = _make_state()
+        _result, stats = resolver.resolve([], state)
+        assert stats == ResolverStats(conflicts_total=0, conflicts_resolved=0)
+
+    def test_pawn_conflict_counted(self) -> None:
+        resolver = ActionResolver()
+        plans = [
+            _plan("resource_manager", [
+                Action(action_type="set_work_priority",
+                       target_colonist_id="col_01", priority=5),
+            ]),
+            _plan("defense_commander", [
+                Action(action_type="draft_colonist",
+                       target_colonist_id="col_01", priority=1),
+            ]),
+        ]
+        state = _make_state()
+        _result, stats = resolver.resolve(plans, state)
+        assert stats.conflicts_total == 1
+        assert stats.conflicts_resolved == 1
+
+    def test_colony_conflict_counted(self) -> None:
+        resolver = ActionResolver()
+        plans = [
+            _plan("research_director", [
+                Action(action_type="set_research_target",
+                       parameters={"project": "electricity"}),
+            ], confidence=0.8),
+            _plan("resource_manager", [
+                Action(action_type="set_research_target",
+                       parameters={"project": "battery"}),
+            ], confidence=0.5),
+        ]
+        state = _make_state()
+        _result, stats = resolver.resolve(plans, state)
+        assert stats.conflicts_total == 1
+        assert stats.conflicts_resolved == 1
+
+    def test_multiple_conflicts(self) -> None:
+        resolver = ActionResolver()
+        plans = [
+            _plan("resource_manager", [
+                Action(action_type="set_work_priority",
+                       target_colonist_id="col_01", priority=5),
+                Action(action_type="set_work_priority",
+                       target_colonist_id="col_02", priority=3),
+            ]),
+            _plan("defense_commander", [
+                Action(action_type="draft_colonist",
+                       target_colonist_id="col_01", priority=1),
+                Action(action_type="draft_colonist",
+                       target_colonist_id="col_02", priority=1),
+            ]),
+        ]
+        state = _make_state()
+        _result, stats = resolver.resolve(plans, state)
+        assert stats.conflicts_total == 2
+        assert stats.conflicts_resolved == 2

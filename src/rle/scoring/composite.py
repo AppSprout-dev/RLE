@@ -8,18 +8,16 @@ from rle.rimapi.schemas import GameState
 from rle.scoring.metrics import ALL_METRICS, MetricContext
 
 DEFAULT_WEIGHTS: dict[str, float] = {
-    "survival": 0.25,
-    "threat_response": 0.15,
-    "mood": 0.15,
-    "food_security": 0.10,
-    "wealth": 0.10,
-    "research": 0.10,
-    "self_sufficiency": 0.10,
-    "efficiency": 0.05,
-    # Process metrics: weight 0.0 until game loop populates MetricContext counters.
-    # Target weights once wired: coordination=0.12, communication_efficiency=0.08.
-    "coordination": 0.0,
-    "communication_efficiency": 0.0,
+    "survival": 0.20,
+    "threat_response": 0.12,
+    "mood": 0.12,
+    "food_security": 0.08,
+    "wealth": 0.08,
+    "research": 0.08,
+    "self_sufficiency": 0.08,
+    "efficiency": 0.04,
+    "coordination": 0.12,
+    "communication_efficiency": 0.08,
 }
 
 

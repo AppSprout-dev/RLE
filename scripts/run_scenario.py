@@ -28,6 +28,8 @@ from rle.scenarios.evaluator import ScenarioEvaluator
 from rle.scenarios.loader import list_scenarios, load_scenario
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.recorder import TimeSeriesRecorder
+from rle.tracking.cost_tracker import create_cost_tracker
+from rle.tracking.event_log import EventLog
 
 DEFINITIONS_DIR = Path(__file__).parent.parent / "src" / "rle" / "scenarios" / "definitions"
 
@@ -134,6 +136,13 @@ async def main(args: argparse.Namespace) -> None:
 
     max_ticks = args.ticks or scenario.max_ticks
 
+    # Initialize tracking (optional, when --output is specified)
+    event_log: EventLog | None = None
+    if args.output:
+        Path(args.output).mkdir(parents=True, exist_ok=True)
+        event_log = EventLog(Path(args.output) / "events.jsonl")
+    cost_tracker = await create_cost_tracker(args.model or config.model)
+
     # SSE listener for real-time events (optional, only when RIMAPI is live)
     sse = RimAPISSEClient(config.rimapi_url)
     sse_task = asyncio.create_task(sse.listen())
@@ -176,6 +185,8 @@ async def main(args: argparse.Namespace) -> None:
             dashboard_export_dir=Path(args.output) if args.output else None,
             no_agent=args.no_agent,
             no_pause=args.no_pause,
+            event_log=event_log,
+            cost_tracker=cost_tracker,
         )
         try:
             if visualizer:
@@ -196,6 +207,18 @@ async def main(args: argparse.Namespace) -> None:
         csv_path = output_dir / f"{scenario_path.stem}.csv"
         recorder.to_csv(csv_path)
         print(f"\nCSV exported to {csv_path}")
+
+    # Print cost summary
+    snap = cost_tracker.snapshot()
+    if snap.num_calls > 0:
+        print(
+            f"\nTokens: {snap.total_tokens} ({snap.num_calls} calls) "
+            f"| Est. cost: ${snap.estimated_cost_usd:.4f} "
+            f"| Wall time: {snap.wall_time_s:.1f}s",
+        )
+
+    if event_log:
+        event_log.close()
 
 
 if __name__ == "__main__":

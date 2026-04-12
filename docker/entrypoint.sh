@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export HOME=/home/rimworld
+
 # Clean stale X11 locks
 rm -f /tmp/.X99-lock /tmp/.X11-unix/X99
 
@@ -33,6 +35,8 @@ if [ ! -f "$CONFIG_DIR/Mod_RedEyeDev.RIMAPI_Settings.xml" ]; then
 <Mod_RedEyeDev.RIMAPI_Settings>
   <serverIP>0.0.0.0</serverIP>
   <serverPort>8765</serverPort>
+  <enableLogging>True</enableLogging>
+  <loggingLevel>0</loggingLevel>
 </Mod_RedEyeDev.RIMAPI_Settings>
 XMLEOF
 fi
@@ -55,35 +59,83 @@ if [ -d /opt/game/Mods ]; then
         [ -d "$mod" ] && ln -sf "$mod" "$MODS_DIR/$(basename "$mod")"
     done
 fi
-# Link our additional mods on top
+# Link Workshop mods from SteamCMD download (if present in game volume)
+if [ -d /opt/game/steamapps/workshop/content/294100 ]; then
+    for mod in /opt/game/steamapps/workshop/content/294100/*/; do
+        [ -d "$mod" ] && ln -sf "$mod" "$MODS_DIR/$(basename "$mod")"
+    done
+fi
+# Link our additional mods on top (overrides Workshop versions)
 for mod_dir in /opt/mods/*/; do
     [ -d "$mod_dir" ] && ln -sf "$mod_dir" "$MODS_DIR/$(basename "$mod_dir")"
 done
+echo "Mods available in $MODS_DIR:"
+ls "$MODS_DIR"
 
-# Launch RimWorld
+# Pre-seed ModsConfig.xml to activate required mods
+# Load order: Harmony → Core → Royalty → HeadlessRimPatch → RIMAPI
+if [ ! -f "$CONFIG_DIR/ModsConfig.xml" ]; then
+    cat > "$CONFIG_DIR/ModsConfig.xml" << 'XMLEOF'
+<?xml version="1.0" encoding="utf-8"?>
+<ModsConfigData>
+  <version>1.6</version>
+  <activeMods>
+    <li>brrainz.harmony</li>
+    <li>ludeon.rimworld</li>
+    <li>ludeon.rimworld.royalty</li>
+    <li>RedEyeDev.HeadlessRim</li>
+    <li>RedEyeDev.RIMAPI</li>
+  </activeMods>
+  <knownExpansions>
+    <li>ludeon.rimworld.royalty</li>
+  </knownExpansions>
+</ModsConfigData>
+XMLEOF
+    echo "ModsConfig.xml seeded with HeadlessRimPatch + RIMAPI"
+fi
+
+# Replace the game's Mods dir with our merged mods (needs write access to game volume)
+if [ -d /opt/game/Mods ] && [ ! -L /opt/game/Mods ]; then
+    mv /opt/game/Mods /opt/game/Mods.orig
+fi
+ln -sfn "$MODS_DIR" /opt/game/Mods
+echo "Game Mods -> $MODS_DIR"
+
+# Ensure rimworld user can write to needed dirs
+chown -R rimworld:rimworld /home/rimworld /opt/mods-merged /opt/saves 2>/dev/null || true
+chmod +x /opt/game/RimWorldLinux 2>/dev/null || true
+
+# Launch RimWorld as rimworld user
 echo "Starting RimWorld headless..."
-/opt/game/RimWorldLinux \
+su rimworld -c '/opt/game/RimWorldLinux \
     -batchmode \
     -nographics \
     -noshaders \
     -force-opengl \
     -startServer \
-    -logFile /tmp/rimworld_log.txt &
+    -logFile /tmp/rimworld_log.txt' &
 GAME_PID=$!
 
-# Wait for RIMAPI to become responsive
-echo "Waiting for RIMAPI on :8765..."
+# Wait for RIMAPI to become responsive.
+# Wait for RIMAPI to become responsive on loopback
+RIMAPI_TIMEOUT=${RIMAPI_TIMEOUT:-120}
+echo "Waiting for RIMAPI on :8765 (timeout: ${RIMAPI_TIMEOUT}s)..."
 ELAPSED=0
-while ! curl -sf http://localhost:8765/api/v1/game/state > /dev/null 2>&1; do
+while ! curl -sf --max-time 5 http://localhost:8765/api/v1/game/state > /dev/null 2>&1; do
     sleep 5
     ELAPSED=$((ELAPSED + 5))
-    if [ "$ELAPSED" -ge 120 ]; then
-        echo "ERROR: RIMAPI not responsive after 120s"
+    if [ "$ELAPSED" -ge "$RIMAPI_TIMEOUT" ]; then
+        echo "ERROR: RIMAPI not responsive after ${RIMAPI_TIMEOUT}s"
         tail -30 /tmp/rimworld_log.txt 2>/dev/null
         exit 1
     fi
 done
-echo "RIMAPI ready"
+echo "RIMAPI ready on loopback"
+
+# Mono HttpListener binds to [::1] (IPv6 loopback) regardless of config.
+# Bridge all interfaces on port 8765 so Docker port forwarding can reach it.
+socat TCP4-LISTEN:8765,fork,reuseaddr TCP6:[::1]:8765 &
+echo "socat bridge: 0.0.0.0:8765 -> [::1]:8765"
 
 # Keep container alive
 tail -f /tmp/rimworld_log.txt

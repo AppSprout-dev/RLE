@@ -34,7 +34,7 @@ class TestLoadScenario:
     def test_scoring_weights_override(self) -> None:
         path = DEFINITIONS_DIR / "04_raid_defense.yaml"
         scenario = load_scenario(path)
-        assert scenario.scoring_weights["threat_response"] == 0.30
+        assert scenario.scoring_weights["threat_response"] == 0.24
 
     def test_invalid_path_raises(self) -> None:
         with pytest.raises(FileNotFoundError):

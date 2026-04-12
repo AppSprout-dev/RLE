@@ -160,6 +160,7 @@ class RimWorldRoleAgent(LLMAgent):
         self._pending_events: list[RimAPIEvent] = []
         self._last_usage: dict[str, int] | None = None
         self._last_raw_output: str | None = None
+        self._weave_op: Any = None  # Set via enable_weave() for LLM call tracing
 
     def set_provider_kwargs(self, **kwargs: Any) -> None:
         """Set extra kwargs passed to provider.complete() (e.g. extra_body)."""
@@ -172,6 +173,11 @@ class RimWorldRoleAgent(LLMAgent):
     def attach_spoke(self, spoke: Spoke) -> None:
         """Attach this agent's CentralPost spoke for inter-agent messaging."""
         self._spoke = spoke
+
+    def enable_weave(self, weave_module: Any) -> None:
+        """Enable Weave tracing on LLM calls. Pass the `weave` module."""
+        if weave_module is not None:
+            self._weave_op = weave_module.op()
 
     def set_pending_events(self, events: list[RimAPIEvent]) -> None:
         """Inject SSE events for this tick. Called by game loop before deliberation."""
@@ -216,12 +222,21 @@ class RimWorldRoleAgent(LLMAgent):
             messages.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content="</think>"),
             )
-        result = self.provider.complete(
-            messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            **self._provider_kwargs,
-        )
+
+        def _do_complete() -> CompletionResult:
+            return self.provider.complete(
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **self._provider_kwargs,
+            )
+
+        # If Weave tracing is enabled, wrap the provider call
+        if self._weave_op is not None:
+            result: CompletionResult = self._weave_op(_do_complete)()
+        else:
+            result = _do_complete()
+
         self._last_raw_output = result.content
         self._last_usage = result.usage if hasattr(result, "usage") else None
         return result

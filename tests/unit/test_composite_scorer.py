@@ -77,7 +77,7 @@ class TestCompositeScorer:
         assert w == DEFAULT_WEIGHTS
         # Mutation doesn't affect scorer
         w["survival"] = 0.0
-        assert scorer.weights["survival"] == 0.25
+        assert scorer.weights["survival"] == DEFAULT_WEIGHTS["survival"]
 
 
 class TestFinalScore:
