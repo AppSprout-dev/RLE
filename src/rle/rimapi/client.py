@@ -659,7 +659,11 @@ class RimAPIClient:
         """Unforbid all forbidden items on the map. Returns count unforbidden."""
         try:
             data = await self._get(f"/api/v1/map/things?map_id={map_id}")
-            things: list[dict[str, Any]] = data if isinstance(data, list) else []
+            things: list[dict[str, Any]] = (
+                data if isinstance(data, list)
+                else data.get("data", []) if isinstance(data, dict)
+                else []
+            )
             forbidden_ids = [
                 t["thing_id"] for t in things
                 if t.get("is_forbidden", False)
