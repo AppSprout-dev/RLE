@@ -22,6 +22,10 @@ failure_conditions:
     operator: "<"
     value: 0.25
 
+triggered_incidents:
+  - tick_offset: 1
+    name: ToxicFallout
+
 scoring_weights:
   survival: 0.28
   food_security: 0.12

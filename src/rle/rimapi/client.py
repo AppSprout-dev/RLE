@@ -10,6 +10,7 @@ from typing import Any
 import httpx
 
 from rle.rimapi.schemas import (
+    AlertData,
     AreaRect,
     ColonistData,
     ColonyData,
@@ -22,6 +23,7 @@ from rle.rimapi.schemas import (
     ResearchData,
     ResourceData,
     RoomData,
+    ScreenshotResponse,
     StructureData,
     TerrainSummary,
     ThreatData,
@@ -331,6 +333,96 @@ class RimAPIClient:
             return result
         except (RimAPIResponseError, RimAPIConnectionError):
             return []
+
+    async def get_alerts(self, map_id: int = 0) -> list[AlertData]:
+        """Fetch active in-game alerts (starving, raid, idle, etc.)."""
+        try:
+            data = await self._get(f"/api/v1/ui/alerts?map_id={map_id}")
+            alerts_list = data if isinstance(data, list) else []
+            result: list[AlertData] = []
+            for a in alerts_list:
+                if not isinstance(a, dict):
+                    continue
+                targets_raw = a.get("targets") or a.get("Targets") or []
+                target_ids = [int(t) for t in targets_raw if t is not None]
+                cells_raw = a.get("cells") or a.get("Cells") or []
+                cells = [str(c) for c in cells_raw]
+                result.append(AlertData(
+                    label=str(a.get("label") or a.get("Label") or ""),
+                    explanation=str(
+                        a.get("explanation") or a.get("Explanation") or ""
+                    ),
+                    priority=str(
+                        a.get("priority") or a.get("Priority") or "Medium"
+                    ),
+                    target_ids=target_ids,
+                    cells=cells,
+                ))
+            return result
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return []
+
+    async def trigger_incident(
+        self, name: str, map_id: int = 0, **parms: Any,
+    ) -> dict[str, Any]:
+        """Trigger a game incident (raid, toxic fallout, plague, etc.)."""
+        body: dict[str, Any] = {
+            "name": name,
+            "map_id": str(map_id),
+        }
+        if parms:
+            body["incident_parms"] = parms
+        return await self._post("/api/v1/incident/trigger", json=body)
+
+    async def get_upcoming_incidents(
+        self, map_id: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Fetch probability-weighted upcoming incidents."""
+        try:
+            data = await self._get(
+                f"/api/v1/incidents/top?map_id={map_id}"
+            )
+            if isinstance(data, list):
+                return [i for i in data if isinstance(i, dict)]
+            return []
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return []
+
+    async def take_screenshot(
+        self,
+        width: int = 1920,
+        height: int = 1080,
+        fmt: str = "jpeg",
+        quality: int = 75,
+        hide_ui: bool = True,
+    ) -> ScreenshotResponse | None:
+        """Capture a map screenshot as base64."""
+        try:
+            result = await self._post(
+                "/api/v1/camera/screenshot",
+                json={
+                    "format": fmt,
+                    "quality": quality,
+                    "width": width,
+                    "height": height,
+                    "hide_ui": hide_ui,
+                },
+            )
+            data = result.get("data", result)
+            if not isinstance(data, dict):
+                return None
+            image = data.get("image", {})
+            metadata = data.get("metadata", {})
+            context = data.get("game_context", {})
+            return ScreenshotResponse(
+                data_uri=str(image.get("data_uri", "")),
+                width=int(metadata.get("width", width)),
+                height=int(metadata.get("height", height)),
+                size_bytes=int(metadata.get("size_bytes", 0)),
+                game_tick=int(context.get("current_tick", 0)),
+            )
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return None
 
     async def get_resources(self) -> ResourceData:
         try:
@@ -725,6 +817,7 @@ class RimAPIClient:
         weather = await self.get_weather()
         power = await self.get_power_info()
         factions = await self.get_factions()
+        alerts = await self.get_alerts()
 
         # Compute dynamic colony metrics from real data
         if colonists:
@@ -747,6 +840,7 @@ class RimAPIClient:
             timestamp=time.time(),
             power=power,
             factions=factions,
+            alerts=alerts,
         )
 
     async def unforbid_all_items(self, map_id: int = 0) -> int:

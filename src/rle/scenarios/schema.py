@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -25,6 +27,17 @@ class FailureCondition(BaseModel):
     value: float
 
 
+class TriggeredIncident(BaseModel):
+    """An incident to fire at a specific tick during a scenario run."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tick_offset: int
+    name: str
+    map_id: int = 0
+    incident_parms: dict[str, Any] = {}
+
+
 class ScenarioConfig(BaseModel):
     """Complete scenario definition loaded from YAML."""
 
@@ -40,3 +53,4 @@ class ScenarioConfig(BaseModel):
     scoring_weights: dict[str, float] = {}
     max_ticks: int | None = None
     save_name: str = ""
+    triggered_incidents: list[TriggeredIncident] = []

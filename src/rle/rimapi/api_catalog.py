@@ -282,6 +282,13 @@ READ_CATALOG = {
         "path": "/api/v1/traders/defs",
         "description": "Available trader types",
     },
+    # Alerts (new — commit 9885de6)
+    "ui_alerts": {
+        "method": "GET",
+        "path": "/api/v1/ui/alerts",
+        "description": "Active in-game alerts (starving, raid, idle, need beds)",
+        "params": ["map_id"],
+    },
 }
 
 # -- WRITE ENDPOINTS (agents propose these as actions) ----------------------
@@ -483,6 +490,19 @@ WRITE_CATALOG = {
         "method": "POST",
         "path": "/api/v1/map/droppod",
         "description": "Send a drop pod with items",
+    },
+    # Camera (new — commit 654d922)
+    "camera_screenshot": {
+        "method": "POST",
+        "path": "/api/v1/camera/screenshot",
+        "description": "Capture base64 map screenshot",
+        "params": {
+            "format": "string (jpeg or png)",
+            "quality": "int (0-100)",
+            "width": "int?",
+            "height": "int?",
+            "hide_ui": "bool (default true)",
+        },
     },
 }
 

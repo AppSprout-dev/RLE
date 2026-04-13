@@ -209,6 +209,30 @@ class FactionData(BaseModel):
     relation: str
 
 
+class AlertData(BaseModel):
+    """An active in-game alert from /api/v1/ui/alerts."""
+
+    model_config = ConfigDict(frozen=True)
+
+    label: str
+    explanation: str
+    priority: str
+    target_ids: list[int] = []
+    cells: list[str] = []
+
+
+class ScreenshotResponse(BaseModel):
+    """Map screenshot response from /api/v1/camera/screenshot."""
+
+    model_config = ConfigDict(frozen=True)
+
+    data_uri: str
+    width: int
+    height: int
+    size_bytes: int
+    game_tick: int
+
+
 class GameState(BaseModel):
     """Composite snapshot of full colony state for a single tick."""
 
@@ -224,3 +248,4 @@ class GameState(BaseModel):
     timestamp: float
     power: PowerData | None = None
     factions: list[FactionData] = []
+    alerts: list[AlertData] = []

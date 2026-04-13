@@ -22,6 +22,10 @@ failure_conditions:
     operator: "<"
     value: 0.4
 
+triggered_incidents:
+  - tick_offset: 1
+    name: Plague
+
 scoring_weights:
   survival: 0.28
   mood: 0.12

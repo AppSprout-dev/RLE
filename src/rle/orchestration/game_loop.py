@@ -23,6 +23,7 @@ from rle.rimapi.client import RimAPIClient
 from rle.rimapi.schemas import GameState
 from rle.rimapi.sse_client import RimAPISSEClient
 from rle.scenarios.evaluator import EvaluationResult, ScenarioEvaluator
+from rle.scenarios.schema import TriggeredIncident
 from rle.scoring.composite import CompositeScorer, ScoreSnapshot
 from rle.scoring.metrics import MetricContext
 from rle.scoring.recorder import TimeSeriesRecorder
@@ -67,6 +68,8 @@ class RLEGameLoop:
         no_pause: bool = False,
         event_log: EventLog | None = None,
         cost_tracker: CostTracker | None = None,
+        triggered_incidents: list[TriggeredIncident] | None = None,
+        screenshots_enabled: bool = False,
     ) -> None:
         self._config = config
         self._client = client
@@ -105,6 +108,8 @@ class RLEGameLoop:
         self._visualizer = visualizer
         self._event_log = event_log
         self._cost_tracker = cost_tracker
+        self._triggered_incidents = triggered_incidents or []
+        self._screenshots_enabled = screenshots_enabled
 
         # Hub-spoke communication — agents read messages from their spokes
         self._hub = CentralPost(max_agents=len(agents))
@@ -260,6 +265,7 @@ class RLEGameLoop:
         self, plans: list[ActionPlan], resolved: ActionPlan,
         exec_result: ExecutionResult, snapshot: ScoreSnapshot | None,
         tick: int, day: int, macro_time: float,
+        screenshot_data_uri: str | None = None,
     ) -> None:
         """Write tick data as JSON for the rimapi-dashboard to consume."""
         if not self._dashboard_export_dir:
@@ -309,6 +315,7 @@ class RLEGameLoop:
                 "composite": snapshot.composite,
                 "metrics": snapshot.metrics,
             } if snapshot else None,
+            "screenshot_data_uri": screenshot_data_uri,
         }
         (self._dashboard_export_dir / "latest_tick.json").write_text(
             json.dumps(data, indent=2),
@@ -339,6 +346,31 @@ class RLEGameLoop:
             )
             self._last_phase = phase
 
+    async def _fire_scheduled_incidents(self, tick_num: int) -> None:
+        """Fire any triggered_incidents whose tick_offset matches."""
+        for incident in self._triggered_incidents:
+            if incident.tick_offset == tick_num:
+                logger.info(
+                    "Firing scheduled incident %s at tick %d",
+                    incident.name, tick_num,
+                )
+                try:
+                    await self._client.trigger_incident(
+                        incident.name,
+                        map_id=incident.map_id,
+                        **incident.incident_parms,
+                    )
+                    self._emit(
+                        EventType.ACTION_EXEC, tick_num,
+                        action_type="trigger_incident",
+                        target=incident.name, success=True,
+                    )
+                except Exception:
+                    logger.warning(
+                        "Failed to trigger incident %s",
+                        incident.name, exc_info=True,
+                    )
+
     async def run_tick(self) -> TickResult:
         """Execute one turn.
 
@@ -352,6 +384,10 @@ class RLEGameLoop:
             await self._client.pause_game()
 
         self._emit(EventType.TICK_START, tick_num)
+
+        # 1b. Fire scheduled incidents (before state read captures effects)
+        if self._triggered_incidents:
+            await self._fire_scheduled_incidents(tick_num)
 
         # 2. Read state
         state = await self._state_manager.refresh()
@@ -501,13 +537,21 @@ class RLEGameLoop:
         # 10. Render visualization
         self._render_visualizer(state.colony.tick, state.colony.day, exec_result, snapshot)
 
-        # 11. Export tick data for dashboard
+        # 11. Capture screenshot (opt-in, before export so it's in the JSON)
+        screenshot_uri: str | None = None
+        if self._screenshots_enabled:
+            ss = await self._client.take_screenshot()
+            if ss is not None:
+                screenshot_uri = ss.data_uri
+
+        # 12. Export tick data for dashboard
         self._export_tick_json(
             plans, resolved, exec_result, snapshot,
             state.colony.tick, state.colony.day, current_time,
+            screenshot_data_uri=screenshot_uri,
         )
 
-        # 12. Unpause (skip in no-pause mode — game was never paused)
+        # 13. Unpause (skip in no-pause mode — game was never paused)
         if not self._no_pause:
             await self._client.unpause_game()
 

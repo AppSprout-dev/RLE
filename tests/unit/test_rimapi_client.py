@@ -14,6 +14,7 @@ from rle.rimapi.client import (
     RimAPIResponseError,
 )
 from rle.rimapi.schemas import (
+    AlertData,
     ColonistData,
     ColonyData,
     FactionData,
@@ -22,6 +23,7 @@ from rle.rimapi.schemas import (
     PowerData,
     ResearchData,
     ResourceData,
+    ScreenshotResponse,
     ThreatData,
     WeatherData,
 )
@@ -50,6 +52,17 @@ _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/jobs/make/equip": {"success": True},
     "/api/v1/map/repair/rect": {"success": True},
     "/api/v1/map/destroy/rect": {"success": True},
+    "/api/v1/incident/trigger": {"success": True},
+    "/api/v1/camera/screenshot": {
+        "data": {
+            "image": {"data_uri": "data:image/jpeg;base64,/9j/4AAQ..."},
+            "metadata": {
+                "format": "jpeg", "width": 1920,
+                "height": 1080, "size_bytes": 245000,
+            },
+            "game_context": {"current_tick": 60000},
+        },
+    },
 }
 
 
@@ -140,6 +153,30 @@ def all_routes(
             {
                 "name": "Tribe of Elk", "def_name": "TribeCivil",
                 "goodwill": 45, "relation": "neutral", "is_player": False,
+            },
+        ],
+        "/api/v1/ui/alerts?map_id=0": [
+            {
+                "label": "Starvation",
+                "explanation": "A colonist is starving",
+                "priority": "Critical",
+                "targets": [184],
+                "cells": [],
+            },
+            {
+                "label": "Need Beds",
+                "explanation": "Colonists need beds",
+                "priority": "High",
+                "targets": [],
+                "cells": ["(120,125)"],
+            },
+        ],
+        "/api/v1/incidents/top?map_id=0": [
+            {
+                "def_name": "RaidEnemy",
+                "label": "Raid",
+                "category": "ThreatBig",
+                "current_weight": 42.5,
             },
         ],
         "/api/v1/map/buildings?map_id=0": [],
@@ -378,3 +415,45 @@ class TestForkEndpoints:
     async def test_destroy_rect(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.destroy_rect(0, 10, 10, 20, 20)
         assert result["success"] is True
+
+    async def test_trigger_incident(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.trigger_incident(
+            "RaidEnemy", map_id=0, points=500,
+        )
+        assert result["success"] is True
+
+    async def test_take_screenshot(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.take_screenshot()
+        assert result is not None
+        assert isinstance(result, ScreenshotResponse)
+        assert result.width == 1920
+        assert result.height == 1080
+        assert result.size_bytes == 245000
+        assert result.game_tick == 60000
+        assert result.data_uri.startswith("data:image/jpeg")
+
+
+class TestPhase2ReadEndpoints:
+    async def test_get_alerts(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_alerts()
+        assert len(result) == 2
+        assert isinstance(result[0], AlertData)
+        assert result[0].label == "Starvation"
+        assert result[0].priority == "Critical"
+        assert result[0].target_ids == [184]
+        assert result[1].label == "Need Beds"
+        assert result[1].cells == ["(120,125)"]
+
+    async def test_alerts_in_game_state(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        state = await mock_client.get_game_state()
+        assert len(state.alerts) == 2
+        assert state.alerts[0].label == "Starvation"
+
+    async def test_get_upcoming_incidents(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        result = await mock_client.get_upcoming_incidents()
+        assert len(result) == 1
+        assert result[0]["def_name"] == "RaidEnemy"
