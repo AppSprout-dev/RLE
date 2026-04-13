@@ -121,6 +121,21 @@ _MOCK_ROUTES: dict[str, dict | list] = {
         "grid": [100, 0],
         "floor_palette": [], "floor_grid": [100, 0],
     },
+    "/api/v1/resources/stored?map_id=0": {
+        "Resources": [
+            {"def_name": "WoodLog", "stack_count": 200},
+            {"def_name": "Steel", "stack_count": 100},
+            {"def_name": "ComponentIndustrial", "stack_count": 10},
+        ],
+    },
+    "/api/v1/map/power/info?map_id=0": {
+        "current_power": 0.0,
+        "total_consumption": 0.0,
+        "currently_stored_power": 0.0,
+        "total_power_storage": 0.0,
+    },
+    "/api/v1/factions": [],
+    "/api/v1/ui/alerts?map_id=0": [],
 }
 
 
