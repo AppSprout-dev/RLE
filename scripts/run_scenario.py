@@ -158,8 +158,8 @@ async def main(args: argparse.Namespace) -> None:
                 for _ in range(15):
                     await asyncio.sleep(2)
                     try:
-                        state = await client._get("/api/v1/game/state")
-                        if state.get("colonist_count", 0) > 0:
+                        colony = await client.get_colony()
+                        if colony.population > 0:
                             break
                     except Exception:
                         pass

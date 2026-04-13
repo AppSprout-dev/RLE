@@ -86,6 +86,27 @@ class RimAPIClient:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _pick(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
+        """Return the first key present in `data` (explicit membership check).
+
+        Handles snake_case/PascalCase shape variations from RIMAPI without
+        the ``.get(k) or fallback`` anti-pattern, which erases legitimate
+        zero/empty values.
+        """
+        for k in keys:
+            if k in data:
+                return data[k]
+        return default
+
+    async def ping(self) -> bool:
+        """Probe whether RIMAPI is responsive. Safe for loops/health checks."""
+        try:
+            await self._get("/api/v1/game/state")
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return False
+        return True
+
     async def _get(self, path: str) -> Any:
         """Perform a GET request, unwrap RIMAPI envelope, return data payload."""
         try:
@@ -283,9 +304,8 @@ class RimAPIClient:
             for item in items:
                 if not isinstance(item, dict):
                     continue
-                def_name = str(item.get("def_name") or item.get("DefName") or "")
-                raw_count = item.get("stack_count") or item.get("StackCount") or 1
-                count = int(raw_count)
+                def_name = str(self._pick(item, "def_name", "DefName", default=""))
+                count = int(self._pick(item, "stack_count", "StackCount", default=1))
                 if def_name:
                     totals[def_name] = totals.get(def_name, 0) + count
             return totals
@@ -298,15 +318,19 @@ class RimAPIClient:
             data = await self._get(f"/api/v1/map/power/info?map_id={map_id}")
             if not isinstance(data, dict):
                 return None
-            cur = data.get("current_power") or data.get("CurrentPower") or 0.0
-            con = data.get("total_consumption") or data.get("TotalConsumption") or 0.0
-            sto = data.get("currently_stored_power") or data.get("CurrentlyStoredPower") or 0.0
-            cap = data.get("total_power_storage") or data.get("TotalPowerStorage") or 0.0
             return PowerData(
-                current_power=float(cur),
-                total_consumption=float(con),
-                stored_power=float(sto),
-                storage_capacity=float(cap),
+                current_power=float(
+                    self._pick(data, "current_power", "CurrentPower", default=0.0),
+                ),
+                total_consumption=float(
+                    self._pick(data, "total_consumption", "TotalConsumption", default=0.0),
+                ),
+                stored_power=float(self._pick(
+                    data, "currently_stored_power", "CurrentlyStoredPower", default=0.0,
+                )),
+                storage_capacity=float(
+                    self._pick(data, "total_power_storage", "TotalPowerStorage", default=0.0),
+                ),
             )
         except (RimAPIResponseError, RimAPIConnectionError):
             return None
@@ -320,15 +344,13 @@ class RimAPIClient:
             for f in factions_list:
                 if not isinstance(f, dict):
                     continue
-                if f.get("is_player", f.get("IsPlayer", False)):
+                if self._pick(f, "is_player", "IsPlayer", default=False):
                     continue  # Skip player's own faction
-                fname = str(f.get("name") or f.get("Name") or "Unknown")
-                fdef = str(f.get("def_name") or f.get("DefName") or "")
-                fgw = f.get("goodwill") or f.get("Goodwill") or 0
-                frel = str(f.get("relation") or f.get("Relation") or "neutral")
                 result.append(FactionData(
-                    name=fname, def_name=fdef,
-                    goodwill=int(fgw), relation=frel,
+                    name=str(self._pick(f, "name", "Name", default="Unknown")),
+                    def_name=str(self._pick(f, "def_name", "DefName", default="")),
+                    goodwill=int(self._pick(f, "goodwill", "Goodwill", default=0)),
+                    relation=str(self._pick(f, "relation", "Relation", default="neutral")),
                 ))
             return result
         except (RimAPIResponseError, RimAPIConnectionError):
@@ -343,20 +365,18 @@ class RimAPIClient:
             for a in alerts_list:
                 if not isinstance(a, dict):
                     continue
-                targets_raw = a.get("targets") or a.get("Targets") or []
-                target_ids = [int(t) for t in targets_raw if t is not None]
-                cells_raw = a.get("cells") or a.get("Cells") or []
-                cells = [str(c) for c in cells_raw]
+                targets_raw = self._pick(a, "targets", "Targets", default=[])
+                cells_raw = self._pick(a, "cells", "Cells", default=[])
                 result.append(AlertData(
-                    label=str(a.get("label") or a.get("Label") or ""),
+                    label=str(self._pick(a, "label", "Label", default="")),
                     explanation=str(
-                        a.get("explanation") or a.get("Explanation") or ""
+                        self._pick(a, "explanation", "Explanation", default=""),
                     ),
                     priority=str(
-                        a.get("priority") or a.get("Priority") or "Medium"
+                        self._pick(a, "priority", "Priority", default="Medium"),
                     ),
-                    target_ids=target_ids,
-                    cells=cells,
+                    target_ids=[int(t) for t in targets_raw if t is not None],
+                    cells=[str(c) for c in cells_raw],
                 ))
             return result
         except (RimAPIResponseError, RimAPIConnectionError):
@@ -365,7 +385,13 @@ class RimAPIClient:
     async def trigger_incident(
         self, name: str, map_id: int = 0, **parms: Any,
     ) -> dict[str, Any]:
-        """Trigger a game incident (raid, toxic fallout, plague, etc.)."""
+        """Trigger a game incident (raid, toxic fallout, plague, etc.).
+
+        Note: ``map_id`` is serialized as a string here because RIMAPI's
+        ``TriggerIncidentRequestDto.MapId`` is typed as C# string, unlike
+        most other endpoints which take integer map_id. Do not change
+        without testing against a live game.
+        """
         body: dict[str, Any] = {
             "name": name,
             "map_id": str(map_id),
@@ -424,7 +450,10 @@ class RimAPIClient:
         except (RimAPIResponseError, RimAPIConnectionError):
             return None
 
-    async def get_resources(self) -> ResourceData:
+    async def get_resources(
+        self, power_info: PowerData | None = None,
+    ) -> ResourceData:
+        """Fetch resource totals. Pass power_info to avoid a duplicate fetch."""
         try:
             data = await self._get("/api/v1/resources/summary?map_id=0")
             crit = data.get("critical_resources", {})
@@ -436,8 +465,10 @@ class RimAPIClient:
             wood = stored.get("WoodLog", 0)
             components = stored.get("ComponentIndustrial", 0)
 
-            # Fetch power grid data
-            power_info = await self.get_power_info()
+            # Use provided power_info if available (avoids double HTTP call
+            # when called from get_game_state), otherwise fetch it.
+            if power_info is None:
+                power_info = await self.get_power_info()
             power_net = (
                 power_info.current_power - power_info.total_consumption
                 if power_info else 0.0
@@ -799,7 +830,10 @@ class RimAPIClient:
         """Fetch all endpoints and assemble a full GameState snapshot."""
         colony = await self.get_colony()
         colonists = await self.get_colonists()
-        resources = await self.get_resources()
+        # Fetch power_info once and share between get_resources() and GameState
+        # — avoids a duplicate HTTP round-trip per tick.
+        power = await self.get_power_info()
+        resources = await self.get_resources(power_info=power)
         map_data = await self.get_map()
         # Compute terrain summary using colonist positions for colony center
         col_positions = [(c.position[0], c.position[1]) for c in colonists]
@@ -815,7 +849,6 @@ class RimAPIClient:
         research = await self.get_research()
         threats = await self.get_threats()
         weather = await self.get_weather()
-        power = await self.get_power_info()
         factions = await self.get_factions()
         alerts = await self.get_alerts()
 
@@ -1203,10 +1236,15 @@ class RimAPIClient:
     async def change_weather(
         self, weather_def: str, map_id: int = 0,
     ) -> dict[str, Any]:
-        """Change the current weather."""
+        """Change the current weather.
+
+        Uses a JSON body (consistent with other write endpoints) instead
+        of query params so special characters in weather_def don't need
+        URL-escaping.
+        """
         return await self._post(
-            f"/api/v1/map/weather/change?name={weather_def}"
-            f"&map_id={map_id}",
+            "/api/v1/map/weather/change",
+            json={"name": weather_def, "map_id": map_id},
         )
 
     async def equip_item(self, colonist_id: str, thing_id: int) -> dict[str, Any]:

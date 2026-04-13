@@ -56,7 +56,7 @@ _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/pawn/spawn": {"success": True, "data": {"pawn_id": 999, "name": "Val"}},
     "/api/v1/item/spawn": {"success": True},
     "/api/v1/map/droppod": {"success": True},
-    "/api/v1/map/weather/change?name=Rain&map_id=0": {"success": True},
+    "/api/v1/map/weather/change": {"success": True},
     "/api/v1/pawn/edit/skills": {"success": True},
     "/api/v1/pawn/edit/traits": {"success": True},
     "/api/v1/pawn/edit/health": {"success": True},
@@ -563,3 +563,139 @@ class TestPawnEditEndpoints:
         import pytest as _pytest
         with _pytest.raises(ValueError, match="out of range"):
             await mock_client.edit_pawn_needs(184, {"food": 1.5})
+
+
+class TestRequestShapes:
+    """Verify request bodies match expected shapes (not just HTTP 200)."""
+
+    async def test_change_weather_sends_json_body(self) -> None:
+        """change_weather uses JSON body, not query string — avoids URL
+        encoding issues for weather defs with special characters."""
+        captured: dict = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["path"] = request.url.raw_path.decode()
+            captured["body"] = json.loads(request.content.decode())
+            return httpx.Response(
+                200, content=b'{"success": true}',
+                headers={"content-type": "application/json"},
+            )
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler), base_url="http://test",
+            )
+            await client.change_weather("Rain", map_id=0)
+
+        assert captured["path"] == "/api/v1/map/weather/change"
+        assert captured["body"] == {"name": "Rain", "map_id": 0}
+
+    async def test_trigger_incident_nested_parms(self) -> None:
+        """Complex incident_parms (nested values) round-trip through the body."""
+        captured: dict = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.content.decode())
+            return httpx.Response(
+                200, content=b'{"success": true}',
+                headers={"content-type": "application/json"},
+            )
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler), base_url="http://test",
+            )
+            await client.trigger_incident(
+                "RaidEnemy", map_id=0,
+                points=500,
+                raid_strategy="ImmediateAttack",
+                raid_arrival_mode="EdgeWalkIn",
+            )
+
+        assert captured["body"]["name"] == "RaidEnemy"
+        assert captured["body"]["map_id"] == "0"  # string per DTO
+        parms = captured["body"]["incident_parms"]
+        assert parms["points"] == 500
+        assert parms["raid_strategy"] == "ImmediateAttack"
+        assert parms["raid_arrival_mode"] == "EdgeWalkIn"
+
+
+class TestGetResourcesStoredShapes:
+    """get_resources_stored handles both dict and flat-list response shapes."""
+
+    async def test_flat_list_response(self) -> None:
+        """Some RIMAPI versions return a flat list instead of dict-by-category."""
+        def handler(request: httpx.Request) -> httpx.Response:
+            body = [
+                {"def_name": "Steel", "stack_count": 50},
+                {"def_name": "Steel", "stack_count": 25},
+                {"def_name": "WoodLog", "stack_count": 100},
+            ]
+            return httpx.Response(
+                200, content=json.dumps(body).encode(),
+                headers={"content-type": "application/json"},
+            )
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler), base_url="http://test",
+            )
+            result = await client.get_resources_stored()
+
+        assert result["Steel"] == 75
+        assert result["WoodLog"] == 100
+
+
+class TestPing:
+    async def test_ping_returns_true_when_alive(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        assert await mock_client.ping() is True
+
+    async def test_ping_returns_false_on_connection_error(self) -> None:
+        def raise_connect(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("refused")
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=httpx.MockTransport(raise_connect),
+                base_url="http://test",
+            )
+            assert await client.ping() is False
+
+
+class TestPowerInfoNotCalledTwice:
+    """get_game_state should fetch power_info once, not twice (perf)."""
+
+    async def test_power_info_called_once_per_tick(
+        self, all_routes: dict,
+    ) -> None:
+        call_count = 0
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal call_count
+            path = request.url.raw_path.decode()
+            if path == "/api/v1/map/power/info?map_id=0":
+                call_count += 1
+            # Delegate to pre-built routes
+            if request.method == "POST":
+                return httpx.Response(
+                    200, content=b'{"success": true}',
+                    headers={"content-type": "application/json"},
+                )
+            if path in all_routes:
+                return httpx.Response(
+                    200, content=json.dumps(all_routes[path]).encode(),
+                    headers={"content-type": "application/json"},
+                )
+            return httpx.Response(404, content=b"Not found")
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler), base_url="http://test",
+            )
+            await client.get_game_state()
+
+        assert call_count == 1, (
+            f"power_info should be fetched once per tick, got {call_count}"
+        )

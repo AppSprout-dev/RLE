@@ -79,11 +79,25 @@ DEFAULT_MAX_STACK = 75
 
 # Per-scenario setup recipe. Each scenario is a sequence of API calls.
 # `items` entries are (def_name, amount[, stuff_def]) tuples.
+# NOTE on "day advancement": the plan (and issue #7) originally called for
+# building saves at day 30 / 60 / etc with shelter, food, and research
+# progress. RIMAPI does not currently expose an endpoint to fast-forward
+# the game clock or complete research instantly, so the saves below remain
+# day-0 snapshots with setup additions. `set_research_target(force=True)`
+# sets the target but does not complete the project — only queues it.
+#
+# Once RIMAPI adds a dev-mode tick-advance endpoint, first_winter and
+# ship_launch can be advanced via:
+#   await client.advance_ticks(N)   # hypothetical, not yet available
+
 SCENARIOS: dict[str, dict[str, Any]] = {
     "rle_first_winter_v1": {
         "difficulty": "Medium",
         "extra_pawns": 0,
-        "description": "60-day survival through winter — same start, longer duration",
+        "description": (
+            "60-day survival through winter — starts at day 0 (no "
+            "advancement endpoint yet, see note above)"
+        ),
         "items": [],
         "incidents": [],
         "research_complete": [],
@@ -259,7 +273,9 @@ async def _wait_for_save_written(
 
 
 async def _spawn_items(
-    client: RimAPIClient, items: list[tuple[str, int]],
+    client: RimAPIClient,
+    items: list[tuple[str, int]],
+    center: tuple[int, int] = (COLONY_X, COLONY_Z),
 ) -> int:
     """Spawn items near the colony center, splitting into max-stack chunks.
 
@@ -268,6 +284,7 @@ async def _spawn_items(
     MAX_STACK[def_name] each. Returns count of successful spawn calls.
     """
     spawned = 0
+    cx, cz = center
     x_offset, z_offset = -2, -2
     for def_name, total in items:
         max_stack = MAX_STACK.get(def_name, DEFAULT_MAX_STACK)
@@ -277,8 +294,8 @@ async def _spawn_items(
             try:
                 await client.spawn_item(
                     def_name=def_name,
-                    x=COLONY_X + x_offset,
-                    z=COLONY_Z + z_offset,
+                    x=cx + x_offset,
+                    z=cz + z_offset,
                     amount=chunk,
                 )
                 spawned += 1
@@ -296,10 +313,13 @@ async def _spawn_items(
 
 
 async def _spawn_extra_pawns(
-    client: RimAPIClient, count: int,
+    client: RimAPIClient,
+    count: int,
+    center: tuple[int, int] = (COLONY_X, COLONY_Z),
 ) -> int:
     """Spawn extra colonists at offsets from colony center."""
     spawned = 0
+    cx, cz = center
     for i in range(count):
         name = CLONE_NAMES[i]
         try:
@@ -309,8 +329,8 @@ async def _spawn_extra_pawns(
                 first_name=name["first"],
                 last_name=name["last"],
                 nickname=name["nick"],
-                x=COLONY_X + 2 + i * 2,
-                z=COLONY_Z + 2,
+                x=cx + 2 + i * 2,
+                z=cz + 2,
             )
             spawned += 1
             await asyncio.sleep(BETWEEN_OPS_SECONDS)
@@ -388,14 +408,20 @@ async def build_scenario_save(
     # Unpause so RIMAPI processes queued requests
     await client.unpause_game(speed=1)
 
+    # Compute colony center from live colonist positions so we aren't
+    # coupled to hardcoded coords if the base save is ever regenerated.
+    center = await _compute_colony_center(client)
+    if center != (COLONY_X, COLONY_Z):
+        print(f"    colony center from live positions: {center}")
+
     # 2. Spawn items
     if items:
-        count = await _spawn_items(client, items)
+        count = await _spawn_items(client, items, center)
         print(f"    spawned {count}/{len(items)} item stacks")
 
     # 3. Spawn extra colonists
     if extra_pawns:
-        count = await _spawn_extra_pawns(client, extra_pawns)
+        count = await _spawn_extra_pawns(client, extra_pawns, center)
         print(f"    spawned {count}/{extra_pawns} extra pawns")
 
     # 4. Complete research (sequential target setting with force=True)
@@ -447,11 +473,28 @@ async def build_scenario_save(
 
 async def _check_rimapi_alive(client: RimAPIClient) -> bool:
     """Probe RIMAPI to see if the game is still responsive."""
+    return await client.ping()
+
+
+async def _compute_colony_center(
+    client: RimAPIClient,
+    fallback: tuple[int, int] = (COLONY_X, COLONY_Z),
+) -> tuple[int, int]:
+    """Centroid of live colonist positions. Falls back to hardcoded coords
+    if the colonist list is empty or unreachable.
+
+    This protects against silent breakage when the base save is
+    regenerated with a different starting location.
+    """
     try:
-        await client._get("/api/v1/game/state")
+        colonists = await client.get_colonists()
+        if not colonists:
+            return fallback
+        cx = sum(c.position[0] for c in colonists) // len(colonists)
+        cz = sum(c.position[1] for c in colonists) // len(colonists)
+        return cx, cz
     except Exception:
-        return False
-    return True
+        return fallback
 
 
 async def run_all(

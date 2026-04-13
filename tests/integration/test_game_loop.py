@@ -675,3 +675,27 @@ class TestScheduledIncidents:
         mock_client.trigger_incident.reset_mock()
         await loop._fire_scheduled_incidents(6)
         mock_client.trigger_incident.assert_not_awaited()
+
+    async def test_fire_scheduled_incidents_swallows_exceptions(self) -> None:
+        """If trigger_incident raises, the tick must not crash."""
+        from unittest.mock import AsyncMock
+        provider = _make_mock_provider()
+        helix = HelixConfig.default().to_geometry()
+        agent = ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0)
+        config = RLEConfig(tick_interval=0.0)
+
+        mock_client = AsyncMock()
+        mock_client.trigger_incident = AsyncMock(
+            side_effect=RuntimeError("RIMAPI is unhappy"),
+        )
+
+        loop = RLEGameLoop(
+            config, mock_client, [agent],
+            triggered_incidents=[
+                TriggeredIncident(tick_offset=3, name="Flashstorm"),
+            ],
+        )
+
+        # Should NOT raise — the game loop catches exceptions and logs
+        await loop._fire_scheduled_incidents(3)
+        mock_client.trigger_incident.assert_awaited_once()
