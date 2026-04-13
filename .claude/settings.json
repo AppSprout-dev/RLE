@@ -1,12 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Read(//c/Users/redmo/Projects/felix-agent-sdk/**)",
-      "Read(//c/Users/redmo/Projects/rimapi-dashboard/**)",
       "Bash(python -m pytest:*)",
       "Bash(pytest:*)",
       "Bash(python -m ruff:*)",
       "Bash(ruff:*)",
+      "Bash(python -m mypy:*)",
       "Bash(mypy:*)",
       "Bash(pip install:*)",
       "Bash(pip list:*)",
@@ -22,14 +21,15 @@
       "Bash(PYTHONIOENCODING=*)",
       "Bash(bun run:*)",
       "Bash(bun install:*)",
-      "Bash(python -m mypy src/rle/)",
-      "Bash(python -m uv run pytest --tb=short -q)",
-      "Bash(python -m uv run ruff check src/ tests/ scripts/)",
-      "Bash(python -m uv run python scripts/run_benchmark.py --dry-run --ticks 3)"
-    ],
-    "additionalDirectories": [
-      "c:\\Users\\redmo\\Projects\\rimapi-dashboard\\src\\components\\widgets\\rle",
-      "c:\\Users\\redmo\\Projects\\rimapi-dashboard\\src\\features\\dashboard"
+      "Bash(uv run:*)",
+      "Bash(python -m uv run:*)",
+      "Bash(uv pip:*)",
+      "Bash(uv sync:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker build:*)",
+      "Bash(docker exec:*)",
+      "Bash(dotnet build:*)",
+      "Bash(gh pr comment:*)"
     ]
   },
   "hooks": {
@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ruff check --fix --quiet \"$CLAUDE_FILE_PATH\" 2>/dev/null || true"
+            "command": "[[ \"$CLAUDE_FILE_PATH\" == *.py ]] && ruff check --fix --quiet \"$CLAUDE_FILE_PATH\" 2>/dev/null || true"
           }
         ]
       }
