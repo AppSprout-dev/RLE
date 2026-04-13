@@ -345,6 +345,42 @@ class TestErrorHandling:
                 await client.get_colonists()
 
 
+class TestEnvelopeUnwrap:
+    """RIMAPI wraps responses in {"success": bool, "data": ...}. Both
+    `_get` and `_post` should unwrap to the data payload uniformly, so
+    agents see the same shape regardless of HTTP verb."""
+
+    async def test_envelope_unwrap_consistent_across_verbs(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return _json_response({"success": True, "data": {"x": 42}})
+
+        transport = httpx.MockTransport(handler)
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=transport, base_url="http://test",
+            )
+            assert await client._get("/probe") == {"x": 42}
+            assert await client._post("/probe") == {"x": 42}
+            assert await client.call("GET", "/probe") == {"x": 42}
+            assert await client.call("POST", "/probe") == {"x": 42}
+
+    async def test_envelope_noop_when_no_data_key(self) -> None:
+        """{"success": true} with no data key passes through unchanged —
+        the common write-endpoint shape. This keeps `result["success"]`
+        access working for callers that only need to confirm the call
+        didn't error."""
+        def handler(request: httpx.Request) -> httpx.Response:
+            return _json_response({"success": True})
+
+        transport = httpx.MockTransport(handler)
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=transport, base_url="http://test",
+            )
+            assert await client._post("/probe") == {"success": True}
+            assert await client._get("/probe") == {"success": True}
+
+
 class TestWriteEndpoints:
     async def test_pause_game(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.pause_game()
@@ -482,10 +518,12 @@ class TestPhase2ReadEndpoints:
 
 class TestSpawnEndpoints:
     async def test_spawn_pawn(self, mock_client: RimAPIClient) -> None:
+        # spawn_pawn returns {"success": True, "data": {...}} — `_post`
+        # unwraps the envelope so the caller receives the data payload.
         result = await mock_client.spawn_pawn(
             first_name="Val", last_name="Kowalski", x=130, z=140,
         )
-        assert result["success"] is True
+        assert result == {"pawn_id": 999, "name": "Val"}
 
     async def test_spawn_item(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.spawn_item(
