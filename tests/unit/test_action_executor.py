@@ -190,3 +190,54 @@ class TestDispatch:
         )
         await executor.execute(plan)
         client.set_research_target.assert_awaited_once_with("electricity", force=False)
+
+    async def test_equip_item(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(
+            Action(
+                action_type="equip",
+                target_colonist_id="12345",
+                parameters={"thing_id": 999},
+            )
+        )
+        await executor.execute(plan)
+        client.equip_item.assert_awaited_once_with("12345", 999)
+
+    async def test_equip_missing_thing_id_skipped(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(
+            Action(action_type="equip", target_colonist_id="12345")
+        )
+        result = await executor.execute(plan)
+        client.equip_item.assert_not_awaited()
+        assert result.executed == 1  # handler ran without error (skipped)
+
+    async def test_repair_rect(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(
+            Action(
+                action_type="repair_rect",
+                parameters={"map_id": 0, "x1": 10, "z1": 10, "x2": 20, "z2": 20},
+            )
+        )
+        await executor.execute(plan)
+        client.repair_rect.assert_awaited_once_with(
+            map_id=0, x1=10, z1=10, x2=20, z2=20,
+        )
+
+    async def test_destroy_rect(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(
+            Action(
+                action_type="destroy_rect",
+                parameters={"map_id": 0, "x1": 5, "z1": 5, "x2": 15, "z2": 15},
+            )
+        )
+        await executor.execute(plan)
+        client.destroy_rect.assert_awaited_once_with(
+            map_id=0, x1=5, z1=5, x2=15, z2=15,
+        )

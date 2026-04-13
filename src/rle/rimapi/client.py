@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 from types import TracebackType
@@ -10,22 +11,28 @@ from typing import Any
 import httpx
 
 from rle.rimapi.schemas import (
+    AlertData,
     AreaRect,
     ColonistData,
     ColonyData,
+    FactionData,
     FarmSummary,
     GameState,
     MapData,
     OreDeposit,
+    PowerData,
     ResearchData,
     ResourceData,
     RoomData,
+    ScreenshotResponse,
     StructureData,
     TerrainSummary,
     ThreatData,
     WeatherData,
     ZoneData,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RimAPIError(Exception):
@@ -82,6 +89,37 @@ class RimAPIClient:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _pick(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
+        """Return the first key present in `data` (explicit membership check).
+
+        Handles snake_case/PascalCase shape variations from RIMAPI without
+        the ``.get(k) or fallback`` anti-pattern, which erases legitimate
+        zero/empty values.
+        """
+        for k in keys:
+            if k in data:
+                return data[k]
+        return default
+
+    async def ping(self) -> bool:
+        """Probe whether RIMAPI is responsive. Safe for loops/health checks."""
+        try:
+            await self._get("/api/v1/game/state")
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return False
+        return True
+
+    @staticmethod
+    def _unwrap_envelope(body: Any) -> Any:
+        """Unwrap RIMAPI's ``{"success": bool, "data": ...}`` envelope to the
+        ``data`` payload. No-op when ``body`` isn't a dict or has no ``data``
+        key — preserves shapes like ``{"success": true}`` (envelope-only
+        writes) and raw lists (some read endpoints)."""
+        if isinstance(body, dict) and "data" in body:
+            return body["data"]
+        return body
+
     async def _get(self, path: str) -> Any:
         """Perform a GET request, unwrap RIMAPI envelope, return data payload."""
         try:
@@ -93,23 +131,26 @@ class RimAPIClient:
 
         if resp.status_code != 200:
             raise RimAPIResponseError(resp.status_code, resp.text)
-        body = resp.json()
-        # RIMAPI wraps all responses in {"success": bool, "data": ...}
-        if isinstance(body, dict) and "data" in body:
-            return body["data"]
-        return body
+        return self._unwrap_envelope(resp.json())
 
     async def call(
         self, method: str, path: str, json: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Generic endpoint call — used by the dynamic action dispatcher."""
+    ) -> Any:
+        """Generic endpoint call — used by the dynamic action dispatcher.
+
+        Returns the unwrapped ``data`` payload regardless of HTTP verb so
+        agents see the same shape for GET and POST."""
         if method.upper() == "GET":
-            result: dict[str, Any] = await self._get(path)
-            return result
+            return await self._get(path)
         return await self._post(path, json=json)
 
-    async def _post(self, path: str, json: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Perform a POST request and return parsed JSON."""
+    async def _post(self, path: str, json: dict[str, Any] | None = None) -> Any:
+        """POST to RIMAPI and return the unwrapped ``data`` payload.
+
+        Mirrors `_get`: the envelope is unwrapped when present, otherwise
+        the body is returned unchanged. Endpoints that only return
+        ``{"success": true}`` pass through intact, so callers that
+        currently inspect ``result["success"]`` keep working."""
         try:
             resp = await self.client.post(path, json=json or {})
         except httpx.ConnectError as exc:
@@ -121,8 +162,7 @@ class RimAPIClient:
             raise RimAPIResponseError(resp.status_code, resp.text)
         if resp.status_code == 204:
             return {}
-        result: dict[str, Any] = resp.json()
-        return result
+        return self._unwrap_envelope(resp.json())
 
     # ------------------------------------------------------------------
     # Read endpoints
@@ -256,19 +296,215 @@ class RimAPIClient:
         data = await self._get(f"/api/v1/colonist?id={colonist_id}")
         return ColonistData.model_validate(self._adapt_colonist(data))
 
-    async def get_resources(self) -> ResourceData:
+    async def get_resources_stored(self, map_id: int = 0) -> dict[str, int]:
+        """Fetch per-item resource breakdown from /api/v1/resources/stored.
+
+        Returns a dict mapping defName → total stackCount, e.g.
+        {"WoodLog": 342, "Steel": 189, "ComponentIndustrial": 12}.
+        """
+        try:
+            data = await self._get(f"/api/v1/resources/stored?map_id={map_id}")
+            totals: dict[str, int] = {}
+            # Response may be {category: [items...]} or flat [items...]
+            items: list[dict[str, Any]]
+            if isinstance(data, dict):
+                items = []
+                for val in data.values():
+                    if isinstance(val, list):
+                        items.extend(val)
+            elif isinstance(data, list):
+                items = data
+            else:
+                return totals
+            missing_def_name = 0
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                def_name = str(self._pick(item, "def_name", "DefName", default=""))
+                count = int(self._pick(item, "stack_count", "StackCount", default=1))
+                if def_name:
+                    totals[def_name] = totals.get(def_name, 0) + count
+                else:
+                    missing_def_name += 1
+            if missing_def_name:
+                logger.warning(
+                    "get_resources_stored: %d item(s) missing def_name — "
+                    "possible RIMAPI schema drift",
+                    missing_def_name,
+                )
+            return totals
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return {}
+
+    async def get_power_info(self, map_id: int = 0) -> PowerData | None:
+        """Fetch power grid state from /api/v1/map/power/info."""
+        try:
+            data = await self._get(f"/api/v1/map/power/info?map_id={map_id}")
+            if not isinstance(data, dict):
+                return None
+            return PowerData(
+                current_power=float(
+                    self._pick(data, "current_power", "CurrentPower", default=0.0),
+                ),
+                total_consumption=float(
+                    self._pick(data, "total_consumption", "TotalConsumption", default=0.0),
+                ),
+                stored_power=float(self._pick(
+                    data, "currently_stored_power", "CurrentlyStoredPower", default=0.0,
+                )),
+                storage_capacity=float(
+                    self._pick(data, "total_power_storage", "TotalPowerStorage", default=0.0),
+                ),
+            )
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return None
+
+    async def get_factions(self) -> list[FactionData]:
+        """Fetch all factions with goodwill and relation status."""
+        try:
+            data = await self._get("/api/v1/factions")
+            factions_list = data if isinstance(data, list) else []
+            result: list[FactionData] = []
+            for f in factions_list:
+                if not isinstance(f, dict):
+                    continue
+                if self._pick(f, "is_player", "IsPlayer", default=False):
+                    continue  # Skip player's own faction
+                result.append(FactionData(
+                    name=str(self._pick(f, "name", "Name", default="Unknown")),
+                    def_name=str(self._pick(f, "def_name", "DefName", default="")),
+                    goodwill=int(self._pick(f, "goodwill", "Goodwill", default=0)),
+                    relation=str(self._pick(f, "relation", "Relation", default="neutral")),
+                ))
+            return result
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return []
+
+    async def get_alerts(self, map_id: int = 0) -> list[AlertData]:
+        """Fetch active in-game alerts (starving, raid, idle, etc.)."""
+        try:
+            data = await self._get(f"/api/v1/ui/alerts?map_id={map_id}")
+            alerts_list = data if isinstance(data, list) else []
+            result: list[AlertData] = []
+            for a in alerts_list:
+                if not isinstance(a, dict):
+                    continue
+                targets_raw = self._pick(a, "targets", "Targets", default=[])
+                cells_raw = self._pick(a, "cells", "Cells", default=[])
+                result.append(AlertData(
+                    label=str(self._pick(a, "label", "Label", default="")),
+                    explanation=str(
+                        self._pick(a, "explanation", "Explanation", default=""),
+                    ),
+                    priority=str(
+                        self._pick(a, "priority", "Priority", default="Medium"),
+                    ),
+                    target_ids=[int(t) for t in targets_raw if t is not None],
+                    cells=[str(c) for c in cells_raw],
+                ))
+            return result
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return []
+
+    async def trigger_incident(
+        self, name: str, map_id: int = 0, **parms: Any,
+    ) -> Any:
+        """Trigger a game incident (raid, toxic fallout, plague, etc.).
+
+        Note: ``map_id`` is serialized as a string here because RIMAPI's
+        ``TriggerIncidentRequestDto.MapId`` is typed as C# string, unlike
+        most other endpoints which take integer map_id. Do not change
+        without testing against a live game.
+        """
+        body: dict[str, Any] = {
+            "name": name,
+            "map_id": str(map_id),
+        }
+        if parms:
+            body["incident_parms"] = parms
+        return await self._post("/api/v1/incident/trigger", json=body)
+
+    async def get_upcoming_incidents(
+        self, map_id: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Fetch probability-weighted upcoming incidents."""
+        try:
+            data = await self._get(
+                f"/api/v1/incidents/top?map_id={map_id}"
+            )
+            if isinstance(data, list):
+                return [i for i in data if isinstance(i, dict)]
+            return []
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return []
+
+    async def take_screenshot(
+        self,
+        width: int = 1920,
+        height: int = 1080,
+        fmt: str = "jpeg",
+        quality: int = 75,
+        hide_ui: bool = True,
+    ) -> ScreenshotResponse | None:
+        """Capture a map screenshot as base64."""
+        try:
+            data = await self._post(
+                "/api/v1/camera/screenshot",
+                json={
+                    "format": fmt,
+                    "quality": quality,
+                    "width": width,
+                    "height": height,
+                    "hide_ui": hide_ui,
+                },
+            )
+            if not isinstance(data, dict):
+                return None
+            image = data.get("image", {})
+            metadata = data.get("metadata", {})
+            context = data.get("game_context", {})
+            return ScreenshotResponse(
+                data_uri=str(image.get("data_uri", "")),
+                width=int(metadata.get("width", width)),
+                height=int(metadata.get("height", height)),
+                size_bytes=int(metadata.get("size_bytes", 0)),
+                game_tick=int(context.get("current_tick", 0)),
+            )
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return None
+
+    async def get_resources(
+        self, power_info: PowerData | None = None,
+    ) -> ResourceData:
+        """Fetch resource totals. Pass power_info to avoid a duplicate fetch."""
         try:
             data = await self._get("/api/v1/resources/summary?map_id=0")
             crit = data.get("critical_resources", {})
             food_summary = crit.get("food_summary", {})
+
+            # Fetch per-item breakdown for material counts
+            stored = await self.get_resources_stored()
+            steel = stored.get("Steel", 0)
+            wood = stored.get("WoodLog", 0)
+            components = stored.get("ComponentIndustrial", 0)
+
+            # Use provided power_info if available (avoids double HTTP call
+            # when called from get_game_state), otherwise fetch it.
+            if power_info is None:
+                power_info = await self.get_power_info()
+            power_net = (
+                power_info.current_power - power_info.total_consumption
+                if power_info else 0.0
+            )
+
             return ResourceData(
                 food=float(food_summary.get("food_total", 0)),
                 medicine=int(crit.get("medicine_total", 0)),
-                steel=0,  # Not exposed by RIMAPI
-                wood=0,   # Not exposed by RIMAPI
-                components=0,  # Not exposed by RIMAPI
+                steel=steel,
+                wood=wood,
+                components=components,
                 silver=round(data.get("total_market_value", 0.0)),
-                power_net=0.0,  # Not exposed by RIMAPI
+                power_net=round(power_net, 1),
                 items={"total": data.get("total_items", 0)},
             )
         except (RimAPIResponseError, RimAPIConnectionError):
@@ -617,7 +853,10 @@ class RimAPIClient:
         """Fetch all endpoints and assemble a full GameState snapshot."""
         colony = await self.get_colony()
         colonists = await self.get_colonists()
-        resources = await self.get_resources()
+        # Fetch power_info once and share between get_resources() and GameState
+        # — avoids a duplicate HTTP round-trip per tick.
+        power = await self.get_power_info()
+        resources = await self.get_resources(power_info=power)
         map_data = await self.get_map()
         # Compute terrain summary using colonist positions for colony center
         col_positions = [(c.position[0], c.position[1]) for c in colonists]
@@ -633,6 +872,8 @@ class RimAPIClient:
         research = await self.get_research()
         threats = await self.get_threats()
         weather = await self.get_weather()
+        factions = await self.get_factions()
+        alerts = await self.get_alerts()
 
         # Compute dynamic colony metrics from real data
         if colonists:
@@ -653,6 +894,9 @@ class RimAPIClient:
             threats=threats,
             weather=weather,
             timestamp=time.time(),
+            power=power,
+            factions=factions,
+            alerts=alerts,
         )
 
     async def unforbid_all_items(self, map_id: int = 0) -> int:
@@ -690,13 +934,13 @@ class RimAPIClient:
         except (ValueError, TypeError):
             return 0
 
-    async def save_game(self, name: str) -> dict[str, Any]:
+    async def save_game(self, name: str) -> Any:
         """Save the current game state for benchmark reproducibility."""
         return await self._post("/api/v1/game/save", json={"file_name": name})
 
     async def load_game(
         self, name: str, check_version: bool = False, skip_mod_mismatch: bool = True,
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Load a previously saved game state."""
         return await self._post("/api/v1/game/load", json={
             "file_name": name,
@@ -704,14 +948,14 @@ class RimAPIClient:
             "skip_mod_mismatch": skip_mod_mismatch,
         })
 
-    async def pause_game(self) -> dict[str, Any]:
+    async def pause_game(self) -> Any:
         return await self._post("/api/v1/game/speed?speed=0")
 
-    async def unpause_game(self, speed: int = 3) -> dict[str, Any]:
+    async def unpause_game(self, speed: int = 3) -> Any:
         """Unpause at given speed (1=normal, 2=fast, 3=very fast)."""
         return await self._post(f"/api/v1/game/speed?speed={speed}")
 
-    async def draft_colonist(self, colonist_id: str, draft: bool) -> dict[str, Any]:
+    async def draft_colonist(self, colonist_id: str, draft: bool) -> Any:
         return await self._post(
             "/api/v1/pawn/edit/status",
             json={"pawn_id": self._int_id(colonist_id), "is_drafted": draft},
@@ -719,7 +963,7 @@ class RimAPIClient:
 
     async def set_work_priorities(
         self, colonist_id: str, priorities: dict[str, int],
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Set work priorities one at a time via the singular endpoint.
 
         The bulk endpoint (/api/v1/colonists/work-priority) has a
@@ -735,7 +979,7 @@ class RimAPIClient:
             )
         return last_result
 
-    async def place_blueprint(self, blueprint: dict[str, Any]) -> dict[str, Any]:
+    async def place_blueprint(self, blueprint: dict[str, Any]) -> Any:
         """Place a blueprint using the full PasteAreaRequestDto format.
 
         The blueprint dict must contain: map_id, position, blueprint (with
@@ -753,7 +997,7 @@ class RimAPIClient:
         stuff_def: str = "WoodLog",
         rotation: int = 0,
         map_id: int = 0,
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Place a single building blueprint at (x, z).
 
         Wraps the PasteAreaRequestDto with a 1x1 blueprint grid.
@@ -778,7 +1022,7 @@ class RimAPIClient:
             "clear_obstacles": True,
         })
 
-    async def move_colonist(self, colonist_id: str, x: int, z: int) -> dict[str, Any]:
+    async def move_colonist(self, colonist_id: str, x: int, z: int) -> Any:
         return await self._post(
             "/api/v1/pawn/edit/position",
             json={
@@ -789,7 +1033,7 @@ class RimAPIClient:
 
     async def set_time_assignment(
         self, colonist_id: str, hour: int, assignment: str,
-    ) -> dict[str, Any]:
+    ) -> Any:
         return await self._post(
             "/api/v1/colonist/time-assignment",
             json={"pawn_id": self._int_id(colonist_id), "hour": hour, "assignment": assignment},
@@ -803,7 +1047,7 @@ class RimAPIClient:
         z1: int,
         x2: int,
         z2: int,
-    ) -> dict[str, Any]:
+    ) -> Any:
         return await self._post(
             "/api/v1/order/designate/area",
             json={
@@ -818,7 +1062,7 @@ class RimAPIClient:
     # Write endpoints — RLE fork (AppSprout-dev/RIMAPI:rle-testing)
     # ------------------------------------------------------------------
 
-    async def set_research_target(self, project: str, force: bool = False) -> dict[str, Any]:
+    async def set_research_target(self, project: str, force: bool = False) -> Any:
         if not project:
             return {"success": False, "skipped": "empty project name"}
         url = f"/api/v1/research/target?name={project}"
@@ -826,7 +1070,7 @@ class RimAPIClient:
             url += "&force=true"
         return await self._post(url)
 
-    async def stop_research(self) -> dict[str, Any]:
+    async def stop_research(self) -> Any:
         return await self._post("/api/v1/research/stop")
 
     async def get_endpoints(self) -> list[dict[str, Any]]:
@@ -843,7 +1087,7 @@ class RimAPIClient:
         job: str,
         target_thing_id: int | None = None,
         target_position: tuple[int, int] | None = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         body: dict[str, Any] = {"pawn_id": self._int_id(colonist_id), "job_def": job}
         if target_thing_id is not None:
             body["target_thing_id"] = target_thing_id
@@ -851,7 +1095,7 @@ class RimAPIClient:
             body["target_position"] = {"x": target_position[0], "y": 0, "z": target_position[1]}
         return await self._post("/api/v1/pawn/job", json=body)
 
-    async def toggle_power(self, building_id: int, power_on: bool) -> dict[str, Any]:
+    async def toggle_power(self, building_id: int, power_on: bool) -> Any:
         return await self._post(
             f"/api/v1/map/building/power?buildingId={building_id}"
             f"&powerOn={str(power_on).lower()}",
@@ -876,7 +1120,7 @@ class RimAPIClient:
         z1: int,
         x2: int,
         z2: int,
-    ) -> dict[str, Any]:
+    ) -> Any:
         return await self._post(
             "/api/v1/map/zone/growing",
             json={
@@ -898,7 +1142,7 @@ class RimAPIClient:
         priority: int = 3,
         allowed_item_defs: list[str] | None = None,
         allowed_item_categories: list[str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         """Create a stockpile zone with optional item filtering."""
         body: dict[str, Any] = {
             "map_id": map_id,
@@ -917,7 +1161,7 @@ class RimAPIClient:
 
     async def assign_bed_rest(
         self, patient_id: str, bed_building_id: int | None = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         body: dict[str, Any] = {"patient_pawn_id": self._int_id(patient_id)}
         if bed_building_id is not None:
             body["bed_building_id"] = bed_building_id
@@ -925,8 +1169,217 @@ class RimAPIClient:
 
     async def administer_medicine(
         self, patient_id: str, doctor_id: str | None = None,
-    ) -> dict[str, Any]:
+    ) -> Any:
         body: dict[str, Any] = {"patient_pawn_id": self._int_id(patient_id)}
         if doctor_id is not None:
             body["doctor_pawn_id"] = self._int_id(doctor_id)
         return await self._post("/api/v1/pawn/medical/tend", json=body)
+
+    async def spawn_pawn(
+        self,
+        pawn_kind: str = "Colonist",
+        map_id: int = 0,
+        *,
+        faction: str | None = None,
+        gender: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        nickname: str | None = None,
+        bio_age: int | None = None,
+        chrono_age: int | None = None,
+        x: int | None = None,
+        z: int | None = None,
+    ) -> Any:
+        """Spawn a new pawn on the map.
+
+        Note: the ``nickname`` kwarg is serialized as ``nick_name`` on the
+        wire to match RIMAPI's DTO. Similarly ``bio_age`` →
+        ``biological_age`` and ``chrono_age`` → ``chronological_age``.
+        """
+        body: dict[str, Any] = {
+            "pawn_kind": pawn_kind,
+            "map_id": str(map_id),
+        }
+        if faction is not None:
+            body["faction"] = faction
+        if gender is not None:
+            body["gender"] = gender
+        if first_name is not None:
+            body["first_name"] = first_name
+        if last_name is not None:
+            body["last_name"] = last_name
+        if nickname is not None:
+            body["nick_name"] = nickname
+        if bio_age is not None:
+            body["biological_age"] = bio_age
+        if chrono_age is not None:
+            body["chronological_age"] = chrono_age
+        if x is not None and z is not None:
+            body["position"] = {"x": x, "y": 0, "z": z}
+        return await self._post("/api/v1/pawn/spawn", json=body)
+
+    async def spawn_item(
+        self,
+        def_name: str,
+        map_id: int = 0,
+        x: int = 0,
+        z: int = 0,
+        amount: int = 1,
+        *,
+        stuff_def_name: str | None = None,
+        quality: str | None = None,
+    ) -> Any:
+        """Spawn items on the map."""
+        body: dict[str, Any] = {
+            "def_name": def_name,
+            "amount": amount,
+            "x": x,
+            "z": z,
+        }
+        if stuff_def_name is not None:
+            body["stuff_def_name"] = stuff_def_name
+        if quality is not None:
+            body["quality"] = quality
+        return await self._post("/api/v1/item/spawn", json=body)
+
+    async def send_drop_pod(
+        self,
+        map_id: int = 0,
+        x: int = 0,
+        z: int = 0,
+        items: list[dict[str, Any]] | None = None,
+        *,
+        faction: str | None = None,
+    ) -> Any:
+        """Send a drop pod with items to a map position."""
+        body: dict[str, Any] = {
+            "map_id": map_id,
+            "position": {"x": x, "y": 0, "z": z},
+            "items": items or [],
+        }
+        if faction is not None:
+            body["faction"] = faction
+        return await self._post("/api/v1/map/droppod", json=body)
+
+    async def change_weather(
+        self, weather_def: str, map_id: int = 0,
+    ) -> Any:
+        """Change the current weather.
+
+        Uses a JSON body (consistent with other write endpoints) instead
+        of query params so special characters in weather_def don't need
+        URL-escaping.
+        """
+        return await self._post(
+            "/api/v1/map/weather/change",
+            json={"name": weather_def, "map_id": map_id},
+        )
+
+    async def equip_item(self, colonist_id: str, thing_id: int) -> Any:
+        """Make a colonist equip an item."""
+        return await self._post(
+            "/api/v1/jobs/make/equip",
+            json={"pawn_id": self._int_id(colonist_id), "thing_id": thing_id},
+        )
+
+    async def repair_rect(
+        self, map_id: int, x1: int, z1: int, x2: int, z2: int,
+    ) -> Any:
+        """Repair all damaged buildings in a rectangular area."""
+        return await self._post(
+            "/api/v1/map/repair/rect",
+            json={
+                "map_id": map_id,
+                "point_a": {"x": x1, "y": 0, "z": z1},
+                "point_b": {"x": x2, "y": 0, "z": z2},
+            },
+        )
+
+    async def destroy_rect(
+        self, map_id: int, x1: int, z1: int, x2: int, z2: int,
+    ) -> Any:
+        """Destroy all things in a rectangular area."""
+        return await self._post(
+            "/api/v1/map/destroy/rect",
+            json={
+                "map_id": map_id,
+                "point_a": {"x": x1, "y": 0, "z": z1},
+                "point_b": {"x": x2, "y": 0, "z": z2},
+            },
+        )
+
+    # ------------------------------------------------------------------
+    # Pawn edit endpoints — for test fixtures and save creation
+    # ------------------------------------------------------------------
+
+    async def edit_pawn_skills(
+        self,
+        pawn_id: int,
+        skills: dict[str, int],
+        passions: dict[str, int] | None = None,
+    ) -> Any:
+        """Set pawn skill levels and passions.
+
+        skills: {"Shooting": 10, "Construction": 8, ...}
+        passions: {"Shooting": 2, "Construction": 1, ...}
+                  (0=None, 1=Minor, 2=Major)
+        """
+        skill_entries = []
+        for name, level in skills.items():
+            entry: dict[str, Any] = {
+                "skill_name": name, "level": level,
+            }
+            if passions and name in passions:
+                entry["passion"] = passions[name]
+            skill_entries.append(entry)
+        return await self._post(
+            "/api/v1/pawn/edit/skills",
+            json={"pawn_id": pawn_id, "skills": skill_entries},
+        )
+
+    async def edit_pawn_traits(
+        self,
+        pawn_id: int,
+        add: list[str] | None = None,
+        remove: list[str] | None = None,
+    ) -> Any:
+        """Add or remove traits from a pawn."""
+        body: dict[str, Any] = {"pawn_id": pawn_id}
+        if add:
+            body["add_traits"] = [{"trait_name": t} for t in add]
+        if remove:
+            body["remove_traits"] = remove
+        return await self._post("/api/v1/pawn/edit/traits", json=body)
+
+    async def edit_pawn_health(
+        self,
+        pawn_id: int,
+        *,
+        heal_all: bool = False,
+        restore_parts: bool = False,
+        cure_diseases: bool = False,
+    ) -> Any:
+        """Heal injuries, restore body parts, or cure diseases."""
+        return await self._post(
+            "/api/v1/pawn/edit/health",
+            json={
+                "pawn_id": pawn_id,
+                "heal_all_injuries": heal_all,
+                "restore_body_parts": restore_parts,
+                "remove_all_diseases": cure_diseases,
+            },
+        )
+
+    async def edit_pawn_needs(
+        self, pawn_id: int, needs: dict[str, float],
+    ) -> Any:
+        """Set pawn needs (food, rest, mood). Values must be 0.0-1.0."""
+        for name, val in needs.items():
+            if not 0.0 <= val <= 1.0:
+                msg = f"Need '{name}' value {val} out of range [0.0, 1.0]"
+                raise ValueError(msg)
+        body: dict[str, Any] = {"pawn_id": pawn_id}
+        for key in ("food", "rest", "mood"):
+            if key in needs:
+                body[key] = needs[key]
+        return await self._post("/api/v1/pawn/edit/needs", json=body)

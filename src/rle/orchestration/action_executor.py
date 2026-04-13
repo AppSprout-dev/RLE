@@ -14,18 +14,16 @@ from rle.rimapi.client import RimAPIClient
 logger = logging.getLogger(__name__)
 
 # Endpoints that require a valid colonist/pawn ID.
-_NEEDS_PAWN: frozenset[str] = frozenset(
-    {
-        "work_priority",
-        "draft",
-        "move",
-        "job_assign",
-        "time_assignment",
-        "equip",
-        "bed_rest",
-        "tend",
-    }
-)
+_NEEDS_PAWN: frozenset[str] = frozenset({
+    "work_priority",
+    "draft",
+    "move",
+    "job_assign",
+    "time_assignment",
+    "equip",
+    "bed_rest",
+    "tend",
+})
 
 
 class ExecutionResult(BaseModel):
@@ -200,6 +198,33 @@ class ActionExecutor:
     async def _h_research_stop(self, cid: str, params: dict[str, Any]) -> None:
         await self._client.stop_research()
 
+    async def _h_equip(self, cid: str, params: dict[str, Any]) -> None:
+        thing_id = params.get("thing_id")
+        if thing_id is None:
+            logger.info("Skipping equip: no thing_id")
+            return
+        await self._client.equip_item(cid, int(thing_id))
+
+    async def _h_repair_rect(self, cid: str, params: dict[str, Any]) -> None:
+        x1 = int(params.get("x1", params.get("x", 0)))
+        z1 = int(params.get("z1", params.get("z", 0)))
+        x2 = int(params.get("x2", x1))
+        z2 = int(params.get("z2", z1))
+        await self._client.repair_rect(
+            map_id=int(params.get("map_id", 0)),
+            x1=x1, z1=z1, x2=x2, z2=z2,
+        )
+
+    async def _h_destroy_rect(self, cid: str, params: dict[str, Any]) -> None:
+        x1 = int(params.get("x1", params.get("x", 0)))
+        z1 = int(params.get("z1", params.get("z", 0)))
+        x2 = int(params.get("x2", x1))
+        z2 = int(params.get("z2", z1))
+        await self._client.destroy_rect(
+            map_id=int(params.get("map_id", 0)),
+            x1=x1, z1=z1, x2=x2, z2=z2,
+        )
+
 
 # String-keyed handler map (matches WRITE_CATALOG keys).
 _SPECIALIZED_HANDLERS: dict[str, Any] = {
@@ -217,4 +242,7 @@ _SPECIALIZED_HANDLERS: dict[str, Any] = {
     "toggle_power": ActionExecutor._h_toggle_power,
     "research_target": ActionExecutor._h_research_target,
     "research_stop": ActionExecutor._h_research_stop,
+    "equip": ActionExecutor._h_equip,
+    "repair_rect": ActionExecutor._h_repair_rect,
+    "destroy_rect": ActionExecutor._h_destroy_rect,
 }

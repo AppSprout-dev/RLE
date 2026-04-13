@@ -14,12 +14,16 @@ from rle.rimapi.client import (
     RimAPIResponseError,
 )
 from rle.rimapi.schemas import (
+    AlertData,
     ColonistData,
     ColonyData,
+    FactionData,
     GameState,
     MapData,
+    PowerData,
     ResearchData,
     ResourceData,
+    ScreenshotResponse,
     ThreatData,
     WeatherData,
 )
@@ -45,6 +49,28 @@ _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/map/zone/growing": {"success": True},
     "/api/v1/pawn/medical/bed-rest": {"success": True},
     "/api/v1/pawn/medical/tend": {"success": True},
+    "/api/v1/jobs/make/equip": {"success": True},
+    "/api/v1/map/repair/rect": {"success": True},
+    "/api/v1/map/destroy/rect": {"success": True},
+    "/api/v1/incident/trigger": {"success": True},
+    "/api/v1/pawn/spawn": {"success": True, "data": {"pawn_id": 999, "name": "Val"}},
+    "/api/v1/item/spawn": {"success": True},
+    "/api/v1/map/droppod": {"success": True},
+    "/api/v1/map/weather/change": {"success": True},
+    "/api/v1/pawn/edit/skills": {"success": True},
+    "/api/v1/pawn/edit/traits": {"success": True},
+    "/api/v1/pawn/edit/health": {"success": True},
+    "/api/v1/pawn/edit/needs": {"success": True},
+    "/api/v1/camera/screenshot": {
+        "data": {
+            "image": {"data_uri": "data:image/jpeg;base64,/9j/4AAQ..."},
+            "metadata": {
+                "format": "jpeg", "width": 1920,
+                "height": 1080, "size_bytes": 245000,
+            },
+            "game_context": {"current_tick": 60000},
+        },
+    },
 }
 
 
@@ -108,6 +134,59 @@ def all_routes(
         "/api/v1/colonists": [sample_colonist_dict],
         "/api/v1/colonist?id=col_01": sample_colonist_dict,
         "/api/v1/resources/summary?map_id=0": resources_summary,
+        "/api/v1/resources/stored?map_id=0": {
+            "Resources": [
+                {"def_name": "WoodLog", "stack_count": 342},
+                {"def_name": "WoodLog", "stack_count": 108},
+                {"def_name": "Steel", "stack_count": 189},
+                {"def_name": "ComponentIndustrial", "stack_count": 12},
+                {"def_name": "Silver", "stack_count": 500},
+            ],
+        },
+        "/api/v1/map/power/info?map_id=0": {
+            "current_power": 1800.0,
+            "total_consumption": 1200.0,
+            "currently_stored_power": 400.0,
+            "total_power_storage": 1000.0,
+        },
+        "/api/v1/factions": [
+            {
+                "name": "Pirate Band", "def_name": "Pirate",
+                "goodwill": -100, "relation": "hostile", "is_player": False,
+            },
+            {
+                "name": "New Hope", "def_name": "PlayerColony",
+                "goodwill": 0, "relation": "self", "is_player": True,
+            },
+            {
+                "name": "Tribe of Elk", "def_name": "TribeCivil",
+                "goodwill": 45, "relation": "neutral", "is_player": False,
+            },
+        ],
+        "/api/v1/ui/alerts?map_id=0": [
+            {
+                "label": "Starvation",
+                "explanation": "A colonist is starving",
+                "priority": "Critical",
+                "targets": [184],
+                "cells": [],
+            },
+            {
+                "label": "Need Beds",
+                "explanation": "Colonists need beds",
+                "priority": "High",
+                "targets": [],
+                "cells": ["(120,125)"],
+            },
+        ],
+        "/api/v1/incidents/top?map_id=0": [
+            {
+                "def_name": "RaidEnemy",
+                "label": "Raid",
+                "category": "ThreatBig",
+                "current_weight": 42.5,
+            },
+        ],
         "/api/v1/map/buildings?map_id=0": [],
         "/api/v1/research/summary": sample_research_dict,
         "/api/v1/incidents?map_id=0": {"incidents": [sample_threat_dict]},
@@ -175,6 +254,40 @@ class TestReadEndpoints:
         assert result.food == 120.0
         assert result.medicine == 8
         assert result.silver == 9186
+        # Phase 1: real material counts from /resources/stored
+        assert result.wood == 450  # 342 + 108
+        assert result.steel == 189
+        assert result.components == 12
+
+    async def test_get_resources_stored(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_resources_stored()
+        assert result["WoodLog"] == 450
+        assert result["Steel"] == 189
+        assert result["ComponentIndustrial"] == 12
+        assert result["Silver"] == 500
+
+    async def test_get_power_info(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_power_info()
+        assert result is not None
+        assert isinstance(result, PowerData)
+        assert result.current_power == 1800.0
+        assert result.total_consumption == 1200.0
+        assert result.stored_power == 400.0
+        assert result.storage_capacity == 1000.0
+
+    async def test_get_resources_includes_power_net(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_resources()
+        assert result.power_net == 600.0  # 1800 current - 1200 consumption
+
+    async def test_get_factions(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_factions()
+        assert len(result) == 2  # Player faction filtered out
+        assert isinstance(result[0], FactionData)
+        assert result[0].name == "Pirate Band"
+        assert result[0].goodwill == -100
+        assert result[0].relation == "hostile"
+        assert result[1].name == "Tribe of Elk"
+        assert result[1].goodwill == 45
 
     async def test_get_map(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.get_map()
@@ -205,6 +318,11 @@ class TestReadEndpoints:
         assert result.colony.name == "New Hope"
         assert len(result.colonists) == 1
         assert result.timestamp > 0
+        # Phase 1: power and factions included in game state
+        assert result.power is not None
+        assert result.power.current_power == 1800.0
+        assert len(result.factions) == 2
+        assert result.factions[0].name == "Pirate Band"
 
 
 class TestErrorHandling:
@@ -225,6 +343,42 @@ class TestErrorHandling:
             client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
             with pytest.raises(RimAPIConnectionError):
                 await client.get_colonists()
+
+
+class TestEnvelopeUnwrap:
+    """RIMAPI wraps responses in {"success": bool, "data": ...}. Both
+    `_get` and `_post` should unwrap to the data payload uniformly, so
+    agents see the same shape regardless of HTTP verb."""
+
+    async def test_envelope_unwrap_consistent_across_verbs(self) -> None:
+        def handler(request: httpx.Request) -> httpx.Response:
+            return _json_response({"success": True, "data": {"x": 42}})
+
+        transport = httpx.MockTransport(handler)
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=transport, base_url="http://test",
+            )
+            assert await client._get("/probe") == {"x": 42}
+            assert await client._post("/probe") == {"x": 42}
+            assert await client.call("GET", "/probe") == {"x": 42}
+            assert await client.call("POST", "/probe") == {"x": 42}
+
+    async def test_envelope_noop_when_no_data_key(self) -> None:
+        """{"success": true} with no data key passes through unchanged —
+        the common write-endpoint shape. This keeps `result["success"]`
+        access working for callers that only need to confirm the call
+        didn't error."""
+        def handler(request: httpx.Request) -> httpx.Response:
+            return _json_response({"success": True})
+
+        transport = httpx.MockTransport(handler)
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=transport, base_url="http://test",
+            )
+            assert await client._post("/probe") == {"success": True}
+            assert await client._get("/probe") == {"success": True}
 
 
 class TestWriteEndpoints:
@@ -293,3 +447,293 @@ class TestForkEndpoints:
     async def test_administer_medicine(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.administer_medicine("12345")
         assert result["success"] is True
+
+    async def test_equip_item(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.equip_item("12345", 999)
+        assert result["success"] is True
+
+    async def test_repair_rect(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.repair_rect(0, 10, 10, 20, 20)
+        assert result["success"] is True
+
+    async def test_destroy_rect(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.destroy_rect(0, 10, 10, 20, 20)
+        assert result["success"] is True
+
+    async def test_trigger_incident(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.trigger_incident(
+            "RaidEnemy", map_id=0, points=500,
+        )
+        assert result["success"] is True
+
+    async def test_take_screenshot(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.take_screenshot()
+        assert result is not None
+        assert isinstance(result, ScreenshotResponse)
+        assert result.width == 1920
+        assert result.height == 1080
+        assert result.size_bytes == 245000
+        assert result.game_tick == 60000
+        assert result.data_uri.startswith("data:image/jpeg")
+
+
+class TestPhase2ReadEndpoints:
+    async def test_get_alerts(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_alerts()
+        assert len(result) == 2
+        assert isinstance(result[0], AlertData)
+        assert result[0].label == "Starvation"
+        assert result[0].priority == "Critical"
+        assert result[0].target_ids == [184]
+        assert result[1].label == "Need Beds"
+        assert result[1].cells == ["(120,125)"]
+
+    async def test_alerts_in_game_state(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        state = await mock_client.get_game_state()
+        assert len(state.alerts) == 2
+        assert state.alerts[0].label == "Starvation"
+
+    async def test_alerts_empty_on_error(self) -> None:
+        """get_alerts returns [] when RIMAPI is unreachable."""
+        def raise_connect(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("refused")
+
+        transport = httpx.MockTransport(raise_connect)
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=transport, base_url="http://test",
+            )
+            result = await client.get_alerts()
+            assert result == []
+
+    async def test_get_upcoming_incidents(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        result = await mock_client.get_upcoming_incidents()
+        assert len(result) == 1
+        assert result[0]["def_name"] == "RaidEnemy"
+
+
+class TestSpawnEndpoints:
+    async def test_spawn_pawn(self, mock_client: RimAPIClient) -> None:
+        # spawn_pawn returns {"success": True, "data": {...}} — `_post`
+        # unwraps the envelope so the caller receives the data payload.
+        result = await mock_client.spawn_pawn(
+            first_name="Val", last_name="Kowalski", x=130, z=140,
+        )
+        assert result == {"pawn_id": 999, "name": "Val"}
+
+    async def test_spawn_item(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.spawn_item(
+            "Steel", x=120, z=130, amount=200,
+        )
+        assert result["success"] is True
+
+    async def test_spawn_item_with_quality(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        result = await mock_client.spawn_item(
+            "Gun_BoltActionRifle", x=120, z=130,
+            stuff_def_name="Steel", quality="Good",
+        )
+        assert result["success"] is True
+
+    async def test_send_drop_pod(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.send_drop_pod(
+            x=125, z=135,
+            items=[{"def_name": "Steel", "count": 100}],
+        )
+        assert result["success"] is True
+
+    async def test_change_weather(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.change_weather("Rain")
+        assert result["success"] is True
+
+
+class TestPawnEditEndpoints:
+    async def test_edit_skills(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.edit_pawn_skills(
+            184, {"Shooting": 10, "Construction": 8},
+            passions={"Shooting": 2},
+        )
+        assert result["success"] is True
+
+    async def test_edit_traits(self, mock_client: RimAPIClient) -> None:
+        """Add and remove traits in one call."""
+        result = await mock_client.edit_pawn_traits(
+            184, add=["Industrious"], remove=["Neurotic"],
+        )
+        assert result["success"] is True
+
+    async def test_edit_traits_add(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.edit_pawn_traits(
+            184, add=["Industrious", "Tough"],
+        )
+        assert result["success"] is True
+
+    async def test_edit_traits_remove(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        result = await mock_client.edit_pawn_traits(
+            184, remove=["Neurotic"],
+        )
+        assert result["success"] is True
+
+    async def test_edit_health_heal_all(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        result = await mock_client.edit_pawn_health(
+            184, heal_all=True, cure_diseases=True,
+        )
+        assert result["success"] is True
+
+    async def test_edit_needs(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.edit_pawn_needs(
+            184, {"food": 1.0, "rest": 0.8},
+        )
+        assert result["success"] is True
+
+    async def test_edit_needs_validates_range(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        import pytest as _pytest
+        with _pytest.raises(ValueError, match="out of range"):
+            await mock_client.edit_pawn_needs(184, {"food": 1.5})
+
+
+class TestRequestShapes:
+    """Verify request bodies match expected shapes (not just HTTP 200)."""
+
+    async def test_change_weather_sends_json_body(self) -> None:
+        """change_weather uses JSON body, not query string — avoids URL
+        encoding issues for weather defs with special characters."""
+        captured: dict = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["path"] = request.url.raw_path.decode()
+            captured["body"] = json.loads(request.content.decode())
+            return httpx.Response(
+                200, content=b'{"success": true}',
+                headers={"content-type": "application/json"},
+            )
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler), base_url="http://test",
+            )
+            await client.change_weather("Rain", map_id=0)
+
+        assert captured["path"] == "/api/v1/map/weather/change"
+        assert captured["body"] == {"name": "Rain", "map_id": 0}
+
+    async def test_trigger_incident_nested_parms(self) -> None:
+        """Complex incident_parms (nested values) round-trip through the body."""
+        captured: dict = {}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            captured["body"] = json.loads(request.content.decode())
+            return httpx.Response(
+                200, content=b'{"success": true}',
+                headers={"content-type": "application/json"},
+            )
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler), base_url="http://test",
+            )
+            await client.trigger_incident(
+                "RaidEnemy", map_id=0,
+                points=500,
+                raid_strategy="ImmediateAttack",
+                raid_arrival_mode="EdgeWalkIn",
+            )
+
+        assert captured["body"]["name"] == "RaidEnemy"
+        assert captured["body"]["map_id"] == "0"  # string per DTO
+        parms = captured["body"]["incident_parms"]
+        assert parms["points"] == 500
+        assert parms["raid_strategy"] == "ImmediateAttack"
+        assert parms["raid_arrival_mode"] == "EdgeWalkIn"
+
+
+class TestGetResourcesStoredShapes:
+    """get_resources_stored handles both dict and flat-list response shapes."""
+
+    async def test_flat_list_response(self) -> None:
+        """Some RIMAPI versions return a flat list instead of dict-by-category."""
+        def handler(request: httpx.Request) -> httpx.Response:
+            body = [
+                {"def_name": "Steel", "stack_count": 50},
+                {"def_name": "Steel", "stack_count": 25},
+                {"def_name": "WoodLog", "stack_count": 100},
+            ]
+            return httpx.Response(
+                200, content=json.dumps(body).encode(),
+                headers={"content-type": "application/json"},
+            )
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler), base_url="http://test",
+            )
+            result = await client.get_resources_stored()
+
+        assert result["Steel"] == 75
+        assert result["WoodLog"] == 100
+
+
+class TestPing:
+    async def test_ping_returns_true_when_alive(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        assert await mock_client.ping() is True
+
+    async def test_ping_returns_false_on_connection_error(self) -> None:
+        def raise_connect(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("refused")
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=httpx.MockTransport(raise_connect),
+                base_url="http://test",
+            )
+            assert await client.ping() is False
+
+
+class TestPowerInfoNotCalledTwice:
+    """get_game_state should fetch power_info once, not twice (perf)."""
+
+    async def test_power_info_called_once_per_tick(
+        self, all_routes: dict,
+    ) -> None:
+        call_count = 0
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal call_count
+            path = request.url.raw_path.decode()
+            if path == "/api/v1/map/power/info?map_id=0":
+                call_count += 1
+            # Delegate to pre-built routes
+            if request.method == "POST":
+                return httpx.Response(
+                    200, content=b'{"success": true}',
+                    headers={"content-type": "application/json"},
+                )
+            if path in all_routes:
+                return httpx.Response(
+                    200, content=json.dumps(all_routes[path]).encode(),
+                    headers={"content-type": "application/json"},
+                )
+            return httpx.Response(404, content=b"Not found")
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler), base_url="http://test",
+            )
+            await client.get_game_state()
+
+        assert call_count == 1, (
+            f"power_info should be fetched once per tick, got {call_count}"
+        )

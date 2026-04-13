@@ -22,6 +22,12 @@ failure_conditions:
     operator: "<"
     value: 0.2
 
+triggered_incidents:
+  - tick_offset: 2
+    name: RaidEnemy
+    incident_parms:
+      points: 500
+
 scoring_weights:
   survival: 0.20
   threat_response: 0.24

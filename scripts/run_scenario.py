@@ -158,8 +158,8 @@ async def main(args: argparse.Namespace) -> None:
                 for _ in range(15):
                     await asyncio.sleep(2)
                     try:
-                        state = await client._get("/api/v1/game/state")
-                        if state.get("colonist_count", 0) > 0:
+                        colony = await client.get_colony()
+                        if colony.population > 0:
                             break
                     except Exception:
                         pass
@@ -171,6 +171,22 @@ async def main(args: argparse.Namespace) -> None:
             except Exception as e:
                 print(f"Warning: Could not load save '{scenario.save_name}': {e}")
                 print("Continuing with current game state...")
+
+        # Execute pre-game setup commands (spawn items, pawns, etc.)
+        for cmd in scenario.setup_commands:
+            try:
+                if cmd.type == "spawn_pawn":
+                    await client.spawn_pawn(**cmd.params)
+                elif cmd.type == "spawn_item":
+                    await client.spawn_item(**cmd.params)
+                elif cmd.type == "drop_pod":
+                    await client.send_drop_pod(**cmd.params)
+                elif cmd.type == "change_weather":
+                    await client.change_weather(**cmd.params)
+                else:
+                    print(f"Unknown setup command: {cmd.type}")
+            except Exception as e:
+                print(f"Setup command {cmd.type} failed: {e}")
 
         loop = RLEGameLoop(
             config, client, agents,
@@ -187,6 +203,7 @@ async def main(args: argparse.Namespace) -> None:
             no_pause=args.no_pause,
             event_log=event_log,
             cost_tracker=cost_tracker,
+            triggered_incidents=scenario.triggered_incidents,
         )
         try:
             if visualizer:

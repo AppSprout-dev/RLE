@@ -40,6 +40,9 @@ The upstream Workshop DLL is backed up as `RIMAPI.dll.upstream-backup` in the sa
 - All POST request bodies must use **snake_case** field names (`pawn_id` not `PawnId`). See RIMAPI's [API conventions](https://github.com/IlyaChichkov/RIMAPI/blob/develop/docs/developer_guide/api_conventions.md).
 - All pawn/building/zone IDs are **integers**, not strings. Sending `"184"` deserializes as `0`.
 - POST requests require a `Content-Length` header (send `{}` as body even if using query params).
+- **Writes are async.** `save_game`, `load_game`, and `spawn_*` return HTTP 200 before Unity's main thread actually executes them. `save_game` returns before the file is flushed (poll file size to confirm). `load_game` needs ~10s settle after `colonist_count > 0` before the map is usable.
+- **`spawn_item` cannot split stacks.** Sending `amount > max_stack[def_name]` triggers a null ref that cascades and destabilizes the entire game. Chunk manually (e.g. MealSurvivalPack max=10, WoodLog/Steel max=75).
+- **Null-ref cascades.** Once one RIMAPI call errors with "Object reference not set", subsequent calls start failing. Only recovery is a game restart.
 
 ### Verify everything is running
 
@@ -223,10 +226,15 @@ Tick-specific priorities injected into all agents:
 ### Save Loading + Item Setup
 
 `run_scenario.py` automatically:
-1. Loads the scenario's save file (`rle_crashlanded_v1`)
+1. Loads the scenario's save file (`rle_crashlanded_v1`, etc.)
 2. Polls until game is ready (colonist_count > 0)
 3. Unforbids all starting items (via `POST /api/v1/things/set-forbidden`)
-4. Unpauses game at speed 3 (if `--no-pause`)
+4. Runs any `setup_commands` declared in the scenario YAML (spawn_pawn, spawn_item, change_weather, drop_pod)
+5. Unpauses game at speed 3 (if `--no-pause`)
+
+### Regenerating scenario saves
+
+The 5 advanced saves (first_winter, toxic_fallout, raid_defense, plague_response, ship_launch) are built via `scripts/create_scenario_saves.py` — declarative RIMAPI calls that load the base crashlanded save, spawn items/pawns, trigger incidents, and write each scenario. Requires RimWorld running with a map loaded. Saves land in AppData and are mirrored to `docker/saves/`. Use `--only <name>` for a single rebuild or `--difficulty-only` for offline byte-patching.
 
 ## CentralPost Hub-Spoke Communication
 
