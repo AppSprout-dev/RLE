@@ -53,6 +53,10 @@ _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/map/repair/rect": {"success": True},
     "/api/v1/map/destroy/rect": {"success": True},
     "/api/v1/incident/trigger": {"success": True},
+    "/api/v1/pawn/spawn": {"success": True, "data": {"pawn_id": 999, "name": "Val"}},
+    "/api/v1/item/spawn": {"success": True},
+    "/api/v1/map/droppod": {"success": True},
+    "/api/v1/map/weather/change?name=Rain&map_id=0": {"success": True},
     "/api/v1/camera/screenshot": {
         "data": {
             "image": {"data_uri": "data:image/jpeg;base64,/9j/4AAQ..."},
@@ -457,3 +461,37 @@ class TestPhase2ReadEndpoints:
         result = await mock_client.get_upcoming_incidents()
         assert len(result) == 1
         assert result[0]["def_name"] == "RaidEnemy"
+
+
+class TestSpawnEndpoints:
+    async def test_spawn_pawn(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.spawn_pawn(
+            first_name="Val", last_name="Kowalski", x=130, z=140,
+        )
+        assert result["success"] is True
+
+    async def test_spawn_item(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.spawn_item(
+            "Steel", x=120, z=130, amount=200,
+        )
+        assert result["success"] is True
+
+    async def test_spawn_item_with_quality(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        result = await mock_client.spawn_item(
+            "Gun_BoltActionRifle", x=120, z=130,
+            stuff_def_name="Steel", quality="Good",
+        )
+        assert result["success"] is True
+
+    async def test_send_drop_pod(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.send_drop_pod(
+            x=125, z=135,
+            items=[{"def_name": "Steel", "count": 100}],
+        )
+        assert result["success"] is True
+
+    async def test_change_weather(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.change_weather("Rain")
+        assert result["success"] is True

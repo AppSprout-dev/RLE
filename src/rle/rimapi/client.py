@@ -1119,6 +1119,96 @@ class RimAPIClient:
             body["doctor_pawn_id"] = self._int_id(doctor_id)
         return await self._post("/api/v1/pawn/medical/tend", json=body)
 
+    async def spawn_pawn(
+        self,
+        pawn_kind: str = "Colonist",
+        map_id: int = 0,
+        *,
+        faction: str | None = None,
+        gender: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        nickname: str | None = None,
+        bio_age: int | None = None,
+        chrono_age: int | None = None,
+        x: int | None = None,
+        z: int | None = None,
+    ) -> dict[str, Any]:
+        """Spawn a new pawn on the map."""
+        body: dict[str, Any] = {
+            "pawn_kind": pawn_kind,
+            "map_id": str(map_id),
+        }
+        if faction is not None:
+            body["faction"] = faction
+        if gender is not None:
+            body["gender"] = gender
+        if first_name is not None:
+            body["first_name"] = first_name
+        if last_name is not None:
+            body["last_name"] = last_name
+        if nickname is not None:
+            body["nick_name"] = nickname
+        if bio_age is not None:
+            body["biological_age"] = bio_age
+        if chrono_age is not None:
+            body["chronological_age"] = chrono_age
+        if x is not None and z is not None:
+            body["position"] = {"x": x, "y": 0, "z": z}
+        return await self._post("/api/v1/pawn/spawn", json=body)
+
+    async def spawn_item(
+        self,
+        def_name: str,
+        map_id: int = 0,
+        x: int = 0,
+        z: int = 0,
+        amount: int = 1,
+        *,
+        stuff_def_name: str | None = None,
+        quality: str | None = None,
+    ) -> dict[str, Any]:
+        """Spawn items on the map."""
+        body: dict[str, Any] = {
+            "def_name": def_name,
+            "amount": amount,
+            "x": x,
+            "z": z,
+        }
+        if stuff_def_name is not None:
+            body["stuff_def_name"] = stuff_def_name
+        if quality is not None:
+            body["quality"] = quality
+        return await self._post("/api/v1/item/spawn", json=body)
+
+    async def send_drop_pod(
+        self,
+        map_id: int = 0,
+        x: int = 0,
+        z: int = 0,
+        items: list[dict[str, Any]] | None = None,
+        *,
+        faction: str | None = None,
+    ) -> dict[str, Any]:
+        """Send a drop pod with items to a map position."""
+        body: dict[str, Any] = {
+            "map_id": map_id,
+            "position": {"x": x, "y": 0, "z": z},
+            "items": items or [],
+        }
+        if faction is not None:
+            body["faction"] = faction
+        return await self._post("/api/v1/map/droppod", json=body)
+
+    async def change_weather(
+        self, weather_def: str, map_id: int = 0,
+    ) -> dict[str, Any]:
+        """Change the current weather."""
+        return await self._post(
+            f"/api/v1/map/weather/change?name={weather_def}"
+            f"&map_id={map_id}",
+        )
+
     async def equip_item(self, colonist_id: str, thing_id: int) -> dict[str, Any]:
         """Make a colonist equip an item."""
         return await self._post(
