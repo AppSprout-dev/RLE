@@ -200,26 +200,26 @@ class ActionExecutor:
 
     async def _h_equip(self, cid: str, params: dict[str, Any]) -> None:
         thing_id = params.get("thing_id")
-        if not thing_id:
+        if thing_id is None:
             logger.info("Skipping equip: no thing_id")
             return
         await self._client.equip_item(cid, int(thing_id))
 
     async def _h_repair_rect(self, cid: str, params: dict[str, Any]) -> None:
-        x1 = params.get("x1", params.get("x", 0))
-        z1 = params.get("z1", params.get("z", 0))
-        x2 = params.get("x2", x1)
-        z2 = params.get("z2", z1)
+        x1 = int(params.get("x1", params.get("x", 0)))
+        z1 = int(params.get("z1", params.get("z", 0)))
+        x2 = int(params.get("x2", x1))
+        z2 = int(params.get("z2", z1))
         await self._client.repair_rect(
             map_id=int(params.get("map_id", 0)),
             x1=x1, z1=z1, x2=x2, z2=z2,
         )
 
     async def _h_destroy_rect(self, cid: str, params: dict[str, Any]) -> None:
-        x1 = params.get("x1", params.get("x", 0))
-        z1 = params.get("z1", params.get("z", 0))
-        x2 = params.get("x2", x1)
-        z2 = params.get("z2", z1)
+        x1 = int(params.get("x1", params.get("x", 0)))
+        z1 = int(params.get("z1", params.get("z", 0)))
+        x2 = int(params.get("x2", x1))
+        z2 = int(params.get("z2", z1))
         await self._client.destroy_rect(
             map_id=int(params.get("map_id", 0)),
             x1=x1, z1=z1, x2=x2, z2=z2,

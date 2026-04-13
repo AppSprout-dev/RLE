@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 from types import TracebackType
@@ -30,6 +31,8 @@ from rle.rimapi.schemas import (
     WeatherData,
     ZoneData,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RimAPIError(Exception):
@@ -313,6 +316,7 @@ class RimAPIClient:
                 items = data
             else:
                 return totals
+            missing_def_name = 0
             for item in items:
                 if not isinstance(item, dict):
                     continue
@@ -320,6 +324,14 @@ class RimAPIClient:
                 count = int(self._pick(item, "stack_count", "StackCount", default=1))
                 if def_name:
                     totals[def_name] = totals.get(def_name, 0) + count
+                else:
+                    missing_def_name += 1
+            if missing_def_name:
+                logger.warning(
+                    "get_resources_stored: %d item(s) missing def_name — "
+                    "possible RIMAPI schema drift",
+                    missing_def_name,
+                )
             return totals
         except (RimAPIResponseError, RimAPIConnectionError):
             return {}
@@ -1178,7 +1190,12 @@ class RimAPIClient:
         x: int | None = None,
         z: int | None = None,
     ) -> Any:
-        """Spawn a new pawn on the map."""
+        """Spawn a new pawn on the map.
+
+        Note: the ``nickname`` kwarg is serialized as ``nick_name`` on the
+        wire to match RIMAPI's DTO. Similarly ``bio_age`` →
+        ``biological_age`` and ``chrono_age`` → ``chronological_age``.
+        """
         body: dict[str, Any] = {
             "pawn_kind": pawn_kind,
             "map_id": str(map_id),

@@ -35,17 +35,21 @@ BASE_SAVE = "rle_crashlanded_v1"
 def _default_rimworld_save_dir() -> Path:
     """Return RimWorld's default save directory for the current OS."""
     if sys.platform == "win32":
-        user_profile = os.environ.get("USERPROFILE", "")
-        return Path(user_profile) / (
-            "AppData/LocalLow/Ludeon Studios/"
-            "RimWorld by Ludeon Studios/Saves"
+        user_profile = Path(os.environ.get("USERPROFILE", ""))
+        return (
+            user_profile / "AppData" / "LocalLow" / "Ludeon Studios"
+            / "RimWorld by Ludeon Studios" / "Saves"
         )
     if sys.platform == "darwin":
-        return Path.home() / (
-            "Library/Application Support/RimWorld/Saves"
+        return (
+            Path.home() / "Library" / "Application Support"
+            / "RimWorld" / "Saves"
         )
     # Linux/other
-    return Path.home() / ".config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios/Saves"
+    return (
+        Path.home() / ".config" / "unity3d" / "Ludeon Studios"
+        / "RimWorld by Ludeon Studios" / "Saves"
+    )
 
 # Colony center (from the base save)
 COLONY_X, COLONY_Z = 132, 137
@@ -219,7 +223,8 @@ async def _wait_for_save_written(
 
     RIMAPI's save_game() returns before the file is flushed. Without
     polling, we see partial writes (67 KB - 1.4 MB for files that should
-    be ~14 MB).
+    be ~14 MB). Returns True once the file reaches SAVE_MIN_SIZE_MB and
+    its size is unchanged across two consecutive polls.
     """
     poll_interval = 1.0
     elapsed = 0.0
@@ -232,37 +237,6 @@ async def _wait_for_save_written(
             if size >= min_size and size == last_size:
                 stable_polls += 1
                 if stable_polls >= 2:
-                    return True
-            else:
-                stable_polls = 0
-            last_size = size
-        await asyncio.sleep(poll_interval)
-        elapsed += poll_interval
-    return False
-
-
-async def _wait_for_save_written(
-    path: Path,
-    min_size_mb: float = 5.0,
-    timeout_seconds: float = 30.0,
-) -> bool:
-    """Poll the save file until it reaches min_size_mb and stabilizes.
-
-    RIMAPI's save_game() returns before the file is flushed to disk.
-    Without polling, we read a partial file (observed: 67 KB - 1.4 MB
-    for files that should be ~14 MB).
-    """
-    poll_interval = 1.0
-    elapsed = 0.0
-    last_size = -1
-    stable_polls = 0
-    min_size = int(min_size_mb * 1024 * 1024)
-    while elapsed < timeout_seconds:
-        if path.exists():
-            size = path.stat().st_size
-            if size >= min_size and size == last_size:
-                stable_polls += 1
-                if stable_polls >= 2:  # size unchanged for 2 consecutive polls
                     return True
             else:
                 stable_polls = 0
