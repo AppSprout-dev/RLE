@@ -16,8 +16,10 @@ from rle.rimapi.client import (
 from rle.rimapi.schemas import (
     ColonistData,
     ColonyData,
+    FactionData,
     GameState,
     MapData,
+    PowerData,
     ResearchData,
     ResourceData,
     ThreatData,
@@ -45,6 +47,9 @@ _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/map/zone/growing": {"success": True},
     "/api/v1/pawn/medical/bed-rest": {"success": True},
     "/api/v1/pawn/medical/tend": {"success": True},
+    "/api/v1/jobs/make/equip": {"success": True},
+    "/api/v1/map/repair/rect": {"success": True},
+    "/api/v1/map/destroy/rect": {"success": True},
 }
 
 
@@ -108,6 +113,35 @@ def all_routes(
         "/api/v1/colonists": [sample_colonist_dict],
         "/api/v1/colonist?id=col_01": sample_colonist_dict,
         "/api/v1/resources/summary?map_id=0": resources_summary,
+        "/api/v1/resources/stored?map_id=0": {
+            "Resources": [
+                {"def_name": "WoodLog", "stack_count": 342},
+                {"def_name": "WoodLog", "stack_count": 108},
+                {"def_name": "Steel", "stack_count": 189},
+                {"def_name": "ComponentIndustrial", "stack_count": 12},
+                {"def_name": "Silver", "stack_count": 500},
+            ],
+        },
+        "/api/v1/map/power/info?map_id=0": {
+            "current_power": 1800.0,
+            "total_consumption": 1200.0,
+            "currently_stored_power": 400.0,
+            "total_power_storage": 1000.0,
+        },
+        "/api/v1/factions": [
+            {
+                "name": "Pirate Band", "def_name": "Pirate",
+                "goodwill": -100, "relation": "hostile", "is_player": False,
+            },
+            {
+                "name": "New Hope", "def_name": "PlayerColony",
+                "goodwill": 0, "relation": "self", "is_player": True,
+            },
+            {
+                "name": "Tribe of Elk", "def_name": "TribeCivil",
+                "goodwill": 45, "relation": "neutral", "is_player": False,
+            },
+        ],
         "/api/v1/map/buildings?map_id=0": [],
         "/api/v1/research/summary": sample_research_dict,
         "/api/v1/incidents?map_id=0": {"incidents": [sample_threat_dict]},
@@ -175,6 +209,40 @@ class TestReadEndpoints:
         assert result.food == 120.0
         assert result.medicine == 8
         assert result.silver == 9186
+        # Phase 1: real material counts from /resources/stored
+        assert result.wood == 450  # 342 + 108
+        assert result.steel == 189
+        assert result.components == 12
+
+    async def test_get_resources_stored(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_resources_stored()
+        assert result["WoodLog"] == 450
+        assert result["Steel"] == 189
+        assert result["ComponentIndustrial"] == 12
+        assert result["Silver"] == 500
+
+    async def test_get_power_info(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_power_info()
+        assert result is not None
+        assert isinstance(result, PowerData)
+        assert result.current_power == 1800.0
+        assert result.total_consumption == 1200.0
+        assert result.stored_power == 400.0
+        assert result.storage_capacity == 1000.0
+
+    async def test_get_resources_includes_power_net(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_resources()
+        assert result.power_net == 600.0  # 1800 current - 1200 consumption
+
+    async def test_get_factions(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_factions()
+        assert len(result) == 2  # Player faction filtered out
+        assert isinstance(result[0], FactionData)
+        assert result[0].name == "Pirate Band"
+        assert result[0].goodwill == -100
+        assert result[0].relation == "hostile"
+        assert result[1].name == "Tribe of Elk"
+        assert result[1].goodwill == 45
 
     async def test_get_map(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.get_map()
@@ -205,6 +273,11 @@ class TestReadEndpoints:
         assert result.colony.name == "New Hope"
         assert len(result.colonists) == 1
         assert result.timestamp > 0
+        # Phase 1: power and factions included in game state
+        assert result.power is not None
+        assert result.power.current_power == 1800.0
+        assert len(result.factions) == 2
+        assert result.factions[0].name == "Pirate Band"
 
 
 class TestErrorHandling:
@@ -292,4 +365,16 @@ class TestForkEndpoints:
 
     async def test_administer_medicine(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.administer_medicine("12345")
+        assert result["success"] is True
+
+    async def test_equip_item(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.equip_item("12345", 999)
+        assert result["success"] is True
+
+    async def test_repair_rect(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.repair_rect(0, 10, 10, 20, 20)
+        assert result["success"] is True
+
+    async def test_destroy_rect(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.destroy_rect(0, 10, 10, 20, 20)
         assert result["success"] is True

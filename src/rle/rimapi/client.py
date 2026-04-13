@@ -13,10 +13,12 @@ from rle.rimapi.schemas import (
     AreaRect,
     ColonistData,
     ColonyData,
+    FactionData,
     FarmSummary,
     GameState,
     MapData,
     OreDeposit,
+    PowerData,
     ResearchData,
     ResourceData,
     RoomData,
@@ -256,19 +258,107 @@ class RimAPIClient:
         data = await self._get(f"/api/v1/colonist?id={colonist_id}")
         return ColonistData.model_validate(self._adapt_colonist(data))
 
+    async def get_resources_stored(self, map_id: int = 0) -> dict[str, int]:
+        """Fetch per-item resource breakdown from /api/v1/resources/stored.
+
+        Returns a dict mapping defName → total stackCount, e.g.
+        {"WoodLog": 342, "Steel": 189, "ComponentIndustrial": 12}.
+        """
+        try:
+            data = await self._get(f"/api/v1/resources/stored?map_id={map_id}")
+            totals: dict[str, int] = {}
+            # Response may be {category: [items...]} or flat [items...]
+            items: list[dict[str, Any]]
+            if isinstance(data, dict):
+                items = []
+                for val in data.values():
+                    if isinstance(val, list):
+                        items.extend(val)
+            elif isinstance(data, list):
+                items = data
+            else:
+                return totals
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                def_name = str(item.get("def_name") or item.get("DefName") or "")
+                raw_count = item.get("stack_count") or item.get("StackCount") or 1
+                count = int(raw_count)
+                if def_name:
+                    totals[def_name] = totals.get(def_name, 0) + count
+            return totals
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return {}
+
+    async def get_power_info(self, map_id: int = 0) -> PowerData | None:
+        """Fetch power grid state from /api/v1/map/power/info."""
+        try:
+            data = await self._get(f"/api/v1/map/power/info?map_id={map_id}")
+            if not isinstance(data, dict):
+                return None
+            cur = data.get("current_power") or data.get("CurrentPower") or 0.0
+            con = data.get("total_consumption") or data.get("TotalConsumption") or 0.0
+            sto = data.get("currently_stored_power") or data.get("CurrentlyStoredPower") or 0.0
+            cap = data.get("total_power_storage") or data.get("TotalPowerStorage") or 0.0
+            return PowerData(
+                current_power=float(cur),
+                total_consumption=float(con),
+                stored_power=float(sto),
+                storage_capacity=float(cap),
+            )
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return None
+
+    async def get_factions(self) -> list[FactionData]:
+        """Fetch all factions with goodwill and relation status."""
+        try:
+            data = await self._get("/api/v1/factions")
+            factions_list = data if isinstance(data, list) else []
+            result: list[FactionData] = []
+            for f in factions_list:
+                if not isinstance(f, dict):
+                    continue
+                if f.get("is_player", f.get("IsPlayer", False)):
+                    continue  # Skip player's own faction
+                fname = str(f.get("name") or f.get("Name") or "Unknown")
+                fdef = str(f.get("def_name") or f.get("DefName") or "")
+                fgw = f.get("goodwill") or f.get("Goodwill") or 0
+                frel = str(f.get("relation") or f.get("Relation") or "neutral")
+                result.append(FactionData(
+                    name=fname, def_name=fdef,
+                    goodwill=int(fgw), relation=frel,
+                ))
+            return result
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return []
+
     async def get_resources(self) -> ResourceData:
         try:
             data = await self._get("/api/v1/resources/summary?map_id=0")
             crit = data.get("critical_resources", {})
             food_summary = crit.get("food_summary", {})
+
+            # Fetch per-item breakdown for material counts
+            stored = await self.get_resources_stored()
+            steel = stored.get("Steel", 0)
+            wood = stored.get("WoodLog", 0)
+            components = stored.get("ComponentIndustrial", 0)
+
+            # Fetch power grid data
+            power_info = await self.get_power_info()
+            power_net = (
+                power_info.current_power - power_info.total_consumption
+                if power_info else 0.0
+            )
+
             return ResourceData(
                 food=float(food_summary.get("food_total", 0)),
                 medicine=int(crit.get("medicine_total", 0)),
-                steel=0,  # Not exposed by RIMAPI
-                wood=0,   # Not exposed by RIMAPI
-                components=0,  # Not exposed by RIMAPI
+                steel=steel,
+                wood=wood,
+                components=components,
                 silver=round(data.get("total_market_value", 0.0)),
-                power_net=0.0,  # Not exposed by RIMAPI
+                power_net=round(power_net, 1),
                 items={"total": data.get("total_items", 0)},
             )
         except (RimAPIResponseError, RimAPIConnectionError):
@@ -633,6 +723,8 @@ class RimAPIClient:
         research = await self.get_research()
         threats = await self.get_threats()
         weather = await self.get_weather()
+        power = await self.get_power_info()
+        factions = await self.get_factions()
 
         # Compute dynamic colony metrics from real data
         if colonists:
@@ -653,6 +745,8 @@ class RimAPIClient:
             threats=threats,
             weather=weather,
             timestamp=time.time(),
+            power=power,
+            factions=factions,
         )
 
     async def unforbid_all_items(self, map_id: int = 0) -> int:
@@ -930,3 +1024,36 @@ class RimAPIClient:
         if doctor_id is not None:
             body["doctor_pawn_id"] = self._int_id(doctor_id)
         return await self._post("/api/v1/pawn/medical/tend", json=body)
+
+    async def equip_item(self, colonist_id: str, thing_id: int) -> dict[str, Any]:
+        """Make a colonist equip an item."""
+        return await self._post(
+            "/api/v1/jobs/make/equip",
+            json={"pawn_id": self._int_id(colonist_id), "thing_id": thing_id},
+        )
+
+    async def repair_rect(
+        self, map_id: int, x1: int, z1: int, x2: int, z2: int,
+    ) -> dict[str, Any]:
+        """Repair all damaged buildings in a rectangular area."""
+        return await self._post(
+            "/api/v1/map/repair/rect",
+            json={
+                "map_id": map_id,
+                "point_a": {"x": x1, "y": 0, "z": z1},
+                "point_b": {"x": x2, "y": 0, "z": z2},
+            },
+        )
+
+    async def destroy_rect(
+        self, map_id: int, x1: int, z1: int, x2: int, z2: int,
+    ) -> dict[str, Any]:
+        """Destroy all things in a rectangular area."""
+        return await self._post(
+            "/api/v1/map/destroy/rect",
+            json={
+                "map_id": map_id,
+                "point_a": {"x": x1, "y": 0, "z": z1},
+                "point_b": {"x": x2, "y": 0, "z": z2},
+            },
+        )

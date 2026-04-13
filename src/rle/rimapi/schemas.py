@@ -187,6 +187,28 @@ class WeatherData(BaseModel):
     outdoor_severity: float
 
 
+class PowerData(BaseModel):
+    """Power grid state from /api/v1/map/power/info."""
+
+    model_config = ConfigDict(frozen=True)
+
+    current_power: float
+    total_consumption: float
+    stored_power: float
+    storage_capacity: float
+
+
+class FactionData(BaseModel):
+    """A faction and its relation to the player colony."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    def_name: str
+    goodwill: int
+    relation: str
+
+
 class GameState(BaseModel):
     """Composite snapshot of full colony state for a single tick."""
 
@@ -200,3 +222,5 @@ class GameState(BaseModel):
     threats: list[ThreatData]
     weather: WeatherData
     timestamp: float
+    power: PowerData | None = None
+    factions: list[FactionData] = []
