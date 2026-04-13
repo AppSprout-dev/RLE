@@ -459,6 +459,19 @@ class TestPhase2ReadEndpoints:
         assert len(state.alerts) == 2
         assert state.alerts[0].label == "Starvation"
 
+    async def test_alerts_empty_on_error(self) -> None:
+        """get_alerts returns [] when RIMAPI is unreachable."""
+        def raise_connect(request: httpx.Request) -> httpx.Response:
+            raise httpx.ConnectError("refused")
+
+        transport = httpx.MockTransport(raise_connect)
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=transport, base_url="http://test",
+            )
+            result = await client.get_alerts()
+            assert result == []
+
     async def test_get_upcoming_incidents(
         self, mock_client: RimAPIClient,
     ) -> None:
@@ -506,6 +519,13 @@ class TestPawnEditEndpoints:
         result = await mock_client.edit_pawn_skills(
             184, {"Shooting": 10, "Construction": 8},
             passions={"Shooting": 2},
+        )
+        assert result["success"] is True
+
+    async def test_edit_traits(self, mock_client: RimAPIClient) -> None:
+        """Add and remove traits in one call."""
+        result = await mock_client.edit_pawn_traits(
+            184, add=["Industrious"], remove=["Neurotic"],
         )
         assert result["success"] is True
 
