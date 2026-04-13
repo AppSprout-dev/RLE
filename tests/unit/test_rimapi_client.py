@@ -57,6 +57,10 @@ _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/item/spawn": {"success": True},
     "/api/v1/map/droppod": {"success": True},
     "/api/v1/map/weather/change?name=Rain&map_id=0": {"success": True},
+    "/api/v1/pawn/edit/skills": {"success": True},
+    "/api/v1/pawn/edit/traits": {"success": True},
+    "/api/v1/pawn/edit/health": {"success": True},
+    "/api/v1/pawn/edit/needs": {"success": True},
     "/api/v1/camera/screenshot": {
         "data": {
             "image": {"data_uri": "data:image/jpeg;base64,/9j/4AAQ..."},
@@ -495,3 +499,47 @@ class TestSpawnEndpoints:
     async def test_change_weather(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.change_weather("Rain")
         assert result["success"] is True
+
+
+class TestPawnEditEndpoints:
+    async def test_edit_skills(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.edit_pawn_skills(
+            184, {"Shooting": 10, "Construction": 8},
+            passions={"Shooting": 2},
+        )
+        assert result["success"] is True
+
+    async def test_edit_traits_add(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.edit_pawn_traits(
+            184, add=["Industrious", "Tough"],
+        )
+        assert result["success"] is True
+
+    async def test_edit_traits_remove(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        result = await mock_client.edit_pawn_traits(
+            184, remove=["Neurotic"],
+        )
+        assert result["success"] is True
+
+    async def test_edit_health_heal_all(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        result = await mock_client.edit_pawn_health(
+            184, heal_all=True, cure_diseases=True,
+        )
+        assert result["success"] is True
+
+    async def test_edit_needs(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.edit_pawn_needs(
+            184, {"food": 1.0, "rest": 0.8},
+        )
+        assert result["success"] is True
+
+    async def test_edit_needs_validates_range(
+        self, mock_client: RimAPIClient,
+    ) -> None:
+        import pytest as _pytest
+        with _pytest.raises(ValueError, match="out of range"):
+            await mock_client.edit_pawn_needs(184, {"food": 1.5})

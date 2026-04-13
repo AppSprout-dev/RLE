@@ -491,6 +491,36 @@ WRITE_CATALOG = {
         "path": "/api/v1/map/droppod",
         "description": "Send a drop pod with items",
     },
+    # Pawn edit (for save creation / test fixtures, not agent actions)
+    "edit_skills": {
+        "method": "POST",
+        "path": "/api/v1/pawn/edit/skills",
+        "description": "Set pawn skill levels and passions",
+        "params": {"pawn_id": "int", "skills": "list[{skill_name, level, passion?}]"},
+    },
+    "edit_traits": {
+        "method": "POST",
+        "path": "/api/v1/pawn/edit/traits",
+        "description": "Add or remove traits from a pawn",
+        "params": {"pawn_id": "int", "add_traits": "list?", "remove_traits": "list?"},
+    },
+    "edit_health": {
+        "method": "POST",
+        "path": "/api/v1/pawn/edit/health",
+        "description": "Heal injuries, restore body parts, cure diseases",
+        "params": {
+            "pawn_id": "int",
+            "heal_all_injuries": "bool",
+            "restore_body_parts": "bool",
+            "remove_all_diseases": "bool",
+        },
+    },
+    "edit_needs": {
+        "method": "POST",
+        "path": "/api/v1/pawn/edit/needs",
+        "description": "Set pawn needs (food, rest, mood) to 0.0-1.0",
+        "params": {"pawn_id": "int", "food": "float?", "rest": "float?", "mood": "float?"},
+    },
     # Camera (new — commit 654d922)
     "camera_screenshot": {
         "method": "POST",

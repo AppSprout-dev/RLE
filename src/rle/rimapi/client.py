@@ -1241,3 +1241,79 @@ class RimAPIClient:
                 "point_b": {"x": x2, "y": 0, "z": z2},
             },
         )
+
+    # ------------------------------------------------------------------
+    # Pawn edit endpoints — for test fixtures and save creation
+    # ------------------------------------------------------------------
+
+    async def edit_pawn_skills(
+        self,
+        pawn_id: int,
+        skills: dict[str, int],
+        passions: dict[str, int] | None = None,
+    ) -> dict[str, Any]:
+        """Set pawn skill levels and passions.
+
+        skills: {"Shooting": 10, "Construction": 8, ...}
+        passions: {"Shooting": 2, "Construction": 1, ...}
+                  (0=None, 1=Minor, 2=Major)
+        """
+        skill_entries = []
+        for name, level in skills.items():
+            entry: dict[str, Any] = {
+                "skill_name": name, "level": level,
+            }
+            if passions and name in passions:
+                entry["passion"] = passions[name]
+            skill_entries.append(entry)
+        return await self._post(
+            "/api/v1/pawn/edit/skills",
+            json={"pawn_id": pawn_id, "skills": skill_entries},
+        )
+
+    async def edit_pawn_traits(
+        self,
+        pawn_id: int,
+        add: list[str] | None = None,
+        remove: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Add or remove traits from a pawn."""
+        body: dict[str, Any] = {"pawn_id": pawn_id}
+        if add:
+            body["add_traits"] = [{"trait_name": t} for t in add]
+        if remove:
+            body["remove_traits"] = remove
+        return await self._post("/api/v1/pawn/edit/traits", json=body)
+
+    async def edit_pawn_health(
+        self,
+        pawn_id: int,
+        *,
+        heal_all: bool = False,
+        restore_parts: bool = False,
+        cure_diseases: bool = False,
+    ) -> dict[str, Any]:
+        """Heal injuries, restore body parts, or cure diseases."""
+        return await self._post(
+            "/api/v1/pawn/edit/health",
+            json={
+                "pawn_id": pawn_id,
+                "heal_all_injuries": heal_all,
+                "restore_body_parts": restore_parts,
+                "remove_all_diseases": cure_diseases,
+            },
+        )
+
+    async def edit_pawn_needs(
+        self, pawn_id: int, needs: dict[str, float],
+    ) -> dict[str, Any]:
+        """Set pawn needs (food, rest, mood). Values must be 0.0-1.0."""
+        for name, val in needs.items():
+            if not 0.0 <= val <= 1.0:
+                msg = f"Need '{name}' value {val} out of range [0.0, 1.0]"
+                raise ValueError(msg)
+        body: dict[str, Any] = {"pawn_id": pawn_id}
+        for key in ("food", "rest", "mood"):
+            if key in needs:
+                body[key] = needs[key]
+        return await self._post("/api/v1/pawn/edit/needs", json=body)
