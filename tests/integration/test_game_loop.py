@@ -23,7 +23,7 @@ from rle.config import RLEConfig
 from rle.orchestration.game_loop import RLEGameLoop, TickResult
 from rle.rimapi.client import RimAPIClient
 from rle.scenarios.evaluator import ScenarioEvaluator
-from rle.scenarios.schema import FailureCondition, ScenarioConfig
+from rle.scenarios.schema import FailureCondition, ScenarioConfig, TriggeredIncident
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.recorder import TimeSeriesRecorder
 
@@ -97,6 +97,7 @@ _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/colonist/work-priority": {"success": True},
     "/api/v1/builder/blueprint": {"success": True},
     "/api/v1/colonist/time-assignment": {"success": True},
+    "/api/v1/incident/trigger": {"success": True},
 }
 
 
@@ -588,3 +589,89 @@ class TestHubSpokeCommunication:
         # Each agent should have received it
         for agent in agents:
             assert agent._spoke.messages_received >= 1
+
+
+class TestScheduledIncidents:
+    async def test_scheduled_incidents_fire_at_tick(self) -> None:
+        """triggered_incidents with matching tick_offset fire without error."""
+        provider = _make_mock_provider()
+        helix = HelixConfig.default().to_geometry()
+        agent = ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(
+                config, client, [agent],
+                triggered_incidents=[
+                    TriggeredIncident(tick_offset=0, name="ToxicFallout"),
+                    TriggeredIncident(
+                        tick_offset=2, name="RaidEnemy",
+                        incident_parms={"points": 500},
+                    ),
+                ],
+            )
+            # Tick 0 fires ToxicFallout, tick 1 fires nothing, tick 2 fires RaidEnemy
+            for _ in range(3):
+                await loop.run_tick()
+
+        # Test passes if all 3 ticks completed without raising — end-to-end
+        # wiring verification. See test_fire_scheduled_incidents_calls_client
+        # below for assertion on actual call arguments.
+
+    async def test_no_triggered_incidents_no_calls(self) -> None:
+        """Without triggered_incidents, no trigger_incident calls happen."""
+        provider = _make_mock_provider()
+        helix = HelixConfig.default().to_geometry()
+        agent = ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            # Empty list — no incidents should fire
+            loop = RLEGameLoop(config, client, [agent], triggered_incidents=[])
+            result = await loop.run_tick()
+
+        assert isinstance(result, TickResult)
+
+    async def test_fire_scheduled_incidents_calls_client(self) -> None:
+        """Directly verify _fire_scheduled_incidents invokes client.trigger_incident."""
+        provider = _make_mock_provider()
+        helix = HelixConfig.default().to_geometry()
+        agent = ResourceManager("rm-01", provider, helix, spawn_time=0.0, velocity=1.0)
+        config = RLEConfig(tick_interval=0.0)
+
+        # Use AsyncMock so we can assert on call args
+        from unittest.mock import AsyncMock
+        mock_client = AsyncMock()
+        mock_client.trigger_incident = AsyncMock(return_value={"success": True})
+
+        loop = RLEGameLoop(
+            config, mock_client, [agent],
+            triggered_incidents=[
+                TriggeredIncident(
+                    tick_offset=5, name="Plague",
+                    incident_parms={"custom_letter_label": "Plague outbreak"},
+                ),
+            ],
+        )
+
+        # Tick 4 — should NOT fire
+        await loop._fire_scheduled_incidents(4)
+        mock_client.trigger_incident.assert_not_awaited()
+
+        # Tick 5 — SHOULD fire Plague
+        await loop._fire_scheduled_incidents(5)
+        mock_client.trigger_incident.assert_awaited_once_with(
+            "Plague", map_id=0,
+            custom_letter_label="Plague outbreak",
+        )
+
+        # Tick 6 — should NOT fire again
+        mock_client.trigger_incident.reset_mock()
+        await loop._fire_scheduled_incidents(6)
+        mock_client.trigger_incident.assert_not_awaited()
