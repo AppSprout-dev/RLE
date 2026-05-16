@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, cast
 
@@ -9,7 +10,7 @@ from pydantic import BaseModel, ConfigDict
 
 from rle.agents.actions import Action, ActionPlan, resolve_endpoint
 from rle.rimapi.api_catalog import WRITE_CATALOG
-from rle.rimapi.client import RimAPIClient
+from rle.rimapi.client import RimAPIClient, RimAPIResponseError
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,20 @@ _NEEDS_PAWN: frozenset[str] = frozenset({
 })
 
 
+class ActionOutcome(BaseModel):
+    """Per-action execution result. Captures failure detail so the next
+    tick's deliberation context can surface it to the agent that proposed it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    action_type: str
+    endpoint: str
+    target_colonist_id: str | None = None
+    success: bool
+    error: str | None = None
+
+
 class ExecutionResult(BaseModel):
     """Summary of action execution for one tick."""
 
@@ -34,6 +49,19 @@ class ExecutionResult(BaseModel):
     executed: int
     failed: int
     total: int
+    outcomes: tuple[ActionOutcome, ...] = ()
+
+
+def _extract_rimapi_error(detail: str) -> str:
+    """Pull the first error string out of a RIMAPI JSON envelope, else return raw detail."""
+    try:
+        parsed = json.loads(detail)
+    except (json.JSONDecodeError, TypeError):
+        return detail
+    errors = parsed.get("errors") if isinstance(parsed, dict) else None
+    if isinstance(errors, list) and errors:
+        return str(errors[0])
+    return detail
 
 
 class ActionExecutor:
@@ -47,10 +75,11 @@ class ActionExecutor:
         self._client = client
 
     async def execute(self, plan: ActionPlan) -> ExecutionResult:
-        """Execute all actions in a plan, return summary."""
+        """Execute all actions in a plan, return summary + per-action outcomes."""
         executed = 0
         failed = 0
         no_action_count = 0
+        outcomes: list[ActionOutcome] = []
         for action in plan.actions:
             endpoint = resolve_endpoint(action.action_type)
             if endpoint == "no_action":
@@ -59,13 +88,37 @@ class ActionExecutor:
             try:
                 await self._dispatch(action, endpoint)
                 executed += 1
-            except Exception:
+                outcomes.append(ActionOutcome(
+                    action_type=action.action_type,
+                    endpoint=endpoint,
+                    target_colonist_id=action.target_colonist_id,
+                    success=True,
+                ))
+            except RimAPIResponseError as exc:
+                logger.warning("Action %s failed: %s", endpoint, exc.detail)
+                failed += 1
+                outcomes.append(ActionOutcome(
+                    action_type=action.action_type,
+                    endpoint=endpoint,
+                    target_colonist_id=action.target_colonist_id,
+                    success=False,
+                    error=_extract_rimapi_error(exc.detail),
+                ))
+            except Exception as exc:
                 logger.warning("Action %s failed", endpoint, exc_info=True)
                 failed += 1
+                outcomes.append(ActionOutcome(
+                    action_type=action.action_type,
+                    endpoint=endpoint,
+                    target_colonist_id=action.target_colonist_id,
+                    success=False,
+                    error=str(exc) or type(exc).__name__,
+                ))
         return ExecutionResult(
             executed=executed,
             failed=failed,
             total=len(plan.actions) - no_action_count,
+            outcomes=tuple(outcomes),
         )
 
     async def _dispatch(self, action: Action, endpoint: str) -> None:

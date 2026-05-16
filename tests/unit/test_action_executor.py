@@ -74,6 +74,71 @@ class TestExecute:
         assert result.failed == 0
 
 
+class TestOutcomes:
+    """ExecutionResult.outcomes carries per-action success/error so the
+    game loop can surface failures back to agents next tick."""
+
+    async def test_success_outcome_recorded(self) -> None:
+        from rle.orchestration.action_executor import ActionExecutor
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(
+            Action(action_type="set_work_priority",
+                   target_colonist_id="42", parameters={"Growing": 1}),
+        )
+        result = await executor.execute(plan)
+        assert len(result.outcomes) == 1
+        outcome = result.outcomes[0]
+        assert outcome.success is True
+        assert outcome.action_type == "set_work_priority"
+        assert outcome.target_colonist_id == "42"
+        assert outcome.error is None
+
+    async def test_rimapi_error_extracted_into_outcome(self) -> None:
+        """RIMAPI's JSON error envelope is unwrapped to a clean human-readable string."""
+        from rle.orchestration.action_executor import ActionExecutor
+        from rle.rimapi.client import RimAPIResponseError
+        client = AsyncMock()
+        client.set_research_target = AsyncMock(side_effect=RimAPIResponseError(
+            500,
+            '{"success":false,"errors":["Research project \'Electricity\' is already finished."],'
+            '"warnings":[],"timestamp":"2026-05-16T06:00:00Z"}',
+        ))
+        executor = ActionExecutor(client)
+        plan = _make_plan(
+            Action(action_type="set_research_target", parameters={"project": "Electricity"}),
+        )
+        result = await executor.execute(plan)
+        assert result.failed == 1
+        assert len(result.outcomes) == 1
+        outcome = result.outcomes[0]
+        assert outcome.success is False
+        assert outcome.error == "Research project 'Electricity' is already finished."
+
+    async def test_generic_exception_message_captured(self) -> None:
+        from rle.orchestration.action_executor import ActionExecutor
+        client = AsyncMock()
+        client.set_research_target = AsyncMock(side_effect=RuntimeError("boom"))
+        executor = ActionExecutor(client)
+        plan = _make_plan(Action(action_type="set_research_target", parameters={}))
+        result = await executor.execute(plan)
+        assert result.outcomes[0].success is False
+        assert result.outcomes[0].error == "boom"
+
+    async def test_outcomes_preserve_order(self) -> None:
+        """no_action is skipped; outcomes only cover dispatched actions in order."""
+        from rle.orchestration.action_executor import ActionExecutor
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(
+            Action(action_type="no_action"),
+            Action(action_type="draft_colonist", target_colonist_id="1"),
+            Action(action_type="draft_colonist", target_colonist_id="2"),
+        )
+        result = await executor.execute(plan)
+        assert [o.target_colonist_id for o in result.outcomes] == ["1", "2"]
+
+
 class TestDispatch:
     async def test_set_work_priority(self) -> None:
         client = AsyncMock()
