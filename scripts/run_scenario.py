@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import sys
 from pathlib import Path
@@ -40,6 +41,15 @@ def _find_scenario(query: str) -> Path:
         if path.stem.startswith(query) or query in path.stem:
             return path
     raise SystemExit(f"Scenario not found: {query}")
+
+
+def _write_deliberations_jsonl(
+    path: Path, deliberations: list[dict[str, object]],
+) -> None:
+    """Write per-tick deliberation records to a JSONL file."""
+    with open(path, "w", encoding="utf-8") as f:
+        for entry in deliberations:
+            f.write(json.dumps(entry) + "\n")
 
 
 def _create_agents(provider, helix):  # type: ignore[no-untyped-def]
@@ -234,6 +244,12 @@ async def main(args: argparse.Namespace) -> None:
         csv_path = output_dir / f"{scenario_path.stem}.csv"
         recorder.to_csv(csv_path)
         print(f"\nCSV exported to {csv_path}")
+
+        deliberation_log = loop.deliberation_log
+        if deliberation_log:
+            log_path = output_dir / f"{scenario_path.stem}_deliberations.jsonl"
+            await asyncio.to_thread(_write_deliberations_jsonl, log_path, deliberation_log)
+            print(f"Deliberations exported to {log_path}")
 
     # Print cost summary
     snap = cost_tracker.snapshot()

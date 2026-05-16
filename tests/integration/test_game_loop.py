@@ -326,6 +326,30 @@ class TestMultiAgent:
         # 7 agents * 3 ticks = 21 provider calls
         assert provider.complete.call_count == 21
 
+    async def test_deliberation_log_property_returns_per_tick_records(self) -> None:
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, agents)
+            await loop.run(max_ticks=2)
+
+        log = loop.deliberation_log
+        # 7 agents * 2 ticks = 14 deliberation records
+        assert len(log) == 14
+        # Each entry has the required keys
+        for entry in log:
+            assert "tick" in entry
+            assert "agent" in entry
+            assert "status" in entry
+        # Property returns a copy: mutating the result doesn't change loop state
+        log.clear()
+        assert len(loop.deliberation_log) == 14
+
 
 # ------------------------------------------------------------------
 # Scored game loop tests (Phase 6)

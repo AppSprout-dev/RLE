@@ -643,3 +643,13 @@ class RLEGameLoop:
     @property
     def metric_context(self) -> MetricContext:
         return self._metric_context
+
+    @property
+    def deliberation_log(self) -> list[dict[str, object]]:
+        """Per-tick agent deliberation records (status, actions, reasons, summary).
+
+        Returns a shallow copy. Each entry has keys: tick, agent, status,
+        plus status-specific fields (actions, summary, confidence for success;
+        raw, reason for parse_failure; reason for provider_error).
+        """
+        return list(self._deliberation_log)

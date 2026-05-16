@@ -285,10 +285,11 @@ async def _run_scenario(
         csv_name = scenario.name.lower().replace(" ", "_") + ".csv"
         recorder.to_csv(output_dir / csv_name)
 
-    if output_dir and loop._deliberation_log:
+    deliberation_log = loop.deliberation_log
+    if output_dir and deliberation_log:
         log_name = scenario.name.lower().replace(" ", "_") + "_deliberations.jsonl"
         with open(output_dir / log_name, "w") as f:
-            for entry in loop._deliberation_log:
+            for entry in deliberation_log:
                 f.write(json.dumps(entry) + "\n")
 
     return {
