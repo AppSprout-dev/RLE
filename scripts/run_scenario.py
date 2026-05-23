@@ -46,6 +46,11 @@ def _find_scenario(query: str) -> Path:
     raise SystemExit(f"Scenario not found: {query}")
 
 
+def _per_mtok_to_per_token(price_per_mtok: float | None) -> float | None:
+    """Convert a CLI override in USD per million tokens to per-token."""
+    return None if price_per_mtok is None else price_per_mtok / 1_000_000
+
+
 def _write_deliberations_jsonl(
     path: Path, deliberations: list[dict[str, object]],
 ) -> None:
@@ -197,7 +202,11 @@ async def main(args: argparse.Namespace) -> None:
     if args.output:
         Path(args.output).mkdir(parents=True, exist_ok=True)
         event_log = EventLog(Path(args.output) / "events.jsonl")
-    cost_tracker = await create_cost_tracker(args.model or config.model)
+    cost_tracker = await create_cost_tracker(
+        args.model or config.model,
+        prompt_price_override=_per_mtok_to_per_token(args.prompt_price_per_mtok),
+        completion_price_override=_per_mtok_to_per_token(args.completion_price_per_mtok),
+    )
 
     # SSE listener for real-time events (optional, only when RIMAPI is live)
     sse = RimAPISSEClient(config.rimapi_url)
@@ -392,6 +401,18 @@ if __name__ == "__main__":
             "fallbacks). Does NOT control RimWorld's RNG. Recorded in the run "
             "summary for replay."
         ),
+    )
+    parser.add_argument(
+        "--prompt-price-per-mtok", type=float, default=None,
+        help=(
+            "Override prompt token price in USD per million tokens. Use this "
+            "when the OpenRouter /models price diverges from your actual "
+            "billed cost (e.g. BYOK markup or provider routing surcharges)."
+        ),
+    )
+    parser.add_argument(
+        "--completion-price-per-mtok", type=float, default=None,
+        help="Override completion token price (USD per million tokens).",
     )
     parser.add_argument("--log-level", default="INFO", help="Logging level")
     asyncio.run(main(parser.parse_args()))

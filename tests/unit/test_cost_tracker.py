@@ -229,3 +229,59 @@ class TestCreateCostTracker:
         tracker.record_raw(5000, 2000)
         snap = tracker.snapshot()
         assert snap.estimated_cost_usd == 0.0
+        # A9: pricing_source flags this as untrustworthy
+        assert snap.pricing_source == "unknown"
+
+    async def test_pricing_source_is_openrouter_when_fetched_nonzero(
+        self,
+    ) -> None:
+        with mock.patch(
+            "rle.tracking.cost_tracker.fetch_pricing",
+            new=mock.AsyncMock(return_value=(0.000003, 0.000015)),
+        ):
+            tracker = await create_cost_tracker("test/model")
+
+        snap = tracker.snapshot()
+        assert snap.pricing_source == "openrouter_api"
+        assert snap.prompt_price_per_token == pytest.approx(0.000003)
+        assert snap.completion_price_per_token == pytest.approx(0.000015)
+
+    async def test_override_bypasses_fetch_and_tags_source(self) -> None:
+        """A9: CLI overrides take precedence over OpenRouter pricing and
+        the snapshot records pricing_source=override for reconciliation."""
+        # Even if the fetch would return a different price, the override wins.
+        with mock.patch(
+            "rle.tracking.cost_tracker.fetch_pricing",
+            new=mock.AsyncMock(return_value=(0.000001, 0.000002)),
+        ) as patched:
+            tracker = await create_cost_tracker(
+                "test/model",
+                prompt_price_override=0.00000009,
+                completion_price_override=0.00000045,
+            )
+
+        # Fetch is skipped entirely when both overrides provided.
+        patched.assert_not_awaited()
+        snap = tracker.snapshot()
+        assert snap.pricing_source == "override"
+        assert snap.prompt_price_per_token == pytest.approx(0.00000009)
+        assert snap.completion_price_per_token == pytest.approx(0.00000045)
+
+    async def test_snapshot_carries_pricing_for_reconciliation(self) -> None:
+        """Operators reconciling estimates against actual OpenRouter receipts
+        need to see exactly which prices the tracker used."""
+        with mock.patch(
+            "rle.tracking.cost_tracker.fetch_pricing",
+            new=mock.AsyncMock(return_value=(0.00000009, 0.00000045)),
+        ):
+            tracker = await create_cost_tracker(
+                "nvidia/nemotron-3-super-120b-a12b",
+            )
+
+        tracker.record_raw(815347, 267898)
+        snap = tracker.snapshot()
+        expected = 815347 * 0.00000009 + 267898 * 0.00000045
+        assert snap.estimated_cost_usd == pytest.approx(expected, abs=1e-4)
+        assert snap.prompt_price_per_token == pytest.approx(0.00000009)
+        assert snap.completion_price_per_token == pytest.approx(0.00000045)
+        assert snap.pricing_source == "openrouter_api"

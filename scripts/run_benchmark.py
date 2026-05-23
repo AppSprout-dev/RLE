@@ -573,8 +573,18 @@ async def main(args: argparse.Namespace) -> None:
             "ticks_per_scenario": ticks_override,
         })
 
-    # Initialize cost tracker (fetches OpenRouter pricing)
-    cost_tracker = await create_cost_tracker(args.model or config.model)
+    # Initialize cost tracker (fetches OpenRouter pricing; CLI may override)
+    cost_tracker = await create_cost_tracker(
+        args.model or config.model,
+        prompt_price_override=(
+            args.prompt_price_per_mtok / 1_000_000
+            if args.prompt_price_per_mtok is not None else None
+        ),
+        completion_price_override=(
+            args.completion_price_per_mtok / 1_000_000
+            if args.completion_price_per_mtok is not None else None
+        ),
+    )
 
     # Initialize event log
     event_log: EventLog | None = None
@@ -808,6 +818,18 @@ if __name__ == "__main__":
             "fallbacks). Does NOT control RimWorld's RNG. Recorded in the "
             "benchmark_summary for replay."
         ),
+    )
+    parser.add_argument(
+        "--prompt-price-per-mtok", type=float, default=None,
+        help=(
+            "Override prompt token price in USD per million tokens. Use this "
+            "when the OpenRouter /models price diverges from your actual "
+            "billed cost (e.g. BYOK markup or provider routing surcharges)."
+        ),
+    )
+    parser.add_argument(
+        "--completion-price-per-mtok", type=float, default=None,
+        help="Override completion token price (USD per million tokens).",
     )
     parser.add_argument("--log-level", default="WARNING", help="Logging level")
     asyncio.run(main(parser.parse_args()))
