@@ -32,6 +32,7 @@ from rle.scoring.composite import CompositeScorer
 from rle.scoring.recorder import TimeSeriesRecorder
 from rle.tracking.cost_tracker import create_cost_tracker
 from rle.tracking.event_log import EventLog
+from rle.tracking.history import append_history
 from rle.tracking.metadata import collect_metadata
 
 DEFINITIONS_DIR = Path(__file__).parent.parent / "src" / "rle" / "scenarios" / "definitions"
@@ -321,6 +322,25 @@ async def main(args: argparse.Namespace) -> None:
         summary_path = output_dir / f"{scenario_path.stem}_summary.json"
         summary_path.write_text(json.dumps(summary, indent=2, default=str))
         print(f"Summary exported to {summary_path}")
+
+        # Append to results/benchmark_history.jsonl so this run is replayable
+        # alongside benchmark-suite runs. The leaderboard can filter on
+        # run_type to keep single-scenario runs out of multi-scenario rollups.
+        # Skip when no real LLM was called (smoke tests / pre-flight checks).
+        if cost_tracker.snapshot().num_calls > 0:
+            history_entry = {
+                **summary,
+                "run_type": "scenario",
+                "scenarios": [{
+                    "name": scenario.name,
+                    "difficulty": scenario.difficulty,
+                    "score": summary["final_score"],
+                    "outcome": summary["outcome"],
+                    "ticks": summary["ticks_run"],
+                }],
+            }
+            history_path = append_history(history_entry)
+            print(f"History appended to {history_path}")
 
     # Print cost summary
     snap = cost_tracker.snapshot()
