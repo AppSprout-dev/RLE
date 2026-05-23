@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import logging
+import random
 import time
 from pathlib import Path
 from typing import Any
@@ -507,6 +508,11 @@ async def main(args: argparse.Namespace) -> None:
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
 
+    # Seed RLE-side stochasticity (resolver tiebreaks, json_repair fallbacks).
+    # RimWorld's RNG is unaffected — see metadata.collect_metadata docstring.
+    if args.seed is not None:
+        random.seed(args.seed)
+
     helix = HelixConfig.default().to_geometry()
     scenarios = list_scenarios()
     provider, config = _build_provider(args)
@@ -559,7 +565,7 @@ async def main(args: argparse.Namespace) -> None:
     )
     if wandb_logger.enabled:
         wandb_logger.log_config({
-            **collect_metadata(),
+            **collect_metadata(random_seed=args.seed),
             "model": args.model or config.model,
             "provider": args.provider or config.provider,
             "no_think": args.no_think,
@@ -671,7 +677,7 @@ async def main(args: argparse.Namespace) -> None:
             _print_leaderboard(results, model=args.model)
 
         # Build enriched summary with metadata
-        metadata = collect_metadata()
+        metadata = collect_metadata(random_seed=args.seed)
         summary: dict[str, Any] = {
             **metadata,
             "model": args.model or config.model,
@@ -795,5 +801,13 @@ if __name__ == "__main__":
     )
     parser.add_argument("--wandb", action="store_true", help="Log to Weights & Biases")
     parser.add_argument("--push-hf", action="store_true", help="Push results to HuggingFace Hub")
+    parser.add_argument(
+        "--seed", type=int, default=None,
+        help=(
+            "Seed for RLE-side stochasticity (resolver tiebreaks, json_repair "
+            "fallbacks). Does NOT control RimWorld's RNG. Recorded in the "
+            "benchmark_summary for replay."
+        ),
+    )
     parser.add_argument("--log-level", default="WARNING", help="Logging level")
     asyncio.run(main(parser.parse_args()))

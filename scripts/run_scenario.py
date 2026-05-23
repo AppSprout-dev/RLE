@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import logging
+import random
 import sys
 from pathlib import Path
 
@@ -31,6 +32,7 @@ from rle.scoring.composite import CompositeScorer
 from rle.scoring.recorder import TimeSeriesRecorder
 from rle.tracking.cost_tracker import create_cost_tracker
 from rle.tracking.event_log import EventLog
+from rle.tracking.metadata import collect_metadata
 
 DEFINITIONS_DIR = Path(__file__).parent.parent / "src" / "rle" / "scenarios" / "definitions"
 
@@ -50,6 +52,44 @@ def _write_deliberations_jsonl(
     with open(path, "w", encoding="utf-8") as f:
         for entry in deliberations:
             f.write(json.dumps(entry) + "\n")
+
+
+def _build_run_summary(  # noqa: PLR0913
+    args: argparse.Namespace,
+    config_model: str,
+    config_provider: str,
+    config_tick_interval: float,
+    scenario_name: str,
+    scenario_save_name: str,
+    max_ticks: int | None,
+    outcome: str,
+    final_score: float | None,
+    ticks_run: int,
+    cost_snapshot_dict: dict[str, object],
+    event_summary_dict: dict[str, object] | None,
+) -> dict[str, object]:
+    """Compose the per-scenario summary JSON (metadata + config + result)."""
+    summary: dict[str, object] = {
+        **collect_metadata(random_seed=args.seed),
+        "scenario": scenario_name,
+        "scenario_save_name": scenario_save_name,
+        "model": args.model or config_model,
+        "provider": args.provider or config_provider,
+        "base_url": args.base_url or None,
+        "no_think": args.no_think,
+        "parallel": not args.sequential,
+        "no_agent": args.no_agent,
+        "no_pause": args.no_pause,
+        "tick_interval": config_tick_interval,
+        "max_ticks": max_ticks,
+        "outcome": outcome,
+        "final_score": final_score,
+        "ticks_run": ticks_run,
+        "cost_snapshot": cost_snapshot_dict,
+    }
+    if event_summary_dict is not None:
+        summary["event_summary"] = event_summary_dict
+    return summary
 
 
 def _create_agents(provider, helix):  # type: ignore[no-untyped-def]
@@ -91,6 +131,11 @@ async def main(args: argparse.Namespace) -> None:
         level=getattr(logging, args.log_level.upper(), logging.INFO),
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
+
+    # Seed RLE-side stochasticity (resolver tiebreaks, json_repair fallbacks).
+    # RimWorld's RNG is unaffected — see metadata.collect_metadata docstring.
+    if args.seed is not None:
+        random.seed(args.seed)
 
     # List mode
     if args.list:
@@ -251,6 +296,32 @@ async def main(args: argparse.Namespace) -> None:
             await asyncio.to_thread(_write_deliberations_jsonl, log_path, deliberation_log)
             print(f"Deliberations exported to {log_path}")
 
+        # Replay-grade scenario summary with full metadata + cost + score.
+        summary = _build_run_summary(
+            args=args,
+            config_model=config.model,
+            config_provider=config.provider,
+            config_tick_interval=config.tick_interval,
+            scenario_name=scenario.name,
+            scenario_save_name=scenario.save_name,
+            max_ticks=max_ticks,
+            outcome=(
+                loop.evaluation_result.outcome
+                if loop.evaluation_result else "timeout"
+            ),
+            final_score=(
+                recorder.snapshots[-1].composite if recorder.snapshots else None
+            ),
+            ticks_run=len(loop.tick_results),
+            cost_snapshot_dict=cost_tracker.snapshot().model_dump(),
+            event_summary_dict=(
+                event_log.summary().model_dump() if event_log else None
+            ),
+        )
+        summary_path = output_dir / f"{scenario_path.stem}_summary.json"
+        summary_path.write_text(json.dumps(summary, indent=2, default=str))
+        print(f"Summary exported to {summary_path}")
+
     # Print cost summary
     snap = cost_tracker.snapshot()
     if snap.num_calls > 0:
@@ -293,6 +364,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-pause", action="store_true",
         help="Don't pause game during deliberation (SSE-driven, game runs continuously)",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=None,
+        help=(
+            "Seed for RLE-side stochasticity (resolver tiebreaks, json_repair "
+            "fallbacks). Does NOT control RimWorld's RNG. Recorded in the run "
+            "summary for replay."
+        ),
     )
     parser.add_argument("--log-level", default="INFO", help="Logging level")
     asyncio.run(main(parser.parse_args()))
