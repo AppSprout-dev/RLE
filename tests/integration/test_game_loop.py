@@ -385,6 +385,39 @@ class TestMultiAgent:
                 assert "priority" in action
                 assert "reason" in action
 
+    async def test_provider_call_event_carries_raw_output(
+        self, tmp_path: object,
+    ) -> None:
+        """A3: PROVIDER_CALL events include raw_output (truncated) for replay."""
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        log_path = tmp_path / "events.jsonl"  # type: ignore[attr-defined]
+        with EventLog(log_path) as event_log:
+            async with RimAPIClient("http://test") as client:
+                client._client = httpx.AsyncClient(
+                    transport=_make_transport(), base_url="http://test",
+                )
+                loop = RLEGameLoop(config, client, agents, event_log=event_log)
+                await loop.run_tick()
+
+            provider_calls = [
+                e for e in event_log.events
+                if e.event_type == EventType.PROVIDER_CALL
+            ]
+
+        # Each agent that produced usage info should emit a PROVIDER_CALL
+        assert len(provider_calls) >= 1
+        for event in provider_calls:
+            assert "raw_output" in event.data
+            assert "raw_output_truncated" in event.data
+            # Mock provider returns the canned ACTION_PLAN_JSON — verify it's there
+            assert event.data["raw_output"] is not None
+            assert "actions" in event.data["raw_output"]
+            # Mock output is well under 4KB → truncation flag stays False
+            assert event.data["raw_output_truncated"] is False
+
 
 # ------------------------------------------------------------------
 # Scored game loop tests (Phase 6)

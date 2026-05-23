@@ -38,6 +38,11 @@ logger = logging.getLogger(__name__)
 _ACTION_REASON_CHARS = 200
 _PLAN_SUMMARY_CHARS = 300
 _PARSE_FAILURE_RAW_CHARS = 500
+# Full LLM completion text on successful deliberation (PROVIDER_CALL events).
+# 4 KB covers the typical JSON action plan plus a reasoning preamble; longer
+# completions are tail-truncated rather than head-truncated so the parsed
+# action JSON remains visible.
+_RAW_OUTPUT_CHARS = 4096
 
 
 class TickResult(BaseModel):
@@ -269,9 +274,19 @@ class RLEGameLoop:
             if isinstance(pt, int) and isinstance(ct, int):
                 if self._cost_tracker:
                     self._cost_tracker.record_raw(pt, ct)
+                raw_output = agent._last_raw_output
+                raw_output_truncated = (
+                    raw_output[:_RAW_OUTPUT_CHARS] if raw_output else None
+                )
+                was_truncated = (
+                    raw_output is not None
+                    and len(raw_output) > _RAW_OUTPUT_CHARS
+                )
                 self._emit(
                     EventType.PROVIDER_CALL, tick_num, agent=plan.role,
                     prompt_tokens=pt, completion_tokens=ct,
+                    raw_output=raw_output_truncated,
+                    raw_output_truncated=was_truncated,
                 )
 
         return agent, plan
