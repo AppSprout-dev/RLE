@@ -385,6 +385,54 @@ class TestMultiAgent:
                 assert "priority" in action
                 assert "reason" in action
 
+    async def test_role_timeout_emits_event_and_other_agents_continue(
+        self, tmp_path: object,
+    ) -> None:
+        """A7: a hung deliberation must time out, emit ERROR with
+        error_type=deliberation_timeout, and leave the rest of the tick
+        operational. The hung thread keeps running in the background — we
+        check only the orchestrator-visible behaviour."""
+        # Slow provider: blocks for 5s on every call. role_timeout_s=0.05
+        # forces the timeout long before the call completes.
+        slow_provider = MagicMock(spec=BaseProvider)
+
+        def _slow_complete(*_args: object, **_kwargs: object) -> CompletionResult:
+            import time as _t
+            _t.sleep(5.0)
+            return CompletionResult(
+                content=ACTION_PLAN_JSON, model="mock",
+                usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            )
+
+        slow_provider.complete.side_effect = _slow_complete
+        slow_provider.provider_name = "openai"
+
+        agents = _make_all_agents(slow_provider)
+        config = RLEConfig(tick_interval=0.0, role_timeout_s=0.05)
+
+        log_path = tmp_path / "events.jsonl"  # type: ignore[attr-defined]
+        with EventLog(log_path) as event_log:
+            async with RimAPIClient("http://test") as client:
+                client._client = httpx.AsyncClient(
+                    transport=_make_transport(), base_url="http://test",
+                )
+                loop = RLEGameLoop(config, client, agents, event_log=event_log)
+                # Tick completes even though every agent is hung
+                result = await loop.run_tick()
+
+            timeouts = [
+                e for e in event_log.events
+                if e.event_type == EventType.ERROR
+                and e.data.get("error_type") == "deliberation_timeout"
+            ]
+
+        # All 7 agents (MapAnalyst + 6 role agents) time out
+        assert len(timeouts) == 7
+        for event in timeouts:
+            assert event.data["timeout_s"] == pytest.approx(0.05)
+        # Merged plan has zero actions because no agent contributed
+        assert len(result.plan.actions) == 0
+
     async def test_provider_call_event_carries_raw_output(
         self, tmp_path: object,
     ) -> None:

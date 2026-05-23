@@ -37,6 +37,12 @@ class RLEConfig(BaseSettings):
     provider_base_url: str | None = None
     openrouter_api_key: str | None = None
     tick_interval: float = 1.0
+    role_timeout_s: float = 60.0
+    """Max wall-clock seconds for a single agent's deliberation. Hung LLM
+    calls beyond this fire a deliberation_timeout ERROR event and the agent
+    contributes no actions for the tick. The hung thread eventually unwinds
+    via the provider's own timeout (Python threads can't be force-killed).
+    Docker-benchmark average is ~7s per deliberation; 60s leaves ~8x headroom."""
     helix_preset: str = "default"
     max_agents: int = 7
     log_level: str = "INFO"
