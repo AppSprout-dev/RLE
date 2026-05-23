@@ -5,27 +5,23 @@ expected_duration_days: 20
 initial_population: 5
 max_ticks: 200
 save_name: rle_plague_response_v1
-
 victory_conditions:
-  - metric: days_survived
-    operator: ">="
-    value: 20
-  - metric: survival_rate
-    operator: ">="
-    value: 0.8
-
+- metric: days_survived
+  operator: '>='
+  value: 20
+- metric: survival_rate
+  operator: '>='
+  value: 0.8
 failure_conditions:
-  - metric: all_colonists_dead
-    operator: "=="
-    value: 1
-  - metric: survival_rate
-    operator: "<"
-    value: 0.4
-
+- metric: all_colonists_dead
+  operator: ==
+  value: 1
+- metric: survival_rate
+  operator: <
+  value: 0.4
 triggered_incidents:
-  - tick_offset: 1
-    name: Plague
-
+- tick_offset: 1
+  name: Plague
 scoring_weights:
   survival: 0.28
   mood: 0.12
@@ -37,3 +33,4 @@ scoring_weights:
   efficiency: 0.08
   coordination: 0.12
   communication_efficiency: 0.08
+save_sha256: a31a1eb31913fee79cb39b91009e4058029eac133a30ad3e0fc0e53a31a79e6d

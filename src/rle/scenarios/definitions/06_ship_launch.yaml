@@ -5,19 +5,16 @@ expected_duration_days: 120
 initial_population: 5
 max_ticks: 1200
 save_name: rle_ship_launch_v1
-
 victory_conditions:
-  - metric: research_completed
-    operator: ">="
-    value: 10
-
+- metric: research_completed
+  operator: '>='
+  value: 10
 failure_conditions:
-  - metric: all_colonists_dead
-    operator: "=="
-    value: 1
-
+- metric: all_colonists_dead
+  operator: ==
+  value: 1
 scoring_weights:
-  research: 0.20
+  research: 0.2
   survival: 0.16
   wealth: 0.12
   self_sufficiency: 0.12
@@ -27,3 +24,4 @@ scoring_weights:
   efficiency: 0.04
   coordination: 0.12
   communication_efficiency: 0.08
+save_sha256: 24db37fec15423b8eb5da56a9be471a4814b0e4040a436a4864d3dba234397ff

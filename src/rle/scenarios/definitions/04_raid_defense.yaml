@@ -5,31 +5,27 @@ expected_duration_days: 15
 initial_population: 5
 max_ticks: 150
 save_name: rle_raid_defense_v1
-
 victory_conditions:
-  - metric: days_survived
-    operator: ">="
-    value: 15
-  - metric: survival_rate
-    operator: ">="
-    value: 0.6
-
+- metric: days_survived
+  operator: '>='
+  value: 15
+- metric: survival_rate
+  operator: '>='
+  value: 0.6
 failure_conditions:
-  - metric: all_colonists_dead
-    operator: "=="
-    value: 1
-  - metric: survival_rate
-    operator: "<"
-    value: 0.2
-
+- metric: all_colonists_dead
+  operator: ==
+  value: 1
+- metric: survival_rate
+  operator: <
+  value: 0.2
 triggered_incidents:
-  - tick_offset: 2
-    name: RaidEnemy
-    incident_parms:
-      points: 500
-
+- tick_offset: 2
+  name: RaidEnemy
+  incident_parms:
+    points: 500
 scoring_weights:
-  survival: 0.20
+  survival: 0.2
   threat_response: 0.24
   mood: 0.08
   food_security: 0.04
@@ -39,3 +35,4 @@ scoring_weights:
   efficiency: 0.08
   coordination: 0.15
   communication_efficiency: 0.05
+save_sha256: c11ff2d4476d7f4da7c3bdcbb07f96610ae7588c642af3f5696278c0530666e2

@@ -5,25 +5,22 @@ expected_duration_days: 60
 initial_population: 3
 max_ticks: 600
 save_name: rle_first_winter_v1
-
 victory_conditions:
-  - metric: days_survived
-    operator: ">="
-    value: 60
-  - metric: food_days
-    operator: ">="
-    value: 3
-
+- metric: days_survived
+  operator: '>='
+  value: 60
+- metric: food_days
+  operator: '>='
+  value: 3
 failure_conditions:
-  - metric: all_colonists_dead
-    operator: "=="
-    value: 1
-  - metric: food_days
-    operator: "<="
-    value: 0
-
+- metric: all_colonists_dead
+  operator: ==
+  value: 1
+- metric: food_days
+  operator: <=
+  value: 0
 scoring_weights:
-  survival: 0.20
+  survival: 0.2
   food_security: 0.16
   self_sufficiency: 0.12
   mood: 0.08
@@ -33,3 +30,4 @@ scoring_weights:
   efficiency: 0.04
   coordination: 0.12
   communication_efficiency: 0.08
+save_sha256: 22d52f88b3398f4d3c61de65a93fc809e3c946c41b1b19b8f0f6a0b99e93361d
