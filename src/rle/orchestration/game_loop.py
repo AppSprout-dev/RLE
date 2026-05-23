@@ -32,6 +32,13 @@ from rle.tracking.event_log import EventLog, EventType
 
 logger = logging.getLogger(__name__)
 
+# Truncation limits for human-readable text persisted to the event log /
+# deliberation log. Keep these tight so the JSONL stays grep-able and small;
+# the per-scenario *_deliberations.jsonl carries the full raw reasoning.
+_ACTION_REASON_CHARS = 200
+_PLAN_SUMMARY_CHARS = 300
+_PARSE_FAILURE_RAW_CHARS = 500
+
 
 class TickResult(BaseModel):
     """Summary of a single game tick."""
@@ -200,14 +207,18 @@ class RLEGameLoop:
                 agent.ROLE_NAME, tick_num, e.reason,
             )
             self._parse_failures += 1
+            raw_truncated = (
+                e.raw_content[:_PARSE_FAILURE_RAW_CHARS] if e.raw_content else None
+            )
             self._deliberation_log.append({
                 "tick": tick_num, "agent": agent.ROLE_NAME,
                 "status": "parse_failure", "reason": e.reason,
-                "raw": e.raw_content[:500] if e.raw_content else None,
+                "raw": raw_truncated,
             })
             self._emit(
                 EventType.ERROR, tick_num, agent=agent.ROLE_NAME,
                 error_type="parse_failure", reason=e.reason, latency_ms=latency_ms,
+                raw=raw_truncated,
             )
             return agent, None
         except ProviderError as e:
@@ -229,21 +240,25 @@ class RLEGameLoop:
 
         latency_ms = round((_time.monotonic() - t0) * 1000, 1)
         self._parse_successes += 1
+        actions_payload = [
+            {"type": a.action_type, "target": a.target_colonist_id,
+             "priority": a.priority, "reason": a.reason[:_ACTION_REASON_CHARS]}
+            for a in plan.actions
+        ]
+        summary_truncated = plan.summary[:_PLAN_SUMMARY_CHARS]
         self._deliberation_log.append({
             "tick": tick_num, "agent": plan.role,
             "status": "success", "confidence": plan.confidence,
             "num_actions": len(plan.actions),
-            "actions": [
-                {"type": a.action_type, "target": a.target_colonist_id,
-                 "priority": a.priority, "reason": a.reason[:200]}
-                for a in plan.actions
-            ],
-            "summary": plan.summary[:300],
+            "actions": actions_payload,
+            "summary": summary_truncated,
         })
         self._emit(
             EventType.DELIBERATION, tick_num, agent=plan.role,
             latency_ms=latency_ms, confidence=plan.confidence,
             num_actions=len(plan.actions),
+            actions=actions_payload,
+            summary=summary_truncated,
         )
 
         # Record token usage for cost tracking and event log

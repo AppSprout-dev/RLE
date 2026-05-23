@@ -26,6 +26,7 @@ from rle.scenarios.evaluator import ScenarioEvaluator
 from rle.scenarios.schema import FailureCondition, ScenarioConfig, TriggeredIncident
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.recorder import TimeSeriesRecorder
+from rle.tracking.event_log import EventLog, EventType
 
 # ------------------------------------------------------------------
 # Test data
@@ -349,6 +350,40 @@ class TestMultiAgent:
         # Property returns a copy: mutating the result doesn't change loop state
         log.clear()
         assert len(loop.deliberation_log) == 14
+
+    async def test_deliberation_event_carries_actions_and_summary(
+        self, tmp_path: object,
+    ) -> None:
+        """A2: DELIBERATION events in the JSONL must include actions[] + summary."""
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        log_path = tmp_path / "events.jsonl"  # type: ignore[attr-defined]
+        with EventLog(log_path) as event_log:
+            async with RimAPIClient("http://test") as client:
+                client._client = httpx.AsyncClient(
+                    transport=_make_transport(), base_url="http://test",
+                )
+                loop = RLEGameLoop(config, client, agents, event_log=event_log)
+                await loop.run_tick()
+
+            deliberations = [
+                e for e in event_log.events
+                if e.event_type == EventType.DELIBERATION
+            ]
+
+        # 7 agents = 7 deliberation events emitted
+        assert len(deliberations) == 7
+        for event in deliberations:
+            assert "actions" in event.data
+            assert "summary" in event.data
+            assert isinstance(event.data["actions"], list)
+            # Each action entry has the rich payload (type, target, priority, reason)
+            for action in event.data["actions"]:
+                assert "type" in action
+                assert "priority" in action
+                assert "reason" in action
 
 
 # ------------------------------------------------------------------
