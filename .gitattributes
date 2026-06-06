@@ -1,0 +1,6 @@
+# RimWorld save files are XML text but we treat them as binary blobs so the
+# canonical save_sha256 pinned in each scenario YAML matches across platforms.
+# Without this, Git's autocrlf=true on Windows converts CRLF<->LF on
+# checkout/commit and the on-disk byte sequence (and thus its SHA-256)
+# differs between OSes, breaking the scenario loader's save validation in CI.
+*.rws binary

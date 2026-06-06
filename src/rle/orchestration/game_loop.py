@@ -32,6 +32,18 @@ from rle.tracking.event_log import EventLog, EventType
 
 logger = logging.getLogger(__name__)
 
+# Truncation limits for human-readable text persisted to the event log /
+# deliberation log. Keep these tight so the JSONL stays grep-able and small;
+# the per-scenario *_deliberations.jsonl carries the full raw reasoning.
+_ACTION_REASON_CHARS = 200
+_PLAN_SUMMARY_CHARS = 300
+_PARSE_FAILURE_RAW_CHARS = 500
+# Full LLM completion text on successful deliberation (PROVIDER_CALL events).
+# 4 KB covers the typical JSON action plan plus a reasoning preamble; longer
+# completions are tail-truncated rather than head-truncated so the parsed
+# action JSON remains visible.
+_RAW_OUTPUT_CHARS = 4096
+
 
 class TickResult(BaseModel):
     """Summary of a single game tick."""
@@ -99,6 +111,7 @@ class RLEGameLoop:
         )
         self._parse_successes = 0
         self._parse_failures = 0
+        self._role_timeout_s = config.role_timeout_s
         self._log_dir: Path | None = None
         self._deliberation_log: list[dict[str, object]] = []
         self._parallel = parallel
@@ -158,25 +171,59 @@ class RLEGameLoop:
             extra["score"] = f"{snapshot.composite:.3f}"
         self._visualizer.render(tick=tick, day=day, extra_info=extra)
 
+    async def _deliberate_agent_with_timeout(
+        self, agent: RimWorldRoleAgent, state: object,
+        current_time: float, tick_num: int,
+    ) -> tuple[RimWorldRoleAgent, ActionPlan | None]:
+        """Run one agent's deliberation in a worker thread with a hard timeout.
+
+        On timeout: emits a deliberation_timeout ERROR event, records a
+        provider_error entry in _deliberation_log, and returns (agent, None)
+        so the tick can continue. The hung thread keeps running until the
+        provider's own timeout cleans it up (Python threads can't be killed).
+        """
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(
+                    self._deliberate_agent, agent, state, current_time, tick_num,
+                ),
+                timeout=self._role_timeout_s,
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Agent %s deliberation timed out after %.1fs (tick %d)",
+                agent.ROLE_NAME, self._role_timeout_s, tick_num,
+            )
+            self._parse_failures += 1
+            self._deliberation_log.append({
+                "tick": tick_num, "agent": agent.ROLE_NAME,
+                "status": "deliberation_timeout",
+                "reason": f"timed out after {self._role_timeout_s}s",
+            })
+            self._emit(
+                EventType.ERROR, tick_num, agent=agent.ROLE_NAME,
+                error_type="deliberation_timeout",
+                reason=f"timed out after {self._role_timeout_s}s",
+                timeout_s=self._role_timeout_s,
+            )
+            return agent, None
+
     async def _deliberate_parallel(
         self, state: object, current_time: float, tick_num: int,
     ) -> list[tuple[RimWorldRoleAgent, ActionPlan | None]]:
-        """Run role agents concurrently via asyncio.to_thread."""
+        """Run role agents concurrently in worker threads with per-task timeout."""
+        return list(await asyncio.gather(*[
+            self._deliberate_agent_with_timeout(a, state, current_time, tick_num)
+            for a in self._role_agents
+        ]))
 
-        async def _run(agent: RimWorldRoleAgent) -> tuple[RimWorldRoleAgent, ActionPlan | None]:
-            return await asyncio.to_thread(
-                self._deliberate_agent, agent, state, current_time, tick_num,
-            )
-
-        return list(await asyncio.gather(*[_run(a) for a in self._role_agents]))
-
-    def _deliberate_sequential(
+    async def _deliberate_sequential(
         self, state: object, current_time: float, tick_num: int,
     ) -> list[tuple[RimWorldRoleAgent, ActionPlan | None]]:
         """Run role agents one at a time. Agents read context from their spokes."""
         results: list[tuple[RimWorldRoleAgent, ActionPlan | None]] = []
         for agent in self._role_agents:
-            agent_result, plan = self._deliberate_agent(
+            agent_result, plan = await self._deliberate_agent_with_timeout(
                 agent, state, current_time, tick_num,
             )
             results.append((agent_result, plan))
@@ -200,14 +247,18 @@ class RLEGameLoop:
                 agent.ROLE_NAME, tick_num, e.reason,
             )
             self._parse_failures += 1
+            raw_truncated = (
+                e.raw_content[:_PARSE_FAILURE_RAW_CHARS] if e.raw_content else None
+            )
             self._deliberation_log.append({
                 "tick": tick_num, "agent": agent.ROLE_NAME,
                 "status": "parse_failure", "reason": e.reason,
-                "raw": e.raw_content[:500] if e.raw_content else None,
+                "raw": raw_truncated,
             })
             self._emit(
                 EventType.ERROR, tick_num, agent=agent.ROLE_NAME,
                 error_type="parse_failure", reason=e.reason, latency_ms=latency_ms,
+                raw=raw_truncated,
             )
             return agent, None
         except ProviderError as e:
@@ -229,21 +280,25 @@ class RLEGameLoop:
 
         latency_ms = round((_time.monotonic() - t0) * 1000, 1)
         self._parse_successes += 1
+        actions_payload = [
+            {"type": a.action_type, "target": a.target_colonist_id,
+             "priority": a.priority, "reason": a.reason[:_ACTION_REASON_CHARS]}
+            for a in plan.actions
+        ]
+        summary_truncated = plan.summary[:_PLAN_SUMMARY_CHARS]
         self._deliberation_log.append({
             "tick": tick_num, "agent": plan.role,
             "status": "success", "confidence": plan.confidence,
             "num_actions": len(plan.actions),
-            "actions": [
-                {"type": a.action_type, "target": a.target_colonist_id,
-                 "priority": a.priority, "reason": a.reason[:200]}
-                for a in plan.actions
-            ],
-            "summary": plan.summary[:300],
+            "actions": actions_payload,
+            "summary": summary_truncated,
         })
         self._emit(
             EventType.DELIBERATION, tick_num, agent=plan.role,
             latency_ms=latency_ms, confidence=plan.confidence,
             num_actions=len(plan.actions),
+            actions=actions_payload,
+            summary=summary_truncated,
         )
 
         # Record token usage for cost tracking and event log
@@ -254,9 +309,19 @@ class RLEGameLoop:
             if isinstance(pt, int) and isinstance(ct, int):
                 if self._cost_tracker:
                     self._cost_tracker.record_raw(pt, ct)
+                raw_output = agent._last_raw_output
+                raw_output_truncated = (
+                    raw_output[:_RAW_OUTPUT_CHARS] if raw_output else None
+                )
+                was_truncated = (
+                    raw_output is not None
+                    and len(raw_output) > _RAW_OUTPUT_CHARS
+                )
                 self._emit(
                     EventType.PROVIDER_CALL, tick_num, agent=plan.role,
                     prompt_tokens=pt, completion_tokens=ct,
+                    raw_output=raw_output_truncated,
+                    raw_output_truncated=was_truncated,
                 )
 
         return agent, plan
@@ -420,9 +485,9 @@ class RLEGameLoop:
                     sse_type=evt.event_type, sse_data=str(evt.data)[:200],
                 )
 
-            # 4a. MapAnalyst deliberates FIRST (sequential)
+            # 4a. MapAnalyst deliberates FIRST (sequential, timeout-wrapped)
             if self._map_analyst:
-                ma_agent, ma_plan = self._deliberate_agent(
+                ma_agent, ma_plan = await self._deliberate_agent_with_timeout(
                     self._map_analyst, state, current_time, tick_num,
                 )
                 if ma_plan is not None:
@@ -456,7 +521,7 @@ class RLEGameLoop:
             if self._parallel:
                 results = await self._deliberate_parallel(state, current_time, tick_num)
             else:
-                results = self._deliberate_sequential(state, current_time, tick_num)
+                results = await self._deliberate_sequential(state, current_time, tick_num)
 
             # Collect plans, update visualizer, send via CentralPost
             for agent, plan in results:
@@ -643,3 +708,13 @@ class RLEGameLoop:
     @property
     def metric_context(self) -> MetricContext:
         return self._metric_context
+
+    @property
+    def deliberation_log(self) -> list[dict[str, object]]:
+        """Per-tick agent deliberation records (status, actions, reasons, summary).
+
+        Returns a shallow copy. Each entry has keys: tick, agent, status,
+        plus status-specific fields (actions, summary, confidence for success;
+        raw, reason for parse_failure; reason for provider_error).
+        """
+        return list(self._deliberation_log)

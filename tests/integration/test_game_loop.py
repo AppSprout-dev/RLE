@@ -26,6 +26,7 @@ from rle.scenarios.evaluator import ScenarioEvaluator
 from rle.scenarios.schema import FailureCondition, ScenarioConfig, TriggeredIncident
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.recorder import TimeSeriesRecorder
+from rle.tracking.event_log import EventLog, EventType
 
 # ------------------------------------------------------------------
 # Test data
@@ -325,6 +326,145 @@ class TestMultiAgent:
         assert len(results) == 3
         # 7 agents * 3 ticks = 21 provider calls
         assert provider.complete.call_count == 21
+
+    async def test_deliberation_log_property_returns_per_tick_records(self) -> None:
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(
+                transport=_make_transport(), base_url="http://test",
+            )
+            loop = RLEGameLoop(config, client, agents)
+            await loop.run(max_ticks=2)
+
+        log = loop.deliberation_log
+        # 7 agents * 2 ticks = 14 deliberation records
+        assert len(log) == 14
+        # Each entry has the required keys
+        for entry in log:
+            assert "tick" in entry
+            assert "agent" in entry
+            assert "status" in entry
+        # Property returns a copy: mutating the result doesn't change loop state
+        log.clear()
+        assert len(loop.deliberation_log) == 14
+
+    async def test_deliberation_event_carries_actions_and_summary(
+        self, tmp_path: object,
+    ) -> None:
+        """A2: DELIBERATION events in the JSONL must include actions[] + summary."""
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        log_path = tmp_path / "events.jsonl"  # type: ignore[attr-defined]
+        with EventLog(log_path) as event_log:
+            async with RimAPIClient("http://test") as client:
+                client._client = httpx.AsyncClient(
+                    transport=_make_transport(), base_url="http://test",
+                )
+                loop = RLEGameLoop(config, client, agents, event_log=event_log)
+                await loop.run_tick()
+
+            deliberations = [
+                e for e in event_log.events
+                if e.event_type == EventType.DELIBERATION
+            ]
+
+        # 7 agents = 7 deliberation events emitted
+        assert len(deliberations) == 7
+        for event in deliberations:
+            assert "actions" in event.data
+            assert "summary" in event.data
+            assert isinstance(event.data["actions"], list)
+            # Each action entry has the rich payload (type, target, priority, reason)
+            for action in event.data["actions"]:
+                assert "type" in action
+                assert "priority" in action
+                assert "reason" in action
+
+    async def test_role_timeout_emits_event_and_other_agents_continue(
+        self, tmp_path: object,
+    ) -> None:
+        """A7: a hung deliberation must time out, emit ERROR with
+        error_type=deliberation_timeout, and leave the rest of the tick
+        operational. The hung thread keeps running in the background — we
+        check only the orchestrator-visible behaviour."""
+        # Slow provider: blocks for 5s on every call. role_timeout_s=0.05
+        # forces the timeout long before the call completes.
+        slow_provider = MagicMock(spec=BaseProvider)
+
+        def _slow_complete(*_args: object, **_kwargs: object) -> CompletionResult:
+            import time as _t
+            _t.sleep(5.0)
+            return CompletionResult(
+                content=ACTION_PLAN_JSON, model="mock",
+                usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+            )
+
+        slow_provider.complete.side_effect = _slow_complete
+        slow_provider.provider_name = "openai"
+
+        agents = _make_all_agents(slow_provider)
+        config = RLEConfig(tick_interval=0.0, role_timeout_s=0.05)
+
+        log_path = tmp_path / "events.jsonl"  # type: ignore[attr-defined]
+        with EventLog(log_path) as event_log:
+            async with RimAPIClient("http://test") as client:
+                client._client = httpx.AsyncClient(
+                    transport=_make_transport(), base_url="http://test",
+                )
+                loop = RLEGameLoop(config, client, agents, event_log=event_log)
+                # Tick completes even though every agent is hung
+                result = await loop.run_tick()
+
+            timeouts = [
+                e for e in event_log.events
+                if e.event_type == EventType.ERROR
+                and e.data.get("error_type") == "deliberation_timeout"
+            ]
+
+        # All 7 agents (MapAnalyst + 6 role agents) time out
+        assert len(timeouts) == 7
+        for event in timeouts:
+            assert event.data["timeout_s"] == pytest.approx(0.05)
+        # Merged plan has zero actions because no agent contributed
+        assert len(result.plan.actions) == 0
+
+    async def test_provider_call_event_carries_raw_output(
+        self, tmp_path: object,
+    ) -> None:
+        """A3: PROVIDER_CALL events include raw_output (truncated) for replay."""
+        provider = _make_mock_provider()
+        agents = _make_all_agents(provider)
+        config = RLEConfig(tick_interval=0.0)
+
+        log_path = tmp_path / "events.jsonl"  # type: ignore[attr-defined]
+        with EventLog(log_path) as event_log:
+            async with RimAPIClient("http://test") as client:
+                client._client = httpx.AsyncClient(
+                    transport=_make_transport(), base_url="http://test",
+                )
+                loop = RLEGameLoop(config, client, agents, event_log=event_log)
+                await loop.run_tick()
+
+            provider_calls = [
+                e for e in event_log.events
+                if e.event_type == EventType.PROVIDER_CALL
+            ]
+
+        # Each agent that produced usage info should emit a PROVIDER_CALL
+        assert len(provider_calls) >= 1
+        for event in provider_calls:
+            assert "raw_output" in event.data
+            assert "raw_output_truncated" in event.data
+            # Mock provider returns the canned ACTION_PLAN_JSON — verify it's there
+            assert event.data["raw_output"] is not None
+            assert "actions" in event.data["raw_output"]
+            # Mock output is well under 4KB → truncation flag stays False
+            assert event.data["raw_output_truncated"] is False
 
 
 # ------------------------------------------------------------------

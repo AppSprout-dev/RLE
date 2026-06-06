@@ -37,6 +37,14 @@ class CostSnapshot(BaseModel):
     estimated_cost_usd: float
     wall_time_s: float
     num_calls: int
+    # Pricing inputs surfaced in the summary so consumers can recompute or
+    # spot-check that estimates aren't using a stale or zero price.
+    prompt_price_per_token: float
+    completion_price_per_token: float
+    pricing_source: str
+    """One of: "openrouter_api", "override", "unknown". "unknown" indicates
+    the live fetch failed or the model wasn't in /models — in that case the
+    estimated_cost_usd will be $0 and should be ignored."""
 
 
 class CostTracker:
@@ -47,9 +55,12 @@ class CostTracker:
         model: str,
         prompt_price: float = 0.0,
         completion_price: float = 0.0,
+        pricing_source: str = "unknown",
     ) -> None:
+        self._model = model
         self._prompt_price = prompt_price
         self._completion_price = completion_price
+        self._pricing_source = pricing_source
         self._total_prompt = 0
         self._total_completion = 0
         self._num_calls = 0
@@ -79,6 +90,9 @@ class CostTracker:
             estimated_cost_usd=round(cost, 6),
             wall_time_s=round(time.monotonic() - self._start_time, 2),
             num_calls=self._num_calls,
+            prompt_price_per_token=self._prompt_price,
+            completion_price_per_token=self._completion_price,
+            pricing_source=self._pricing_source,
         )
 
 
@@ -111,7 +125,46 @@ async def fetch_pricing(model: str, timeout: float = 10.0) -> tuple[float, float
         return (0.0, 0.0)
 
 
-async def create_cost_tracker(model: str) -> CostTracker:
-    """Create a CostTracker with pricing fetched from OpenRouter."""
-    prompt_price, completion_price = await fetch_pricing(model)
-    return CostTracker(model, prompt_price, completion_price)
+async def create_cost_tracker(
+    model: str,
+    *,
+    prompt_price_override: float | None = None,
+    completion_price_override: float | None = None,
+) -> CostTracker:
+    """Create a CostTracker with pricing fetched from OpenRouter (or overridden).
+
+    Both overrides accept per-TOKEN prices (USD). Use the CLI flags
+    ``--prompt-price-per-mtok`` / ``--completion-price-per-mtok`` for the more
+    human-readable per-million-tokens unit; conversion happens in the scripts.
+
+    The actual prices used (and their source) are logged at INFO level so
+    operators can spot stale or zero pricing without parsing the run summary.
+    """
+    if prompt_price_override is not None and completion_price_override is not None:
+        prompt_price = prompt_price_override
+        completion_price = completion_price_override
+        source = "override"
+    else:
+        prompt_price, completion_price = await fetch_pricing(model)
+        source = (
+            "openrouter_api"
+            if (prompt_price > 0 or completion_price > 0)
+            else "unknown"
+        )
+        if source == "unknown":
+            logger.warning(
+                "Cost tracker for %r resolved to $0/token — estimated_cost "
+                "will be $0. Pass --prompt-price-per-mtok / "
+                "--completion-price-per-mtok to override.",
+                model,
+            )
+        else:
+            logger.info(
+                "Cost tracker for %r: prompt=$%.2f/MTok completion=$%.2f/MTok "
+                "(source=%s)",
+                model,
+                prompt_price * 1_000_000,
+                completion_price * 1_000_000,
+                source,
+            )
+    return CostTracker(model, prompt_price, completion_price, pricing_source=source)

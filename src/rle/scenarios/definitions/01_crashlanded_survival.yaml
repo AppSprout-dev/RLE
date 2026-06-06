@@ -5,20 +5,17 @@ expected_duration_days: 30
 initial_population: 3
 max_ticks: 300
 save_name: rle_crashlanded_v1
-
 victory_conditions:
-  - metric: days_survived
-    operator: ">="
-    value: 30
-  - metric: survival_rate
-    operator: ">="
-    value: 0.33
-
+- metric: days_survived
+  operator: '>='
+  value: 30
+- metric: survival_rate
+  operator: '>='
+  value: 0.33
 failure_conditions:
-  - metric: all_colonists_dead
-    operator: "=="
-    value: 1
-
+- metric: all_colonists_dead
+  operator: ==
+  value: 1
 scoring_weights:
   survival: 0.24
   food_security: 0.12
@@ -30,3 +27,4 @@ scoring_weights:
   efficiency: 0.04
   coordination: 0.12
   communication_efficiency: 0.08
+save_sha256: 29530cd8e5f373b50f9ee51617bc0b036de97f95c9fd3264a2bbd5939a133d4e
