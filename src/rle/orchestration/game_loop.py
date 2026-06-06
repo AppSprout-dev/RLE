@@ -500,13 +500,39 @@ class RLEGameLoop:
 
         # 7. Execute merged plan
         exec_result = await self._executor.execute(resolved)
-        for i, action in enumerate(resolved.actions):
-            success = i < exec_result.executed
+        for outcome in exec_result.outcomes:
             self._emit(
                 EventType.ACTION_EXEC, tick_num,
-                action_type=action.action_type,
-                target=action.target_colonist_id,
-                success=success,
+                action_type=outcome.action_type,
+                target=outcome.target_colonist_id,
+                success=outcome.success,
+                error=outcome.error,
+            )
+
+        # 7b. Surface per-action errors back to agents so they can avoid
+        # re-proposing the same invalid action next tick (e.g. researching
+        # an already-finished project, setting priority for a disabled work type).
+        failed_outcomes = [o for o in exec_result.outcomes if not o.success and o.error]
+        if failed_outcomes:
+            error_summary = "; ".join(
+                f"{o.action_type}({o.target_colonist_id or '-'}): {o.error}"
+                for o in failed_outcomes[:10]
+            )
+            self._spoke_manager.broadcast_message(
+                MessageType.STATUS_UPDATE,
+                {
+                    "tick": state.colony.tick,
+                    "summary": f"Last tick action errors — DO NOT REPEAT: {error_summary}",
+                    "action_errors": [
+                        {
+                            "action_type": o.action_type,
+                            "target_colonist_id": o.target_colonist_id,
+                            "error": o.error,
+                        }
+                        for o in failed_outcomes
+                    ],
+                },
+                sender_id="hub",
             )
 
         # 8. Score this tick

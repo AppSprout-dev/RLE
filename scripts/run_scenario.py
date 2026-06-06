@@ -153,16 +153,26 @@ async def main(args: argparse.Namespace) -> None:
             print(f"Loading save: {scenario.save_name}")
             try:
                 await client.load_game(scenario.save_name)
-                # Wait for RIMAPI to respond, then poll until colonists are loaded
+                # Wait for RIMAPI to respond, then poll until colonists are loaded.
+                # Then wait ~10s of stable state before any writes: RIMAPI returns
+                # HTTP 200 before Unity's main thread has finished applying the load,
+                # and writes that race the settle window get 500'd.
                 await wait_for_rimapi(config.rimapi_url, timeout=30.0)
-                for _ in range(15):
+                stable_count = 0
+                last_population = -1
+                for _ in range(30):
                     await asyncio.sleep(2)
                     try:
                         colony = await client.get_colony()
-                        if colony.population > 0:
-                            break
+                        if colony.population > 0 and colony.population == last_population:
+                            stable_count += 1
+                            if stable_count >= 5:
+                                break
+                        else:
+                            stable_count = 0
+                        last_population = colony.population
                     except Exception:
-                        pass
+                        stable_count = 0
                 # Unforbid all starting items so colonists can use them
                 unforbid_count = await client.unforbid_all_items()
                 if unforbid_count:
