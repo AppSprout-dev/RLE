@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from felix_agent_sdk import LLMResult
 from felix_agent_sdk.core import HelixGeometry
-from felix_agent_sdk.providers.types import CompletionResult
+from felix_agent_sdk.providers.types import CompletionResult, MessageRole
 
 from rle.agents.actions import ActionPlan, ActionPlanParseError
 from rle.agents.base_role import RimWorldRoleAgent
@@ -64,6 +64,46 @@ class TestConstruction:
     ) -> None:
         agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
         assert agent._last_action_plan is None
+
+
+# ------------------------------------------------------------------
+# no-think prefill gating
+# ------------------------------------------------------------------
+
+
+class TestNoThinkPrefill:
+    def test_prefill_appended_for_openai_provider(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        mock_provider.provider_name = "openai"
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        agent.set_no_think(True)
+        agent._call_provider("sys", "user", 0.5, 100)
+
+        messages = mock_provider.complete.call_args[0][0]
+        assert messages[-1].role == MessageRole.ASSISTANT
+        assert messages[-1].content == "</think>"
+
+    def test_prefill_skipped_for_anthropic_provider(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        mock_provider.provider_name = "anthropic"
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        agent.set_no_think(True)
+        agent._call_provider("sys", "user", 0.5, 100)
+
+        messages = mock_provider.complete.call_args[0][0]
+        assert all(m.role != MessageRole.ASSISTANT for m in messages)
+
+    def test_no_prefill_when_disabled(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        mock_provider.provider_name = "openai"
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        agent._call_provider("sys", "user", 0.5, 100)
+
+        messages = mock_provider.complete.call_args[0][0]
+        assert all(m.role != MessageRole.ASSISTANT for m in messages)
 
 
 # ------------------------------------------------------------------

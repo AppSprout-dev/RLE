@@ -36,6 +36,7 @@ class RLEConfig(BaseSettings):
     model: str = "claude-sonnet-4-5"
     provider_base_url: str | None = None
     openrouter_api_key: str | None = None
+    anthropic_api_key: str | None = None
     tick_interval: float = 1.0
     role_timeout_s: float = 60.0
     """Max wall-clock seconds for a single agent's deliberation. Hung LLM
@@ -77,3 +78,13 @@ def bridge_openrouter_key(config: RLEConfig) -> None:
     """If OPENROUTER_API_KEY is set but OPENAI_API_KEY isn't, bridge them."""
     if config.openrouter_api_key and not os.environ.get("OPENAI_API_KEY"):
         os.environ["OPENAI_API_KEY"] = config.openrouter_api_key
+
+
+def bridge_anthropic_key(config: RLEConfig) -> None:
+    """Export ANTHROPIC_API_KEY from .env so the felix provider can read it.
+
+    pydantic-settings loads .env into the config object but not into
+    os.environ, which is where AnthropicProvider looks for the key.
+    """
+    if config.anthropic_api_key and not os.environ.get("ANTHROPIC_API_KEY"):
+        os.environ["ANTHROPIC_API_KEY"] = config.anthropic_api_key

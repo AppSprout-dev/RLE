@@ -167,7 +167,12 @@ class RimWorldRoleAgent(LLMAgent):
         self._provider_kwargs = kwargs
 
     def set_no_think(self, enabled: bool = True) -> None:
-        """Enable no-think mode: skips reasoning via </think> assistant prefix."""
+        """Enable no-think mode: skips reasoning via </think> assistant prefix.
+
+        No-op on the anthropic provider: Claude 4.6+ rejects trailing
+        assistant prefills with HTTP 400, and Claude skips reasoning by
+        omitting the thinking param anyway.
+        """
         self._no_think = enabled
 
     def attach_spoke(self, spoke: Spoke) -> None:
@@ -218,7 +223,7 @@ class RimWorldRoleAgent(LLMAgent):
             ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
             ChatMessage(role=MessageRole.USER, content=user_prompt),
         ]
-        if self._no_think:
+        if self._no_think and self.provider.provider_name != "anthropic":
             messages.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content="</think>"),
             )
