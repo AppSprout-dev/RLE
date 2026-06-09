@@ -26,7 +26,7 @@ from rle.agents.medical_officer import MedicalOfficer
 from rle.agents.research_director import ResearchDirector
 from rle.agents.resource_manager import ResourceManager
 from rle.agents.social_overseer import SocialOverseer
-from rle.config import RLEConfig, bridge_openrouter_key
+from rle.config import RLEConfig, bridge_anthropic_key, bridge_openrouter_key
 from rle.orchestration.game_loop import RLEGameLoop
 from rle.rimapi.client import RimAPIClient
 from rle.scenarios.evaluator import ScenarioEvaluator
@@ -356,6 +356,7 @@ def _build_provider(args: argparse.Namespace) -> tuple[BaseProvider, RLEConfig]:
         overrides["provider_base_url"] = args.base_url
     config = RLEConfig(**overrides) if overrides else RLEConfig()
     bridge_openrouter_key(config)
+    bridge_anthropic_key(config)
     return config.get_provider(), config
 
 
@@ -525,10 +526,14 @@ async def main(args: argparse.Namespace) -> None:
 
     num_runs = getattr(args, "runs", 1) or 1
 
+    # extra_body is an OpenAI-compatible escape hatch; the Anthropic API
+    # rejects unknown body fields with 400.
+    effective_provider = args.provider or config.provider
+
     if args.ablation:
         ticks_override = _resolve_ticks(args, use_mock_rimapi)
         provider_kwargs_abl: dict[str, Any] = {}
-        if args.no_think:
+        if args.no_think and effective_provider != "anthropic":
             provider_kwargs_abl["extra_body"] = {
                 "chat_template_kwargs": {"enable_thinking": False},
             }
@@ -553,7 +558,7 @@ async def main(args: argparse.Namespace) -> None:
 
     # Build provider kwargs (e.g. no-think for Qwen3.5)
     provider_kwargs: dict[str, Any] = {}
-    if args.no_think:
+    if args.no_think and effective_provider != "anthropic":
         provider_kwargs["extra_body"] = {
             "chat_template_kwargs": {"enable_thinking": False},
         }
