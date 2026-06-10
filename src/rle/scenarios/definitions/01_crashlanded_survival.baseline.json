@@ -1,0 +1,4702 @@
+{
+  "scenario_name": "Crashlanded Survival",
+  "n_runs": 4,
+  "seeds": [
+    42,
+    43,
+    44,
+    45
+  ],
+  "outcomes": [
+    "defeat",
+    "defeat",
+    "defeat",
+    "defeat"
+  ],
+  "time_to_end_days_mean": 8.0,
+  "time_to_end_days_ci95": [
+    4.5,
+    11.5
+  ],
+  "score_trajectory": [
+    {
+      "tick": 0,
+      "composite_mean": 0.86575,
+      "composite_ci95": [
+        0.8654499999999999,
+        0.8659
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.95,
+        "mood": 0.52275,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 1,
+      "composite_mean": 0.8694999999999999,
+      "composite_ci95": [
+        0.8677,
+        0.8704
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.945,
+        "mood": 0.5585,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 2,
+      "composite_mean": 0.8583,
+      "composite_ci95": [
+        0.85615,
+        0.86115
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.9,
+        "mood": 0.5105,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 3,
+      "composite_mean": 0.8472,
+      "composite_ci95": [
+        0.8428,
+        0.855075
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.895,
+        "mood": 0.42300000000000004,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 4,
+      "composite_mean": 0.846025,
+      "composite_ci95": [
+        0.841575,
+        0.8537
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.895,
+        "mood": 0.41325,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 5,
+      "composite_mean": 0.838875,
+      "composite_ci95": [
+        0.8318,
+        0.846025
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.865,
+        "mood": 0.3835,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 6,
+      "composite_mean": 0.8423,
+      "composite_ci95": [
+        0.8276749999999999,
+        0.851075
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.87,
+        "mood": 0.40725,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 7,
+      "composite_mean": 0.838425,
+      "composite_ci95": [
+        0.827375,
+        0.84795
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.845,
+        "mood": 0.39999999999999997,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 8,
+      "composite_mean": 0.8303,
+      "composite_ci95": [
+        0.8202,
+        0.8358000000000001
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.7925,
+        "mood": 0.3845,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 9,
+      "composite_mean": 0.830425,
+      "composite_ci95": [
+        0.822575,
+        0.8364
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.79,
+        "mood": 0.38825,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 10,
+      "composite_mean": 0.827175,
+      "composite_ci95": [
+        0.82335,
+        0.831
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.745,
+        "mood": 0.40625,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 11,
+      "composite_mean": 0.8239,
+      "composite_ci95": [
+        0.8205,
+        0.82715
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.74,
+        "mood": 0.38375000000000004,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 12,
+      "composite_mean": 0.820275,
+      "composite_ci95": [
+        0.81625,
+        0.8243
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.7175,
+        "mood": 0.376,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 13,
+      "composite_mean": 0.814025,
+      "composite_ci95": [
+        0.811325,
+        0.81575
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.705,
+        "mood": 0.3365,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 14,
+      "composite_mean": 0.8104,
+      "composite_ci95": [
+        0.8086249999999999,
+        0.811675
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.695,
+        "mood": 0.3165,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 15,
+      "composite_mean": 0.8104750000000001,
+      "composite_ci95": [
+        0.8060750000000001,
+        0.81385
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.67,
+        "mood": 0.34199999999999997,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 16,
+      "composite_mean": 0.813625,
+      "composite_ci95": [
+        0.81165,
+        0.8156
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.6675,
+        "mood": 0.37075,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 17,
+      "composite_mean": 0.8192,
+      "composite_ci95": [
+        0.8114,
+        0.83145
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.675,
+        "mood": 0.40975,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 18,
+      "composite_mean": 0.82005,
+      "composite_ci95": [
+        0.8122,
+        0.8336250000000001
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.6699999999999999,
+        "mood": 0.42175,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 19,
+      "composite_mean": 0.82085,
+      "composite_ci95": [
+        0.8111499999999999,
+        0.83415
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.6699999999999999,
+        "mood": 0.4285,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 20,
+      "composite_mean": 0.816675,
+      "composite_ci95": [
+        0.8052,
+        0.829725
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.6599999999999999,
+        "mood": 0.40375,
+        "research": 0.2258,
+        "self_sufficiency": 0.6667,
+        "survival": 1.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 21,
+      "composite_mean": 0.7976,
+      "composite_ci95": [
+        0.753275,
+        0.8273250000000001
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.7275,
+        "mood": 0.42725,
+        "research": 0.2258,
+        "self_sufficiency": 0.5833499999999999,
+        "survival": 0.916675,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 22,
+      "composite_mean": 0.797725,
+      "composite_ci95": [
+        0.756875,
+        0.82595
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.7224999999999999,
+        "mood": 0.43325,
+        "research": 0.2258,
+        "self_sufficiency": 0.5833499999999999,
+        "survival": 0.916675,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 23,
+      "composite_mean": 0.798475,
+      "composite_ci95": [
+        0.76335,
+        0.8226749999999999
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.7175,
+        "mood": 0.4445,
+        "research": 0.2258,
+        "self_sufficiency": 0.5833499999999999,
+        "survival": 0.916675,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 24,
+      "composite_mean": 0.7966249999999999,
+      "composite_ci95": [
+        0.76245,
+        0.820175
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.7175,
+        "mood": 0.429,
+        "research": 0.2258,
+        "self_sufficiency": 0.5833499999999999,
+        "survival": 0.916675,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 25,
+      "composite_mean": 0.772975,
+      "composite_ci95": [
+        0.7331,
+        0.8128500000000001
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8075,
+        "mood": 0.392,
+        "research": 0.2258,
+        "self_sufficiency": 0.5,
+        "survival": 0.83335,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 26,
+      "composite_mean": 0.75875,
+      "composite_ci95": [
+        0.7006,
+        0.8113999999999999
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8075,
+        "mood": 0.44,
+        "research": 0.2258,
+        "self_sufficiency": 0.5,
+        "survival": 0.75,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 27,
+      "composite_mean": 0.749825,
+      "composite_ci95": [
+        0.675775,
+        0.80995
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8075,
+        "mood": 0.36575,
+        "research": 0.2258,
+        "self_sufficiency": 0.5,
+        "survival": 0.75,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 28,
+      "composite_mean": 0.750875,
+      "composite_ci95": [
+        0.68045,
+        0.8082
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8075,
+        "mood": 0.3745,
+        "research": 0.2258,
+        "self_sufficiency": 0.5,
+        "survival": 0.75,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 29,
+      "composite_mean": 0.702975,
+      "composite_ci95": [
+        0.6538999999999999,
+        0.74255
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.9625,
+        "mood": 0.32025,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.5833499999999999,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 30,
+      "composite_mean": 0.7031499999999999,
+      "composite_ci95": [
+        0.6573249999999999,
+        0.7422
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.9625,
+        "mood": 0.32175,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.5833499999999999,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 31,
+      "composite_mean": 0.7381,
+      "composite_ci95": [
+        0.69035,
+        0.7826500000000001
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8875,
+        "mood": 0.438,
+        "research": 0.2258,
+        "self_sufficiency": 0.41664999999999996,
+        "survival": 0.666675,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 32,
+      "composite_mean": 0.736625,
+      "composite_ci95": [
+        0.686225,
+        0.7839999999999999
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8875,
+        "mood": 0.42575,
+        "research": 0.2258,
+        "self_sufficiency": 0.41664999999999996,
+        "survival": 0.666675,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 33,
+      "composite_mean": 0.7025250000000001,
+      "composite_ci95": [
+        0.6668499999999999,
+        0.7382
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.44575,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.5,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 34,
+      "composite_mean": 0.70835,
+      "composite_ci95": [
+        0.6797500000000001,
+        0.73695
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49424999999999997,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.5,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 35,
+      "composite_mean": 0.70425,
+      "composite_ci95": [
+        0.6699999999999999,
+        0.7384999999999999
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.46025,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.5,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 36,
+      "composite_mean": 0.70455,
+      "composite_ci95": [
+        0.6709,
+        0.7382
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.46275,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.5,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 37,
+      "composite_mean": 0.688525,
+      "composite_ci95": [
+        0.6663,
+        0.726075
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49575,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.41664999999999996,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 38,
+      "composite_mean": 0.682125,
+      "composite_ci95": [
+        0.6536,
+        0.726075
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.4425,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.41664999999999996,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 39,
+      "composite_mean": 0.6816249999999999,
+      "composite_ci95": [
+        0.6571,
+        0.724125
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.43825,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.41664999999999996,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 40,
+      "composite_mean": 0.6391,
+      "composite_ci95": [
+        0.533325,
+        0.723275
+      ],
+      "n_runs": 4,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.875,
+        "mood": 0.45899999999999996,
+        "research": 0.2258,
+        "self_sufficiency": 0.249975,
+        "survival": 0.333325,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 41,
+      "composite_mean": 0.7126666666666667,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.9733333333333333,
+        "mood": 0.446,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.5555666666666667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 42,
+      "composite_mean": 0.6972333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.513,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 43,
+      "composite_mean": 0.6955333333333332,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49866666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 44,
+      "composite_mean": 0.6932333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.4796666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 45,
+      "composite_mean": 0.6932333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.4796666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 46,
+      "composite_mean": 0.6932333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.4796666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 47,
+      "composite_mean": 0.6912333333333334,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.463,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 48,
+      "composite_mean": 0.6908333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.45966666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 49,
+      "composite_mean": 0.6932333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.4796666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 50,
+      "composite_mean": 0.7056333333333334,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.5830000000000001,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 51,
+      "composite_mean": 0.7072333333333334,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.5963333333333334,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 52,
+      "composite_mean": 0.7052333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.5796666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 53,
+      "composite_mean": 0.6979666666666667,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.519,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 54,
+      "composite_mean": 0.6928333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.4763333333333333,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 55,
+      "composite_mean": 0.6908333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.45966666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 56,
+      "composite_mean": 0.6908333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.45966666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 57,
+      "composite_mean": 0.6888333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.746
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.443,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 58,
+      "composite_mean": 0.6843333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.7325
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.4053333333333333,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 59,
+      "composite_mean": 0.6993,
+      "composite_ci95": [
+        0.6551,
+        0.7241
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.53,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 60,
+      "composite_mean": 0.7025333333333333,
+      "composite_ci95": [
+        0.6551,
+        0.7271
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.557,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 61,
+      "composite_mean": 0.6994333333333334,
+      "composite_ci95": [
+        0.6551,
+        0.7252
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.9833333333333334,
+        "mood": 0.5476666666666666,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 62,
+      "composite_mean": 0.6873999999999999,
+      "composite_ci95": [
+        0.6551,
+        0.7139000000000001
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.9833333333333334,
+        "mood": 0.44733333333333336,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 63,
+      "composite_mean": 0.6833,
+      "composite_ci95": [
+        0.6551,
+        0.7113999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.39666666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 64,
+      "composite_mean": 0.6865,
+      "composite_ci95": [
+        0.6551,
+        0.7113999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.42333333333333334,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 65,
+      "composite_mean": 0.6863,
+      "composite_ci95": [
+        0.6551,
+        0.7113999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.42166666666666663,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 66,
+      "composite_mean": 0.6845,
+      "composite_ci95": [
+        0.6551,
+        0.7113999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.4066666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 67,
+      "composite_mean": 0.6845,
+      "composite_ci95": [
+        0.6551,
+        0.7113999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.4066666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 68,
+      "composite_mean": 0.6972999999999999,
+      "composite_ci95": [
+        0.6551,
+        0.7254
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.5133333333333333,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 69,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 70,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 71,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 72,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 73,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 74,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 75,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 76,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 77,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 78,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 79,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 80,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 81,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 82,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 83,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 84,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 85,
+      "composite_mean": 0.6953,
+      "composite_ci95": [
+        0.6551,
+        0.7193999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.49666666666666665,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 86,
+      "composite_mean": 0.6941,
+      "composite_ci95": [
+        0.6551,
+        0.7158000000000001
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.48666666666666664,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 87,
+      "composite_mean": 0.6941,
+      "composite_ci95": [
+        0.6551,
+        0.7158000000000001
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.48666666666666664,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 88,
+      "composite_mean": 0.6927666666666666,
+      "composite_ci95": [
+        0.6551,
+        0.7117999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.47533333333333333,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 89,
+      "composite_mean": 0.6904666666666667,
+      "composite_ci95": [
+        0.6551,
+        0.7113999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.4563333333333333,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 90,
+      "composite_mean": 0.6881666666666666,
+      "composite_ci95": [
+        0.6551,
+        0.7113999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.437,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.4444333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 91,
+      "composite_mean": 0.6185,
+      "composite_ci95": [
+        0.48900000000000005,
+        0.7113999999999999
+      ],
+      "n_runs": 3,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8333333333333334,
+        "mood": 0.3566666666666667,
+        "research": 0.2258,
+        "self_sufficiency": 0.22219999999999998,
+        "survival": 0.3333333333333333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 92,
+      "composite_mean": 0.6813,
+      "composite_ci95": [
+        0.6512,
+        0.7114
+      ],
+      "n_runs": 2,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.26849999999999996,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.5,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 93,
+      "composite_mean": 0.6002000000000001,
+      "composite_ci95": [
+        0.489,
+        0.7114
+      ],
+      "n_runs": 2,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.75,
+        "mood": 0.34299999999999997,
+        "research": 0.2258,
+        "self_sufficiency": 0.16665,
+        "survival": 0.33335,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 94,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 95,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 96,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 97,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 98,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 99,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 100,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 101,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 102,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 103,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 104,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 105,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 106,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 107,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 108,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 109,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 110,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 111,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 112,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 113,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 114,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 115,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 116,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 117,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 118,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 119,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 120,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 121,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 122,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 123,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 124,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 125,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 126,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 127,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 128,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 129,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 130,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 131,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 132,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 133,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 134,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 135,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 136,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 137,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 138,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 139,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 140,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 141,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 142,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 143,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 144,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 145,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 146,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 147,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 148,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 149,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 150,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 151,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 152,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 153,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 154,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 155,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 156,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 157,
+      "composite_mean": 0.7114,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.186,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 158,
+      "composite_mean": 0.7092,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.168,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 159,
+      "composite_mean": 0.7088,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.165,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 160,
+      "composite_mean": 0.7106,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.18,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 161,
+      "composite_mean": 0.6516,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.355,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 162,
+      "composite_mean": 0.6447,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.297,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 163,
+      "composite_mean": 0.6378,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.24,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 164,
+      "composite_mean": 0.6334,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.203,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 165,
+      "composite_mean": 0.6334,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.203,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 166,
+      "composite_mean": 0.6317,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.189,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 167,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 168,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 169,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 170,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 171,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 172,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 173,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 174,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 175,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 176,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 177,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 178,
+      "composite_mean": 0.6274,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.153,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 179,
+      "composite_mean": 0.6324,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.195,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 180,
+      "composite_mean": 0.637,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.233,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 181,
+      "composite_mean": 0.637,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.233,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 182,
+      "composite_mean": 0.637,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.233,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 183,
+      "composite_mean": 0.637,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.233,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 184,
+      "composite_mean": 0.637,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.233,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 185,
+      "composite_mean": 0.637,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.233,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 186,
+      "composite_mean": 0.637,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.233,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 187,
+      "composite_mean": 0.6296,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.171,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 188,
+      "composite_mean": 0.6226,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.113,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 189,
+      "composite_mean": 0.6158,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.056,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 190,
+      "composite_mean": 0.6118,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.023,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 191,
+      "composite_mean": 0.6101,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.009,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 192,
+      "composite_mean": 0.6107,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.014,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 193,
+      "composite_mean": 0.6118,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.023,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 194,
+      "composite_mean": 0.6118,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.023,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 195,
+      "composite_mean": 0.6167,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.064,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 196,
+      "composite_mean": 0.6138,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.04,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 197,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 198,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 199,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 200,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 201,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 202,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 203,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 204,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 205,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 206,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 207,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 208,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 209,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 210,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 211,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 212,
+      "composite_mean": 0.6194,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.086,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 213,
+      "composite_mean": 0.6298,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.173,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 214,
+      "composite_mean": 0.6401,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.259,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 215,
+      "composite_mean": 0.6506,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.346,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 216,
+      "composite_mean": 0.6562,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.393,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 217,
+      "composite_mean": 0.6562,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.393,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 218,
+      "composite_mean": 0.6671,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.484,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 219,
+      "composite_mean": 0.6701,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.509,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 220,
+      "composite_mean": 0.6761,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.559,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 221,
+      "composite_mean": 0.6761,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.559,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 222,
+      "composite_mean": 0.6761,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.559,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 223,
+      "composite_mean": 0.6404,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.261,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 224,
+      "composite_mean": 0.6101,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.009,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 225,
+      "composite_mean": 0.7019,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.82,
+        "mood": 0.287,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 226,
+      "composite_mean": 0.699,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8,
+        "mood": 0.283,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 227,
+      "composite_mean": 0.6944,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8,
+        "mood": 0.245,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 228,
+      "composite_mean": 0.6944,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8,
+        "mood": 0.245,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 229,
+      "composite_mean": 0.692,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.78,
+        "mood": 0.245,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 230,
+      "composite_mean": 0.689,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.78,
+        "mood": 0.22,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 231,
+      "composite_mean": 0.6854,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.75,
+        "mood": 0.22,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 232,
+      "composite_mean": 0.692,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.8,
+        "mood": 0.225,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 233,
+      "composite_mean": 0.6896,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.78,
+        "mood": 0.225,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 234,
+      "composite_mean": 0.6852,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.75,
+        "mood": 0.218,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 235,
+      "composite_mean": 0.683,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.75,
+        "mood": 0.2,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 236,
+      "composite_mean": 0.6848,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.72,
+        "mood": 0.245,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 237,
+      "composite_mean": 0.6818,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.72,
+        "mood": 0.22,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 238,
+      "composite_mean": 0.6794,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.7,
+        "mood": 0.22,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 239,
+      "composite_mean": 0.6794,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.7,
+        "mood": 0.22,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 240,
+      "composite_mean": 0.6782,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.7,
+        "mood": 0.21,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.6667,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 241,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 242,
+      "composite_mean": 0.609,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 1.0,
+        "mood": 0.0,
+        "research": 0.2258,
+        "self_sufficiency": 0.3333,
+        "survival": 0.3333,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    },
+    {
+      "tick": 243,
+      "composite_mean": 0.489,
+      "composite_ci95": null,
+      "n_runs": 1,
+      "metric_means": {
+        "communication_efficiency": 1.0,
+        "coordination": 1.0,
+        "efficiency": 1.0,
+        "food_security": 0.5,
+        "mood": 0.5,
+        "research": 0.2258,
+        "self_sufficiency": 0.0,
+        "survival": 0.0,
+        "threat_response": 1.0,
+        "wealth": 1.0
+      }
+    }
+  ],
+  "recorded_on": "2026-06-10T08:27:55.211068+00:00",
+  "save_sha256": "29530cd8e5f373b50f9ee51617bc0b036de97f95c9fd3264a2bbd5939a133d4e",
+  "rimapi_dll_sha256": "8b26c3820e37bb21ae7227094a7e84fce52ef1099c913899c39a6c78c8f0f4e1",
+  "rle_commit": "1961e91",
+  "scoring_version": "1.1"
+}
