@@ -1,4 +1,4 @@
-"""Integration tests for the full RLE game loop."""
+﻿"""Integration tests for the full RLE game loop."""
 
 from __future__ import annotations
 
@@ -152,6 +152,7 @@ def _make_mock_provider() -> MagicMock:
         model="mock",
         usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
     )
+    provider.acomplete.return_value = provider.complete.return_value
     return provider
 
 
@@ -229,7 +230,7 @@ class TestMultipleTicks:
             loop = RLEGameLoop(config, client, [agent])
             await loop.run(max_ticks=5)
 
-        assert provider.complete.call_count == 5
+        assert provider.acomplete.call_count == 5
 
 
 class TestMacroTime:
@@ -307,7 +308,7 @@ class TestMultiAgent:
             result = await loop.run_tick()
 
         # Provider called once per agent (1 MapAnalyst + 6 role agents)
-        assert provider.complete.call_count == 7
+        assert provider.acomplete.call_count == 7
         # Result is merged plan from orchestrator
         assert result.plan.role == "orchestrator"
 
@@ -325,7 +326,7 @@ class TestMultiAgent:
 
         assert len(results) == 3
         # 7 agents * 3 ticks = 21 provider calls
-        assert provider.complete.call_count == 21
+        assert provider.acomplete.call_count == 21
 
     async def test_deliberation_log_property_returns_per_tick_records(self) -> None:
         provider = _make_mock_provider()
@@ -390,21 +391,20 @@ class TestMultiAgent:
     ) -> None:
         """A7: a hung deliberation must time out, emit ERROR with
         error_type=deliberation_timeout, and leave the rest of the tick
-        operational. The hung thread keeps running in the background — we
-        check only the orchestrator-visible behaviour."""
+        operational. The in-flight provider request is cancelled by the
+        timeout â€” we check only the orchestrator-visible behaviour."""
         # Slow provider: blocks for 5s on every call. role_timeout_s=0.05
         # forces the timeout long before the call completes.
         slow_provider = MagicMock(spec=BaseProvider)
 
-        def _slow_complete(*_args: object, **_kwargs: object) -> CompletionResult:
-            import time as _t
-            _t.sleep(5.0)
+        async def _slow_acomplete(*_args: object, **_kwargs: object) -> CompletionResult:
+            await asyncio.sleep(5.0)
             return CompletionResult(
                 content=ACTION_PLAN_JSON, model="mock",
                 usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
             )
 
-        slow_provider.complete.side_effect = _slow_complete
+        slow_provider.acomplete.side_effect = _slow_acomplete
         slow_provider.provider_name = "openai"
 
         agents = _make_all_agents(slow_provider)
@@ -460,10 +460,10 @@ class TestMultiAgent:
         for event in provider_calls:
             assert "raw_output" in event.data
             assert "raw_output_truncated" in event.data
-            # Mock provider returns the canned ACTION_PLAN_JSON — verify it's there
+            # Mock provider returns the canned ACTION_PLAN_JSON â€” verify it's there
             assert event.data["raw_output"] is not None
             assert "actions" in event.data["raw_output"]
-            # Mock output is well under 4KB → truncation flag stays False
+            # Mock output is well under 4KB â†’ truncation flag stays False
             assert event.data["raw_output_truncated"] is False
 
 
@@ -550,7 +550,7 @@ class TestScoredLoop:
             )
             results = await loop.run(max_ticks=100)
 
-        # population=3, initial=10 → survival=0.3 < 0.5 → defeat on first tick
+        # population=3, initial=10 â†’ survival=0.3 < 0.5 â†’ defeat on first tick
         assert len(results) == 1
         assert loop.evaluation_result is not None
         assert loop.evaluation_result.outcome == "defeat"
@@ -591,7 +591,7 @@ class TestParallelDeliberation:
             loop = RLEGameLoop(config, client, agents, parallel=True)
             result = await loop.run_tick()
 
-        assert provider.complete.call_count == 7  # 1 MapAnalyst + 6 role agents
+        assert provider.acomplete.call_count == 7  # 1 MapAnalyst + 6 role agents
         assert result.plan.role == "orchestrator"
         assert loop._parse_successes == 7
         assert loop._parse_failures == 0
@@ -629,7 +629,7 @@ class TestParallelDeliberation:
             loop = RLEGameLoop(config, client, agents, parallel=False)
             result = await loop.run_tick()
 
-        assert provider.complete.call_count == 7  # 1 MapAnalyst + 6 role agents
+        assert provider.acomplete.call_count == 7  # 1 MapAnalyst + 6 role agents
         assert result.plan.role == "orchestrator"
         assert loop._parse_successes == 7
 
@@ -646,7 +646,7 @@ class TestParallelDeliberation:
             results = await loop.run(max_ticks=3)
 
         assert len(results) == 3
-        assert provider.complete.call_count == 21  # 7 agents * 3 ticks
+        assert provider.acomplete.call_count == 21  # 7 agents * 3 ticks
 
 
 # ------------------------------------------------------------------
@@ -757,7 +757,7 @@ class TestScheduledIncidents:
             for _ in range(3):
                 await loop.run_tick()
 
-        # Test passes if all 3 ticks completed without raising — end-to-end
+        # Test passes if all 3 ticks completed without raising â€” end-to-end
         # wiring verification. See test_fire_scheduled_incidents_calls_client
         # below for assertion on actual call arguments.
 
@@ -772,7 +772,7 @@ class TestScheduledIncidents:
             client._client = httpx.AsyncClient(
                 transport=_make_transport(), base_url="http://test",
             )
-            # Empty list — no incidents should fire
+            # Empty list â€” no incidents should fire
             loop = RLEGameLoop(config, client, [agent], triggered_incidents=[])
             result = await loop.run_tick()
 
@@ -800,18 +800,18 @@ class TestScheduledIncidents:
             ],
         )
 
-        # Tick 4 — should NOT fire
+        # Tick 4 â€” should NOT fire
         await loop._fire_scheduled_incidents(4)
         mock_client.trigger_incident.assert_not_awaited()
 
-        # Tick 5 — SHOULD fire Plague
+        # Tick 5 â€” SHOULD fire Plague
         await loop._fire_scheduled_incidents(5)
         mock_client.trigger_incident.assert_awaited_once_with(
             "Plague", map_id=0,
             custom_letter_label="Plague outbreak",
         )
 
-        # Tick 6 — should NOT fire again
+        # Tick 6 â€” should NOT fire again
         mock_client.trigger_incident.reset_mock()
         await loop._fire_scheduled_incidents(6)
         mock_client.trigger_incident.assert_not_awaited()
@@ -836,6 +836,6 @@ class TestScheduledIncidents:
             ],
         )
 
-        # Should NOT raise — the game loop catches exceptions and logs
+        # Should NOT raise â€” the game loop catches exceptions and logs
         await loop._fire_scheduled_incidents(3)
         mock_client.trigger_incident.assert_awaited_once()

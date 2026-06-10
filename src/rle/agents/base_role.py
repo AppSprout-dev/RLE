@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
+import time
 from abc import abstractmethod
 from typing import Any, ClassVar, Tuple
 
 from felix_agent_sdk import LLMAgent, LLMResult, LLMTask
 from felix_agent_sdk.communication import Spoke
 from felix_agent_sdk.core import HelixGeometry
+from felix_agent_sdk.events.types import EventType
 from felix_agent_sdk.providers.base import BaseProvider
 from felix_agent_sdk.providers.types import ChatMessage, CompletionResult, MessageRole
 from felix_agent_sdk.tokens.budget import TokenBudget
@@ -227,14 +230,8 @@ class RimWorldRoleAgent(LLMAgent):
             })
         return context
 
-    def _call_provider(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        temperature: float,
-        max_tokens: int,
-    ) -> CompletionResult:
-        """Override to pass extra provider kwargs and no-think prefix."""
+    def _build_messages(self, system_prompt: str, user_prompt: str) -> list[ChatMessage]:
+        """Build the message list, including the no-think prefill when enabled."""
         messages = [
             ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
             ChatMessage(role=MessageRole.USER, content=user_prompt),
@@ -246,6 +243,22 @@ class RimWorldRoleAgent(LLMAgent):
             messages.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content="</think>"),
             )
+        return messages
+
+    def _record_completion(self, result: CompletionResult) -> CompletionResult:
+        self._last_raw_output = result.content
+        self._last_usage = result.usage if hasattr(result, "usage") else None
+        return result
+
+    def _call_provider(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> CompletionResult:
+        """Override to pass extra provider kwargs and no-think prefix."""
+        messages = self._build_messages(system_prompt, user_prompt)
 
         def _do_complete() -> CompletionResult:
             return self.provider.complete(
@@ -261,9 +274,40 @@ class RimWorldRoleAgent(LLMAgent):
         else:
             result = _do_complete()
 
-        self._last_raw_output = result.content
-        self._last_usage = result.usage if hasattr(result, "usage") else None
-        return result
+        return self._record_completion(result)
+
+    async def _acall_provider(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        temperature: float,
+        max_tokens: int,
+    ) -> CompletionResult:
+        """Async mirror of ``_call_provider`` using the provider's native
+        ``acomplete()`` (felix 0.3.0). Providers without async support fall
+        back to running the sync path in a worker thread.
+        """
+        messages = self._build_messages(system_prompt, user_prompt)
+
+        async def _do_complete() -> CompletionResult:
+            return await self.provider.acomplete(
+                messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **self._provider_kwargs,
+            )
+
+        try:
+            if self._weave_op is not None:
+                result: CompletionResult = await self._weave_op(_do_complete)()
+            else:
+                result = await _do_complete()
+        except NotImplementedError:
+            return await asyncio.to_thread(
+                self._call_provider, system_prompt, user_prompt, temperature, max_tokens,
+            )
+
+        return self._record_completion(result)
 
     # ------------------------------------------------------------------
     # Abstract methods — subclasses must implement
@@ -603,20 +647,118 @@ class RimWorldRoleAgent(LLMAgent):
         self._last_action_plan = plan
         return plan
 
-    def _retry_with_correction(self, bad_output: str, error: str) -> LLMResult:
-        """Retry with a short correction prompt asking the LLM to fix its JSON."""
-        system_prompt = (
-            "You previously produced invalid JSON. Fix the error and return ONLY "
-            "valid JSON matching the required schema. No explanation, no markdown."
+    async def adeliberate(
+        self,
+        state: GameState,
+        current_time: float,
+        context_history: list[dict[str, Any]] | None = None,
+    ) -> ActionPlan:
+        """Async mirror of ``deliberate()`` — the LLM call runs on the event
+        loop via the provider's native ``acomplete()`` (felix 0.3.0), so a
+        timeout cancellation actually aborts the request instead of leaving
+        an orphaned worker thread.
+        """
+        if not hasattr(self, "_state") or self._state.value == "waiting":
+            self.spawn(current_time)
+        self.update_position(current_time)
+
+        spoke_context = self._get_spoke_context()
+        effective_context = spoke_context if spoke_context else (context_history or [])
+        task = self.build_task(state, effective_context)
+        result = await self.aprocess_task(task)
+
+        try:
+            plan = self.parse_action_plan(result, state.colony.tick)
+        except ActionPlanParseError as first_error:
+            logger.warning(
+                "%s: parse failed, retrying with correction prompt: %s",
+                self.ROLE_NAME, first_error.reason,
+            )
+            try:
+                retry_result = await self._aretry_with_correction(
+                    result.content, first_error.reason,
+                )
+                plan = self.parse_action_plan(retry_result, state.colony.tick)
+            except (ActionPlanParseError, Exception) as retry_error:
+                raise ActionPlanParseError(
+                    result.content, f"Retry also failed: {retry_error}",
+                ) from retry_error
+
+        self._last_action_plan = plan
+        return plan
+
+    async def aprocess_task(self, task: LLMTask) -> LLMResult:
+        """Async mirror of ``LLMAgent.process_task()`` using ``_acall_provider``.
+
+        Replicates the SDK's sync pipeline (events, adaptive temperature,
+        confidence, accounting) — the SDK exposes async only at the provider
+        layer, not on LLMAgent.
+        """
+        start = time.perf_counter()
+
+        self.emit_event(
+            EventType.TASK_STARTED,
+            {"task_id": task.task_id, "agent_type": self.agent_type},
+            source=f"agent:{self.agent_id}",
         )
-        user_prompt = (
+
+        temperature = self.get_adaptive_temperature()
+        system_prompt, user_prompt = self.create_position_aware_prompt(task)
+
+        completion = await self._acall_provider(
+            system_prompt, user_prompt, temperature, self.max_tokens,
+        )
+
+        confidence = self.calculate_confidence(completion.content)
+        self.record_confidence(confidence)
+
+        elapsed = time.perf_counter() - start
+        self.total_tokens_used += completion.total_tokens
+        self.total_processing_time += elapsed
+
+        result = LLMResult(
+            agent_id=self.agent_id,
+            task_id=task.task_id,
+            content=completion.content,
+            position_info=self.get_position_info(),
+            completion_result=completion,
+            processing_time=elapsed,
+            confidence=confidence,
+            temperature_used=temperature,
+            token_budget_used=completion.total_tokens,
+        )
+        self.processing_results.append(result)
+
+        self.emit_event(
+            EventType.TASK_COMPLETED,
+            {
+                "task_id": task.task_id,
+                "agent_type": self.agent_type,
+                "confidence": round(confidence, 4),
+                "temperature": round(temperature, 4),
+                "tokens": completion.total_tokens,
+                "processing_time": round(elapsed, 4),
+                "phase": result.position_info.get("phase", ""),
+            },
+            source=f"agent:{self.agent_id}",
+        )
+
+        return result
+
+    _CORRECTION_SYSTEM_PROMPT = (
+        "You previously produced invalid JSON. Fix the error and return ONLY "
+        "valid JSON matching the required schema. No explanation, no markdown."
+    )
+
+    @staticmethod
+    def _correction_user_prompt(bad_output: str, error: str) -> str:
+        return (
             f"Your previous output had this error: {error}\n\n"
             f"Original output (fix this):\n{bad_output[:2000]}\n\n"
             "Return ONLY the corrected JSON object."
         )
-        completion = self._call_provider(
-            system_prompt, user_prompt, temperature=0.1, max_tokens=self.max_tokens,
-        )
+
+    def _make_retry_result(self, completion: CompletionResult) -> LLMResult:
         self.total_tokens_used += completion.total_tokens
         return LLMResult(
             agent_id=self.agent_id,
@@ -629,3 +771,21 @@ class RimWorldRoleAgent(LLMAgent):
             temperature_used=0.1,
             token_budget_used=completion.total_tokens,
         )
+
+    def _retry_with_correction(self, bad_output: str, error: str) -> LLMResult:
+        """Retry with a short correction prompt asking the LLM to fix its JSON."""
+        completion = self._call_provider(
+            self._CORRECTION_SYSTEM_PROMPT,
+            self._correction_user_prompt(bad_output, error),
+            temperature=0.1, max_tokens=self.max_tokens,
+        )
+        return self._make_retry_result(completion)
+
+    async def _aretry_with_correction(self, bad_output: str, error: str) -> LLMResult:
+        """Async mirror of ``_retry_with_correction``."""
+        completion = await self._acall_provider(
+            self._CORRECTION_SYSTEM_PROMPT,
+            self._correction_user_prompt(bad_output, error),
+            temperature=0.1, max_tokens=self.max_tokens,
+        )
+        return self._make_retry_result(completion)
