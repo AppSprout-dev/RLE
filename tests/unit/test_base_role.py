@@ -84,10 +84,11 @@ class TestNoThinkPrefill:
         assert messages[-1].role == MessageRole.ASSISTANT
         assert messages[-1].content == "</think>"
 
-    def test_prefill_skipped_for_anthropic_provider(
-        self, mock_provider: MagicMock, helix: HelixGeometry,
+    @pytest.mark.parametrize("provider_name", ["anthropic", "claudecode"])
+    def test_prefill_skipped_for_prefill_rejecting_providers(
+        self, mock_provider: MagicMock, helix: HelixGeometry, provider_name: str,
     ) -> None:
-        mock_provider.provider_name = "anthropic"
+        mock_provider.provider_name = provider_name
         agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
         agent.set_no_think(True)
         agent._call_provider("sys", "user", 0.5, 100)

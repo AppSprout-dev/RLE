@@ -33,6 +33,16 @@ class TestBridgeAnthropicKey:
         assert "ANTHROPIC_API_KEY" not in os.environ
 
 
+class TestProviderRegistry:
+    def test_claude_code_provider_registered(self) -> None:
+        from rle.providers.claude_code import ClaudeCodeProvider
+
+        config = RLEConfig(provider="claude-code", model="claude-fable-5")
+        provider = config.get_provider()
+        assert isinstance(provider, ClaudeCodeProvider)
+        assert provider.model == "claude-fable-5"
+
+
 class TestBridgeOpenRouterKey:
     def test_exports_key_to_process_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("OPENAI_API_KEY", "sentinel")

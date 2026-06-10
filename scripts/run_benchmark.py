@@ -786,7 +786,7 @@ if __name__ == "__main__":
         help="(WIP) Run ablation study: full benchmark + 7 single-agent-removed runs",
     )
     parser.add_argument(
-        "--provider", choices=["anthropic", "openai", "local"],
+        "--provider", choices=["anthropic", "openai", "local", "claude-code"],
         help="LLM provider (default: from config)",
     )
     parser.add_argument("--model", help="Model name (e.g. qwen/qwen3.5-9b)")
