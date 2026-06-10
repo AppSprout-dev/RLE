@@ -737,3 +737,39 @@ class TestPowerInfoNotCalledTwice:
         assert call_count == 1, (
             f"power_info should be fetched once per tick, got {call_count}"
         )
+
+
+class TestTerrainSummaryPinning:
+    """Issue #26: the first terrain summary is pinned for the client lifetime."""
+
+    _TERRAIN = {
+        "width": 10, "height": 10,
+        "palette": ["Soil", "WaterMovingShallow", "SoilRich", "Granite_Rough"],
+        "grid": [100, 0],
+        "floor_palette": [], "floor_grid": [100, 0],
+    }
+
+    async def test_summary_pinned_across_center_changes(self) -> None:
+        from unittest.mock import AsyncMock
+
+        client = RimAPIClient("http://test")
+        client._get = AsyncMock(return_value=dict(self._TERRAIN))  # type: ignore[method-assign]
+
+        first = await client.get_terrain_summary(colonist_positions=[(2, 2)])
+        second = await client.get_terrain_summary(colonist_positions=[(8, 8)])
+
+        assert first is not None
+        assert second is first  # pinned object, not recomputed
+        client._get.assert_awaited_once()  # terrain fetched exactly once
+
+    async def test_failed_fetch_does_not_pin(self) -> None:
+        from unittest.mock import AsyncMock
+
+        client = RimAPIClient("http://test")
+        client._get = AsyncMock(  # type: ignore[method-assign]
+            side_effect=RimAPIConnectionError("down"),
+        )
+        assert await client.get_terrain_summary() is None
+
+        client._get = AsyncMock(return_value=dict(self._TERRAIN))  # type: ignore[method-assign]
+        assert await client.get_terrain_summary() is not None

@@ -64,6 +64,7 @@ class RimAPIClient:
     def __init__(self, base_url: str = "http://localhost:8765") -> None:
         self._base_url = base_url.rstrip("/")
         self._client: httpx.AsyncClient | None = None
+        self._terrain_summary_pin: TerrainSummary | None = None
 
     async def __aenter__(self) -> RimAPIClient:
         self._client = httpx.AsyncClient(base_url=self._base_url, timeout=10.0)
@@ -686,7 +687,14 @@ class RimAPIClient:
 
         Decodes the RLE terrain grid, classifies tiles, and finds the best
         areas for building, farming, and stockpiling near the colony center.
+
+        The first successful summary is pinned for the client's lifetime:
+        terrain is static, and re-deriving the colony center from live pawn
+        positions every tick made the recommended sites chase the builders —
+        10 shelter blueprints at 10 locations, none completed (issue #26).
         """
+        if self._terrain_summary_pin is not None:
+            return self._terrain_summary_pin
         try:
             data = await self._get(f"/api/v1/map/terrain?map_id={map_id}")
             if not isinstance(data, dict):
@@ -803,13 +811,15 @@ class RimAPIClient:
             # Stockpile: buildable 5x5 near center
             stockpile = _find_clear_rect(cx, cz, 5, _is_buildable)
 
-            return TerrainSummary(
+            summary = TerrainSummary(
                 colony_center=(cx, cz),
                 water_areas=water_areas,
                 recommended_shelter=shelter,
                 recommended_farm=farm,
                 recommended_stockpile=stockpile,
             )
+            self._terrain_summary_pin = summary
+            return summary
         except (RimAPIResponseError, RimAPIConnectionError):
             return None
 

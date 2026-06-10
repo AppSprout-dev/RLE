@@ -39,6 +39,7 @@ class ActionOutcome(BaseModel):
     target_colonist_id: str | None = None
     success: bool
     error: str | None = None
+    parameters: dict[str, Any] = {}
 
 
 class ExecutionResult(BaseModel):
@@ -62,6 +63,31 @@ def _extract_rimapi_error(detail: str) -> str:
     if isinstance(errors, list) and errors:
         return str(errors[0])
     return detail
+
+
+def _normalize_work_priorities(params: dict[str, Any]) -> dict[str, int]:
+    """Accept the parameter shapes models actually emit for work_priority.
+
+    Documented shape is flat ``{"<WorkType>": <1-4>}``, but frontier models
+    also emit ``{"work_type": "Research", "priority": 2}`` and
+    ``{"work_priorities": {"Growing": 1, ...}}`` (issue #27). Passing those
+    through verbatim posted garbage like work="work_type" to RIMAPI.
+    """
+    nested = params.get("work_priorities")
+    if isinstance(nested, dict):
+        return {str(work): int(pri) for work, pri in nested.items()}
+    if "work_type" in params:
+        return {str(params["work_type"]): int(params.get("priority", 1))}
+    flat = {
+        str(work): int(pri) for work, pri in params.items()
+        if isinstance(pri, int) and not isinstance(pri, bool)
+    }
+    if not flat:
+        raise ValueError(
+            'work_priority requires {"<WorkType>": <1-4>} parameters '
+            "(e.g. {\"Growing\": 1})"
+        )
+    return flat
 
 
 class ActionExecutor:
@@ -93,6 +119,7 @@ class ActionExecutor:
                     endpoint=endpoint,
                     target_colonist_id=action.target_colonist_id,
                     success=True,
+                    parameters=action.parameters,
                 ))
             except RimAPIResponseError as exc:
                 logger.warning("Action %s failed: %s", endpoint, exc.detail)
@@ -103,6 +130,7 @@ class ActionExecutor:
                     target_colonist_id=action.target_colonist_id,
                     success=False,
                     error=_extract_rimapi_error(exc.detail),
+                    parameters=action.parameters,
                 ))
             except Exception as exc:
                 logger.warning("Action %s failed", endpoint, exc_info=True)
@@ -113,6 +141,7 @@ class ActionExecutor:
                     target_colonist_id=action.target_colonist_id,
                     success=False,
                     error=str(exc) or type(exc).__name__,
+                    parameters=action.parameters,
                 ))
         return ExecutionResult(
             executed=executed,
@@ -149,7 +178,9 @@ class ActionExecutor:
     # -- Specialized handlers (parameter mapping for complex DTOs) -----------
 
     async def _h_work_priority(self, cid: str, params: dict[str, Any]) -> None:
-        await self._client.set_work_priorities(cid, params)
+        await self._client.set_work_priorities(
+            cid, _normalize_work_priorities(params),
+        )
 
     async def _h_draft(self, cid: str, params: dict[str, Any]) -> None:
         is_drafted = params.get("is_drafted", True)
@@ -159,11 +190,21 @@ class ActionExecutor:
         await self._client.move_colonist(cid, params.get("x", 0), params.get("z", 0))
 
     async def _h_job_assign(self, cid: str, params: dict[str, Any]) -> None:
+        # Models emit "job" as often as the documented "job_def" (issue #27);
+        # posting an empty JobDef is a guaranteed RIMAPI error.
+        job = params.get("job_def") or params.get("job") or ""
+        if not job:
+            raise ValueError(
+                'job_assign requires a "job_def" parameter (e.g. "Sow", "Mine")'
+            )
+        target_position = params.get("target_position")
+        if target_position is None and "x" in params and "z" in params:
+            target_position = (int(params["x"]), int(params["z"]))
         await self._client.set_colonist_job(
             cid,
-            job=params.get("job_def", ""),
+            job=str(job),
             target_thing_id=params.get("target_thing_id"),
-            target_position=params.get("target_position"),
+            target_position=target_position,
         )
 
     async def _h_time_assignment(self, cid: str, params: dict[str, Any]) -> None:
