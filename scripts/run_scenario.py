@@ -37,6 +37,10 @@ from rle.tracking.metadata import collect_metadata
 
 DEFINITIONS_DIR = Path(__file__).parent.parent / "src" / "rle" / "scenarios" / "definitions"
 
+# Runaway guard for --until-death runs (the evaluator's terminal conditions
+# are the intended stop; this only catches a colony that never dies or wins).
+_UNTIL_DEATH_SAFETY_CAP = 5000
+
 
 def _find_scenario(query: str) -> Path:
     """Find a scenario YAML by name prefix or number."""
@@ -196,7 +200,15 @@ async def main(args: argparse.Namespace) -> None:
                 agent.agent_id, label=display["label"], color=display["color"],
             )
 
-    max_ticks = args.ticks or scenario.max_ticks
+    if args.until_death:
+        # Natural-conclusion mode (Phase B): no scenario tick cap — the run
+        # ends when the evaluator hits a terminal condition (all colonists
+        # dead, or victory). The safety cap only guards against a runaway
+        # loop if the colony somehow never reaches either.
+        scenario = scenario.model_copy(update={"max_ticks": None})
+        max_ticks = args.ticks or _UNTIL_DEATH_SAFETY_CAP
+    else:
+        max_ticks = args.ticks or scenario.max_ticks
 
     # Initialize tracking (optional, when --output is specified)
     event_log: EventLog | None = None
@@ -390,6 +402,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-agent", action="store_true",
         help="Baseline mode: no agent deliberation, colony runs unmanaged",
+    )
+    parser.add_argument(
+        "--until-death", action="store_true",
+        help="Ignore the scenario tick cap; run until the evaluator reaches "
+             "a terminal condition (all colonists dead, or victory). "
+             "Phase B natural-conclusion mode.",
     )
     parser.add_argument(
         "--no-pause", action="store_true",
