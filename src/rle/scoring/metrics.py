@@ -19,6 +19,9 @@ class MetricContext:
     tick_results: list[TickResult] = field(default_factory=list)
     state_history: list[GameState] = field(default_factory=list)
     threats_seen: list[ThreatData] = field(default_factory=list)
+    # Loop tick at which each threat was first observed (issue #25)
+    threat_seen_tick: dict[str, int] = field(default_factory=dict)
+    # Response delay in loop ticks per threat, recorded when a draft executes
     first_draft_tick: dict[str, int] = field(default_factory=dict)
     initial_wealth: float = 0.0
     # Process metrics (populated by game loop after conflict resolution)

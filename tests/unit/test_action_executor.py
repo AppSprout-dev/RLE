@@ -306,3 +306,103 @@ class TestDispatch:
         client.destroy_rect.assert_awaited_once_with(
             map_id=0, x1=5, z1=5, x2=15, z2=15,
         )
+
+
+class TestWorkPriorityNormalization:
+    """Issue #27: accept the parameter shapes models actually emit."""
+
+    async def test_work_type_shape_normalized(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(Action(
+            action_type="work_priority",
+            target_colonist_id="181",
+            parameters={"work_type": "Research", "priority": 2},
+        ))
+        result = await executor.execute(plan)
+        assert result.executed == 1
+        client.set_work_priorities.assert_awaited_once_with("181", {"Research": 2})
+
+    async def test_nested_work_priorities_shape_normalized(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(Action(
+            action_type="work_priority",
+            target_colonist_id="184",
+            parameters={"work_priorities": {"Growing": 1, "Hauling": 2}},
+        ))
+        result = await executor.execute(plan)
+        assert result.executed == 1
+        client.set_work_priorities.assert_awaited_once_with(
+            "184", {"Growing": 1, "Hauling": 2},
+        )
+
+    async def test_flat_documented_shape_passes_through(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(Action(
+            action_type="work_priority",
+            target_colonist_id="187",
+            parameters={"Cooking": 1, "Hauling": 1},
+        ))
+        result = await executor.execute(plan)
+        assert result.executed == 1
+        client.set_work_priorities.assert_awaited_once_with(
+            "187", {"Cooking": 1, "Hauling": 1},
+        )
+
+    async def test_garbage_params_fail_visibly(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(Action(
+            action_type="work_priority",
+            target_colonist_id="181",
+            parameters={"note": "make Bob research"},
+        ))
+        result = await executor.execute(plan)
+        assert result.failed == 1
+        assert result.outcomes[0].success is False
+        assert "WorkType" in (result.outcomes[0].error or "")
+        client.set_work_priorities.assert_not_awaited()
+
+
+class TestJobAssignNormalization:
+    """Issue #27: 'job' alias accepted, empty JobDef fails visibly."""
+
+    async def test_job_alias_accepted_with_xz_position(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(Action(
+            action_type="job_assign",
+            target_colonist_id="184",
+            parameters={"job": "Sow", "x": 136, "z": 142},
+        ))
+        result = await executor.execute(plan)
+        assert result.executed == 1
+        client.set_colonist_job.assert_awaited_once_with(
+            "184", job="Sow", target_thing_id=None, target_position=(136, 142),
+        )
+
+    async def test_empty_job_fails_visibly(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(Action(
+            action_type="job_assign",
+            target_colonist_id="184",
+            parameters={"x": 136, "z": 142},
+        ))
+        result = await executor.execute(plan)
+        assert result.failed == 1
+        assert "job_def" in (result.outcomes[0].error or "")
+        client.set_colonist_job.assert_not_awaited()
+
+    async def test_outcomes_carry_parameters(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        plan = _make_plan(Action(
+            action_type="job_assign",
+            target_colonist_id="184",
+            parameters={"job_def": "Mine", "x": 204, "z": 6},
+        ))
+        result = await executor.execute(plan)
+        assert result.outcomes[0].parameters == {"job_def": "Mine", "x": 204, "z": 6}

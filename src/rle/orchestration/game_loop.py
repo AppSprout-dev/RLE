@@ -13,7 +13,7 @@ from felix_agent_sdk.providers import ProviderError
 from felix_agent_sdk.visualization import HelixVisualizer
 from pydantic import BaseModel, ConfigDict
 
-from rle.agents.actions import ActionPlan, ActionPlanParseError
+from rle.agents.actions import ActionPlan, ActionPlanParseError, resolve_endpoint
 from rle.agents.base_role import RimWorldRoleAgent
 from rle.config import RLEConfig
 from rle.orchestration.action_executor import ActionExecutor, ExecutionResult
@@ -387,14 +387,46 @@ class RLEGameLoop:
             json.dumps(data, indent=2),
         )
 
-    def _update_metric_context(self, result: TickResult, state: GameState) -> None:
+    def _update_metric_context(
+        self, result: TickResult, state: GameState, tick_num: int,
+    ) -> None:
         """Append tick data to metric context for scoring history."""
-        self._metric_context.tick_results.append(result)
-        self._metric_context.state_history.append(state)
+        ctx = self._metric_context
+        ctx.tick_results.append(result)
+        ctx.state_history.append(state)
+        already_drafted = any(c.is_drafted for c in state.colonists)
+        seen_ids = {t.threat_id for t in ctx.threats_seen}
         for threat in state.threats:
-            seen_ids = {t.threat_id for t in self._metric_context.threats_seen}
-            if threat.threat_id not in seen_ids:
-                self._metric_context.threats_seen.append(threat)
+            # Null incident placeholders (the /incidents endpoint emits them)
+            # are not threats — counting one made threat_response unwinnable
+            # in a run with zero hostiles (issue #25).
+            if threat.enemy_count <= 0 and threat.threat_level <= 0.0:
+                continue
+            if threat.threat_id in seen_ids:
+                continue
+            ctx.threats_seen.append(threat)
+            ctx.threat_seen_tick[threat.threat_id] = tick_num
+            if already_drafted:
+                ctx.first_draft_tick[threat.threat_id] = 0
+
+    def _record_draft_response(
+        self, exec_result: ExecutionResult, tick_num: int,
+    ) -> None:
+        """Record per-threat response delay once a draft action executes (#25)."""
+        drafted = any(
+            o.success
+            and resolve_endpoint(o.action_type) == "draft"
+            and o.parameters.get("is_drafted", True) is not False
+            for o in exec_result.outcomes
+        )
+        if not drafted:
+            return
+        ctx = self._metric_context
+        for threat in ctx.threats_seen:
+            seen = ctx.threat_seen_tick.get(threat.threat_id, tick_num)
+            ctx.first_draft_tick.setdefault(
+                threat.threat_id, max(0, tick_num - seen),
+            )
 
     def _broadcast_phase_if_changed(self, current_time: float) -> None:
         """Broadcast PHASE_ANNOUNCE when macro_time crosses a phase boundary."""
@@ -573,7 +605,11 @@ class RLEGameLoop:
                 target=outcome.target_colonist_id,
                 success=outcome.success,
                 error=outcome.error,
+                parameters=outcome.parameters,
             )
+
+        # 7a. Track draft responses for the threat_response metric (issue #25)
+        self._record_draft_response(exec_result, tick_num)
 
         # 7b. Surface per-action errors back to agents so they can avoid
         # re-proposing the same invalid action next tick (e.g. researching
@@ -658,7 +694,7 @@ class RLEGameLoop:
         self._tick_results.append(result)
 
         # 9. Update metric context and evaluate scenario
-        self._update_metric_context(result, state)
+        self._update_metric_context(result, state, tick_num)
         if self._evaluator:
             eval_result = self._evaluator.evaluate(
                 state, self._metric_context, tick_count=len(self._tick_results),

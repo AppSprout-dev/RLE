@@ -15,10 +15,13 @@ from pathlib import Path
 # metric implementations, or composite math change in a way that makes scores
 # from older runs not directly comparable. The leaderboard re-scores artifacts
 # at the current version on render; mismatches are surfaced, not silently
-# elided. Current scope (1.0): the original 10-metric composite as wired by
-# PR #16 / #18, with coordination + communication_efficiency at the broken
+# elided. 1.1 (issue #25): threat_response now tracks actual draft responses
+# (first_draft_tick wired, was permanently 0.0 once any threat registered)
+# and null incident placeholders (enemy_count=0, threat_level=0.0) no longer
+# count as threats — 1.0 scores with non-empty threats_seen are not
+# comparable. coordination + communication_efficiency remain the broken
 # implementations to be repaired in Phase C.
-SCORING_VERSION = "1.0"
+SCORING_VERSION = "1.1"
 
 # Conventional install path for the RIMAPI Workshop mod we deploy our fork DLL
 # over. Best-effort — if Steam lives elsewhere set the RIMAPI_DLL_PATH env var.
