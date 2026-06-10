@@ -175,6 +175,7 @@ def _make_mock_provider() -> MagicMock:
         content=_MOCK_ACTION_PLAN, model="mock-model",
         usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
     )
+    provider.acomplete.return_value = provider.complete.return_value
     return provider
 
 
