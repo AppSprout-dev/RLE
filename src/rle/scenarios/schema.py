@@ -68,3 +68,42 @@ class ScenarioConfig(BaseModel):
     mismatch unless allow_unpinned=True. Generate via scripts/hash_saves.py."""
     triggered_incidents: list[TriggeredIncident] = []
     setup_commands: list[SetupCommand] = []
+
+
+class BaselinePoint(BaseModel):
+    """One sampled point on a baseline score trajectory (loop-tick indexed)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tick: int
+    composite_mean: float
+    composite_ci95: tuple[float, float] | None = None
+    n_runs: int
+    metric_means: dict[str, float] = {}
+
+
+class BaselineReference(BaseModel):
+    """Pinned no-agent calibration for a scenario (Phase B1).
+
+    Persisted as a .baseline.json sidecar next to the scenario YAML and
+    treated as an immutable scenario property: recharacterize only when the
+    scenario's save_sha256 or SCORING_VERSION changes. Agent runs compute
+    lift against this pinned trajectory instead of re-running baselines.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    scenario_name: str
+    n_runs: int
+    seeds: tuple[int, ...]
+    outcomes: tuple[str, ...]
+    """Per-run terminal outcome ("defeat" = natural colony death,
+    "victory" possible if the unmanaged colony outlasts the scenario)."""
+    time_to_end_days_mean: float
+    time_to_end_days_ci95: tuple[float, float] | None = None
+    score_trajectory: tuple[BaselinePoint, ...]
+    recorded_on: str
+    save_sha256: str | None = None
+    rimapi_dll_sha256: str | None = None
+    rle_commit: str | None = None
+    scoring_version: str

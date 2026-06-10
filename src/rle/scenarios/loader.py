@@ -6,8 +6,8 @@ from pathlib import Path
 
 import yaml
 
-from rle.scenarios.schema import ScenarioConfig
-from rle.tracking.metadata import file_sha256
+from rle.scenarios.schema import BaselineReference, ScenarioConfig
+from rle.tracking.metadata import SCORING_VERSION, file_sha256
 
 # Canonical save mirror (the same files that get baked into the Docker image).
 # Resolves to <repo_root>/docker/saves/. Live game runs may use a save in
@@ -53,6 +53,51 @@ def load_scenario(
             )
 
     return scenario
+
+
+class BaselineMismatchError(RuntimeError):
+    """Raised when a scenario's .baseline.json was calibrated against a
+    different save or scoring version than the scenario currently pins —
+    the baseline must be recharacterized (scripts/calibrate_baseline.py)."""
+
+
+def baseline_path(scenario_path: str | Path) -> Path:
+    """Sidecar .baseline.json path for a scenario YAML path."""
+    return Path(scenario_path).with_suffix(".baseline.json")
+
+
+def load_baseline(
+    scenario_path: str | Path, scenario: ScenarioConfig,
+) -> BaselineReference | None:
+    """Load a scenario's pinned baseline sidecar, if one exists.
+
+    Returns None when no sidecar is present. Fails fast (rather than
+    silently comparing against a stale reference) when the baseline was
+    calibrated against a different save_sha256 or SCORING_VERSION.
+    """
+    path = baseline_path(scenario_path)
+    if not path.is_file():
+        return None
+    ref = BaselineReference.model_validate_json(path.read_text(encoding="utf-8"))
+    if (
+        scenario.save_sha256
+        and ref.save_sha256
+        and ref.save_sha256 != scenario.save_sha256
+    ):
+        raise BaselineMismatchError(
+            f"Baseline {path} was calibrated against save_sha256="
+            f"{ref.save_sha256} but scenario {scenario.name!r} now pins "
+            f"{scenario.save_sha256}. Recharacterize via "
+            f"scripts/calibrate_baseline.py.",
+        )
+    if ref.scoring_version != SCORING_VERSION:
+        raise BaselineMismatchError(
+            f"Baseline {path} was recorded at scoring_version="
+            f"{ref.scoring_version} but the current version is "
+            f"{SCORING_VERSION}. Recharacterize via "
+            f"scripts/calibrate_baseline.py.",
+        )
+    return ref
 
 
 def list_scenarios(
