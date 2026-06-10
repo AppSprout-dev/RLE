@@ -223,7 +223,10 @@ class RimWorldRoleAgent(LLMAgent):
             ChatMessage(role=MessageRole.SYSTEM, content=system_prompt),
             ChatMessage(role=MessageRole.USER, content=user_prompt),
         ]
-        if self._no_think and self.provider.provider_name != "anthropic":
+        if self._no_think and self.provider.provider_name not in (
+            "anthropic",
+            "claudecode",
+        ):
             messages.append(
                 ChatMessage(role=MessageRole.ASSISTANT, content="</think>"),
             )

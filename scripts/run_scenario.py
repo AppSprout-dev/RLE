@@ -370,7 +370,7 @@ if __name__ == "__main__":
     parser.add_argument("scenario", nargs="?", help="Scenario name or number prefix")
     parser.add_argument("--list", action="store_true", help="List available scenarios")
     parser.add_argument(
-        "--provider", choices=["anthropic", "openai", "local"],
+        "--provider", choices=["anthropic", "openai", "local", "claude-code"],
         help="LLM provider (default: from config)",
     )
     parser.add_argument("--model", help="Model name (e.g. unsloth/nvidia-nemotron-3-nano-4b)")

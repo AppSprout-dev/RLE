@@ -13,6 +13,8 @@ from felix_agent_sdk.providers import (
 )
 from pydantic_settings import BaseSettings
 
+from rle.providers.claude_code import ClaudeCodeProvider
+
 _HELIX_PRESETS: dict[str, HelixConfig] = {
     "default": HelixConfig.default(),
     "research_heavy": HelixConfig.research_heavy(),
@@ -23,6 +25,7 @@ _PROVIDER_CLASSES: dict[str, type[BaseProvider]] = {
     "anthropic": AnthropicProvider,
     "openai": OpenAIProvider,
     "local": LocalProvider,
+    "claude-code": ClaudeCodeProvider,
 }
 
 
