@@ -402,3 +402,55 @@ class TestDeliberate:
         assert agent._last_action_plan is plan
         # Provider was called exactly once
         mock_provider.complete.assert_called_once()
+
+
+# ------------------------------------------------------------------
+# adeliberate (async path via provider.acomplete, felix 0.3.0)
+# ------------------------------------------------------------------
+
+
+class TestADeliberate:
+    async def test_full_pipeline_uses_acomplete(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+        sample_game_state: GameState,
+    ) -> None:
+        mock_provider.acomplete.return_value = mock_provider.complete.return_value
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        plan = await agent.adeliberate(sample_game_state, current_time=0.2)
+        assert isinstance(plan, ActionPlan)
+        assert plan.role == "dummy"
+        assert plan.tick == 720000
+        assert agent._last_action_plan is plan
+        mock_provider.acomplete.assert_called_once()
+        mock_provider.complete.assert_not_called()
+
+    async def test_acall_falls_back_to_sync_when_async_unsupported(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        mock_provider.acomplete.side_effect = NotImplementedError("no async")
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        result = await agent._acall_provider("sys", "user", 0.5, 100)
+        assert result is mock_provider.complete.return_value
+        mock_provider.complete.assert_called_once()
+
+    async def test_acall_records_last_output_and_usage(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        completion = mock_provider.complete.return_value
+        mock_provider.acomplete.return_value = completion
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        await agent._acall_provider("sys", "user", 0.5, 100)
+        assert agent._last_raw_output == completion.content
+        assert agent._last_usage == completion.usage
+
+    async def test_acall_applies_no_think_prefill(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        mock_provider.provider_name = "openai"
+        mock_provider.acomplete.return_value = mock_provider.complete.return_value
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        agent.set_no_think(True)
+        await agent._acall_provider("sys", "user", 0.5, 100)
+        messages = mock_provider.acomplete.call_args[0][0]
+        assert messages[-1].role == MessageRole.ASSISTANT
+        assert messages[-1].content == "</think>"

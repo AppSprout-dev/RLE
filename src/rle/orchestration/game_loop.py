@@ -176,18 +176,17 @@ class RLEGameLoop:
         self, agent: RimWorldRoleAgent, state: object,
         current_time: float, tick_num: int,
     ) -> tuple[RimWorldRoleAgent, ActionPlan | None]:
-        """Run one agent's deliberation in a worker thread with a hard timeout.
+        """Run one agent's deliberation with a hard timeout.
 
-        On timeout: emits a deliberation_timeout ERROR event, records a
-        provider_error entry in _deliberation_log, and returns (agent, None)
-        so the tick can continue. The hung thread keeps running until the
-        provider's own timeout cleans it up (Python threads can't be killed).
+        Deliberation is natively async (felix 0.3.0 ``acomplete()``), so a
+        timeout cancels the in-flight provider request instead of leaving an
+        orphaned worker thread. On timeout: emits a deliberation_timeout
+        ERROR event, records it in _deliberation_log, and returns
+        (agent, None) so the tick can continue.
         """
         try:
             return await asyncio.wait_for(
-                asyncio.to_thread(
-                    self._deliberate_agent, agent, state, current_time, tick_num,
-                ),
+                self._deliberate_agent(agent, state, current_time, tick_num),
                 timeout=self._role_timeout_s,
             )
         except asyncio.TimeoutError:
@@ -212,7 +211,7 @@ class RLEGameLoop:
     async def _deliberate_parallel(
         self, state: object, current_time: float, tick_num: int,
     ) -> list[tuple[RimWorldRoleAgent, ActionPlan | None]]:
-        """Run role agents concurrently in worker threads with per-task timeout."""
+        """Run role agents concurrently on the event loop with per-task timeout."""
         return list(await asyncio.gather(*[
             self._deliberate_agent_with_timeout(a, state, current_time, tick_num)
             for a in self._role_agents
@@ -230,17 +229,17 @@ class RLEGameLoop:
             results.append((agent_result, plan))
         return results
 
-    def _deliberate_agent(
+    async def _deliberate_agent(
         self, agent: RimWorldRoleAgent, state: object,
         current_time: float, tick_num: int,
     ) -> tuple[RimWorldRoleAgent, ActionPlan | None]:
-        """Run one agent's deliberation. Thread-safe for parallel execution.
+        """Run one agent's deliberation.
 
         Agents read inter-agent context from their CentralPost spoke internally.
         """
         t0 = _time.monotonic()
         try:
-            plan = agent.deliberate(state, current_time)  # type: ignore[arg-type]
+            plan = await agent.adeliberate(state, current_time)  # type: ignore[arg-type]
         except ActionPlanParseError as e:
             latency_ms = round((_time.monotonic() - t0) * 1000, 1)
             logger.warning(

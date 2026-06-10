@@ -8,6 +8,7 @@ raw completion as the CLI allows.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -84,15 +85,10 @@ class ClaudeCodeProvider(BaseProvider):
                 )
         return "\n\n".join(system_parts), "\n\n".join(user_parts)
 
-    def complete(
-        self,
-        messages: Sequence[ChatMessage],
-        *,
-        temperature: float | None = None,
-        max_tokens: int | None = None,
-        stop_sequences: list[str] | None = None,
-        **kwargs: Any,
-    ) -> CompletionResult:
+    def _build_invocation(
+        self, messages: Sequence[ChatMessage],
+    ) -> tuple[list[str], str, dict[str, str]]:
+        """Build (cmd, stdin_payload, env) for a ``claude -p`` call."""
         cli = self._resolve_cli()
         system_prompt, user_prompt = self._split_messages(messages)
 
@@ -109,6 +105,18 @@ class ClaudeCodeProvider(BaseProvider):
             cmd.extend(["--system-prompt", system_prompt])
 
         env = {k: v for k, v in os.environ.items() if k not in _STRIPPED_ENV_VARS}
+        return cmd, user_prompt, env
+
+    def complete(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        stop_sequences: list[str] | None = None,
+        **kwargs: Any,
+    ) -> CompletionResult:
+        cmd, user_prompt, env = self._build_invocation(messages)
 
         try:
             proc = subprocess.run(
@@ -127,18 +135,68 @@ class ClaudeCodeProvider(BaseProvider):
                 provider=self.provider_name,
             ) from e
 
-        if proc.returncode != 0:
-            detail = (proc.stderr or proc.stdout or "").strip()[-2000:]
+        return self._parse_cli_output(proc.returncode, proc.stdout, proc.stderr)
+
+    async def acomplete(
+        self,
+        messages: Sequence[ChatMessage],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        stop_sequences: list[str] | None = None,
+        **kwargs: Any,
+    ) -> CompletionResult:
+        """Async version of complete(); the CLI subprocess runs without
+        blocking the event loop, and cancellation kills the subprocess."""
+        cmd, user_prompt, env = self._build_invocation(messages)
+
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=self._workdir,
+            env=env,
+        )
+        try:
+            stdout_b, stderr_b = await asyncio.wait_for(
+                proc.communicate(user_prompt.encode("utf-8")),
+                timeout=self.config.timeout,
+            )
+        except asyncio.TimeoutError as e:
+            proc.kill()
+            await proc.wait()
             raise ProviderError(
-                f"claude -p exited with code {proc.returncode}: {detail}",
+                f"claude -p timed out after {self.config.timeout}s",
+                provider=self.provider_name,
+            ) from e
+        except asyncio.CancelledError:
+            proc.kill()
+            await proc.wait()
+            raise
+
+        return self._parse_cli_output(
+            proc.returncode or 0,
+            stdout_b.decode("utf-8", errors="replace"),
+            stderr_b.decode("utf-8", errors="replace"),
+        )
+
+    def _parse_cli_output(
+        self, returncode: int, stdout: str, stderr: str,
+    ) -> CompletionResult:
+        """Translate raw ``claude -p`` output into a CompletionResult."""
+        if returncode != 0:
+            detail = (stderr or stdout or "").strip()[-2000:]
+            raise ProviderError(
+                f"claude -p exited with code {returncode}: {detail}",
                 provider=self.provider_name,
             )
 
         try:
-            data: dict[str, Any] = json.loads(proc.stdout)
+            data: dict[str, Any] = json.loads(stdout)
         except json.JSONDecodeError as e:
             raise ProviderError(
-                f"claude -p returned non-JSON output: {proc.stdout[:500]!r}",
+                f"claude -p returned non-JSON output: {stdout[:500]!r}",
                 provider=self.provider_name,
             ) from e
 

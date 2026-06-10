@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import subprocess
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from felix_agent_sdk.providers.errors import ProviderError
@@ -146,6 +147,82 @@ class TestComplete:
             mock_run.return_value = _mock_proc(_cli_envelope())
             provider.complete(messages)
         assert mock_run.call_args[1]["input"] == "Do the thing."
+
+
+def _mock_async_proc(
+    stdout: str, returncode: int = 0, stderr: str = "",
+) -> MagicMock:
+    proc = MagicMock()
+    proc.returncode = returncode
+    proc.communicate = AsyncMock(
+        return_value=(stdout.encode("utf-8"), stderr.encode("utf-8")),
+    )
+    proc.kill = MagicMock()
+    proc.wait = AsyncMock()
+    return proc
+
+
+class TestAcomplete:
+    async def test_parses_result_and_usage(self) -> None:
+        provider = ClaudeCodeProvider()
+        proc = _mock_async_proc(_cli_envelope(result="hello", input_tokens=50, output_tokens=7))
+        with patch(
+            "rle.providers.claude_code.shutil.which", return_value="claude",
+        ), patch(
+            "rle.providers.claude_code.asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=proc),
+        ):
+            result = await provider.acomplete(MESSAGES)
+        assert result.content == "hello"
+        assert result.usage["total_tokens"] == 57
+
+    async def test_nonzero_exit_raises(self) -> None:
+        provider = ClaudeCodeProvider()
+        proc = _mock_async_proc("", returncode=1, stderr="boom")
+        with patch(
+            "rle.providers.claude_code.shutil.which", return_value="claude",
+        ), patch(
+            "rle.providers.claude_code.asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=proc),
+        ):
+            with pytest.raises(ProviderError, match="exited with code 1"):
+                await provider.acomplete(MESSAGES)
+
+    async def test_timeout_kills_subprocess(self) -> None:
+        provider = ClaudeCodeProvider()
+        proc = _mock_async_proc("")
+        proc.communicate = AsyncMock(side_effect=asyncio.TimeoutError)
+        with patch(
+            "rle.providers.claude_code.shutil.which", return_value="claude",
+        ), patch(
+            "rle.providers.claude_code.asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=proc),
+        ):
+            with pytest.raises(ProviderError, match="timed out"):
+                await provider.acomplete(MESSAGES)
+        proc.kill.assert_called_once()
+
+    async def test_cancellation_kills_subprocess(self) -> None:
+        provider = ClaudeCodeProvider()
+        proc = _mock_async_proc("")
+
+        async def _hang(*args: Any, **kwargs: Any) -> tuple[bytes, bytes]:
+            await asyncio.sleep(30)
+            return b"", b""
+
+        proc.communicate = AsyncMock(side_effect=_hang)
+        with patch(
+            "rle.providers.claude_code.shutil.which", return_value="claude",
+        ), patch(
+            "rle.providers.claude_code.asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=proc),
+        ):
+            task = asyncio.ensure_future(provider.acomplete(MESSAGES))
+            await asyncio.sleep(0)  # let the task start
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        proc.kill.assert_called_once()
 
 
 class TestStreamAndTokens:
