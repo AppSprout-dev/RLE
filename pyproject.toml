@@ -10,7 +10,7 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.14"
 dependencies = [
-    "felix-agent-sdk>=0.2.2",
+    "felix-agent-sdk>=0.3.0",
     "httpx>=0.24",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",

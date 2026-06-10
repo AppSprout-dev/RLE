@@ -22,7 +22,7 @@ wheels = [
 
 [[package]]
 name = "anthropic"
-version = "0.92.0"
+version = "0.109.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -34,9 +34,9 @@ dependencies = [
     { name = "sniffio" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/01/2d/fc5c5a369db977efbaa646d77ba42b38a6de4e95789884032b0e2e3fc834/anthropic-0.92.0.tar.gz", hash = "sha256:d1e792ed0692379452a1af6b266df495e973c3695cd0aace2a108b838393cbc4", size = 652420, upload-time = "2026-04-08T16:55:35.37Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/54/0b/ce24a4f275573f5e436ca954faca60c759d58ed152b8fa36a1e3b888e261/anthropic-0.109.1.tar.gz", hash = "sha256:83e06b3d9d40ff5898f588020e0cc4e42187de954549a3b5fbe6e2685a09c785", size = 927569, upload-time = "2026-06-09T23:55:24.884Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/21/bf5b5ab10b6932c5c43eaa66b6e3f256de569cf0323d89f9cc281a0d0f39/anthropic-0.92.0-py3-none-any.whl", hash = "sha256:f92a4bd065d5cab90a96b65bb44e473bf7c6fe731a743cd156e9ad1d245c381e", size = 621195, upload-time = "2026-04-08T16:55:33.639Z" },
+    { url = "https://files.pythonhosted.org/packages/91/0f/a6110d713370bc92f074a622f8a5ebdec7e92360149b1048dca258a07b2f/anthropic-0.109.1-py3-none-any.whl", hash = "sha256:ce7d94a7657f2aa29338cca448945eac621b4f62c1794cf461cb32847223e9b8", size = 923851, upload-time = "2026-06-09T23:55:23.348Z" },
 ]
 
 [[package]]
@@ -223,7 +223,7 @@ wheels = [
 
 [[package]]
 name = "felix-agent-sdk"
-version = "0.2.2"
+version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -231,9 +231,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/18/b1/070621120fec816f0fbdbfe2edff34a0acddc35b15ee2ed693b304e4a2b8/felix_agent_sdk-0.2.2.tar.gz", hash = "sha256:9f55a40d9db8deda602ef4d9cfc1491344cd89cd809330a2ff5c9f79893b8864", size = 164450, upload-time = "2026-06-10T00:27:16.03Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f7/42/7fa6a6f2051b9c2676997d3a195c6fb1350c7411fdcf5d1d63e141e0b02b/felix_agent_sdk-0.3.0.tar.gz", hash = "sha256:3800c30201750c1e45289e6d4b43446e3c398911a0575b18eb8f2f1f6956b4f9", size = 177983, upload-time = "2026-06-10T19:55:16.422Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/8a/66/d366a2c57df847e1fbe39f8c9fa96805bc0a12d00ec0b2dee94f0f282504/felix_agent_sdk-0.2.2-py3-none-any.whl", hash = "sha256:ec4f6421260db2963a3524dac81cc9aeae188af87de045a27042e933f358fa86", size = 117491, upload-time = "2026-06-10T00:27:14.438Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/18/272ba0eb69a78dbef653cda772b85ea8d5edfc45238ae01357787a17d3ee/felix_agent_sdk-0.3.0-py3-none-any.whl", hash = "sha256:5544df134f80e3b935dc6f17ce526dfca8651c0b9be95fa342b5b337b5930b60", size = 122482, upload-time = "2026-06-10T19:55:15.26Z" },
 ]
 
 [package.optional-dependencies]
@@ -992,7 +992,7 @@ viz = [
 
 [package.metadata]
 requires-dist = [
-    { name = "felix-agent-sdk", specifier = ">=0.2.2" },
+    { name = "felix-agent-sdk", specifier = ">=0.3.0" },
     { name = "felix-agent-sdk", extras = ["all"], marker = "extra == 'all'" },
     { name = "felix-agent-sdk", extras = ["anthropic"], marker = "extra == 'anthropic'" },
     { name = "felix-agent-sdk", extras = ["local"], marker = "extra == 'local'" },
