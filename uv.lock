@@ -223,7 +223,7 @@ wheels = [
 
 [[package]]
 name = "felix-agent-sdk"
-version = "0.2.1"
+version = "0.2.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -231,9 +231,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4a/bb/d39753d61b6f6e90106762c2f3b60ce001c3de5bb4de80d84147667a14c6/felix_agent_sdk-0.2.1.tar.gz", hash = "sha256:8788d983028bde4248abd80562ce72a2f536f935e718a150023b801714eb6241", size = 163584, upload-time = "2026-03-21T20:48:55.135Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/18/b1/070621120fec816f0fbdbfe2edff34a0acddc35b15ee2ed693b304e4a2b8/felix_agent_sdk-0.2.2.tar.gz", hash = "sha256:9f55a40d9db8deda602ef4d9cfc1491344cd89cd809330a2ff5c9f79893b8864", size = 164450, upload-time = "2026-06-10T00:27:16.03Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/4d/69/f63d280921ac2075d523b5dc6915e4607a9701cbea6c3b01707c09e9e5a9/felix_agent_sdk-0.2.1-py3-none-any.whl", hash = "sha256:9a95e987aa46c73328f1e0f55a0bba56f81e29ea2ea49ffce6cd43c05f712d3c", size = 117084, upload-time = "2026-03-21T20:48:53.359Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/66/d366a2c57df847e1fbe39f8c9fa96805bc0a12d00ec0b2dee94f0f282504/felix_agent_sdk-0.2.2-py3-none-any.whl", hash = "sha256:ec4f6421260db2963a3524dac81cc9aeae188af87de045a27042e933f358fa86", size = 117491, upload-time = "2026-06-10T00:27:14.438Z" },
 ]
 
 [package.optional-dependencies]
@@ -992,7 +992,7 @@ viz = [
 
 [package.metadata]
 requires-dist = [
-    { name = "felix-agent-sdk", specifier = ">=0.2.1" },
+    { name = "felix-agent-sdk", specifier = ">=0.2.2" },
     { name = "felix-agent-sdk", extras = ["all"], marker = "extra == 'all'" },
     { name = "felix-agent-sdk", extras = ["anthropic"], marker = "extra == 'anthropic'" },
     { name = "felix-agent-sdk", extras = ["local"], marker = "extra == 'local'" },
