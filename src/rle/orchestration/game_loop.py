@@ -39,10 +39,11 @@ _ACTION_REASON_CHARS = 200
 _PLAN_SUMMARY_CHARS = 300
 _PARSE_FAILURE_RAW_CHARS = 500
 # Full LLM completion text on successful deliberation (PROVIDER_CALL events).
-# 4 KB covers the typical JSON action plan plus a reasoning preamble; longer
+# 16 KB headroom: frontier models (Fable 5) emit multi-KB structured plans
+# and the verbatim transcripts are first-class analysis artifacts; longer
 # completions are tail-truncated rather than head-truncated so the parsed
 # action JSON remains visible.
-_RAW_OUTPUT_CHARS = 4096
+_RAW_OUTPUT_CHARS = 16384
 
 
 class TickResult(BaseModel):

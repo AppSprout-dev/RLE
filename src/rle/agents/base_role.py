@@ -14,12 +14,21 @@ from felix_agent_sdk.providers.base import BaseProvider
 from felix_agent_sdk.providers.types import ChatMessage, CompletionResult, MessageRole
 from felix_agent_sdk.tokens.budget import TokenBudget
 
-from rle.agents.actions import Action, ActionPlan, ActionPlanParseError
+from rle.agents.actions import Action, ActionPlan, ActionPlanParseError, resolve_endpoint
 from rle.agents.json_repair import repair_json
 from rle.rimapi.schemas import GameState
 from rle.rimapi.sse_client import RimAPIEvent
 
 logger = logging.getLogger(__name__)
+
+# Canonical response shape shown to agents — single source of truth for the
+# system-prompt schema block, the trailing per-prompt reminder, and the
+# parse-error correction message.
+_ACTION_PLAN_SCHEMA_EXAMPLE = (
+    '{"actions": [{"action_type": "<endpoint>", "target_colonist_id": "<id or null>", '
+    '"parameters": {}, "priority": <1-10>, "reason": "<why>"}], '
+    '"summary": "<brief>", "confidence": <0.0-1.0>}'
+)
 
 # Shared prefix for all 6 role agents. Placed first in the system prompt so
 # LM Studio / llama.cpp can reuse the KV cache across agents within a tick.
@@ -32,9 +41,7 @@ _SHARED_SYSTEM_PREFIX = (
     "Check your inter-agent context for MapAnalyst spatial data before choosing "
     "coordinates for blueprints, zones, or designations.\n\n"
     "You MUST respond with a JSON object:\n"
-    '{"actions": [{"action_type": "<endpoint>", "target_colonist_id": "<id or null>", '
-    '"parameters": {}, "priority": <1-10>, "reason": "<why>"}], '
-    '"summary": "<brief>", "confidence": <0.0-1.0>}\n\n'
+    f"{_ACTION_PLAN_SCHEMA_EXAMPLE}\n\n"
     "AVAILABLE ACTIONS (use these as action_type):\n"
     "- work_priority: Set colonist work priority. params: {\"<WorkType>\": <1-4>}. "
     "target_colonist_id required. "
@@ -85,6 +92,15 @@ _SHARED_SYSTEM_PREFIX = (
     "work_priority assignments immediately.\n"
     "- Propose 5-15 actions per tick. Be proactive.\n"
     "- Respond ONLY with valid JSON.\n\n"
+)
+
+# Trailing reminder appended to every user prompt. Frontier models served
+# through chat harnesses (Claude Code persona via claude -p) drift into
+# markdown reports when the schema demand sits ~8KB back in the system
+# prompt; a recency-position restatement of the exact shape snaps them back.
+_RESPONSE_FORMAT_REMINDER = (
+    "\n\nRESPONSE FORMAT: Reply with ONLY a single JSON object — no markdown, "
+    f"no headers, no prose outside it. Exact shape: {_ACTION_PLAN_SCHEMA_EXAMPLE}"
 )
 
 # Tick-specific bootstrap playbook injected when day < 3.
@@ -457,7 +473,12 @@ class RimWorldRoleAgent(LLMAgent):
                 text = entry.get("content", "")
                 parts.append(f"  [{agent}]: {text[:300]}")
 
-        user_prompt = "\n".join(parts)
+        allowed = ", ".join(sorted(self.ALLOWED_ACTIONS))
+        user_prompt = (
+            "\n".join(parts)
+            + _RESPONSE_FORMAT_REMINDER
+            + f" Valid action_type values for this role: {allowed}."
+        )
         return system_prompt, user_prompt
 
     # ------------------------------------------------------------------
@@ -478,13 +499,35 @@ class RimWorldRoleAgent(LLMAgent):
                 result.content, f"Expected JSON object, got {type(data).__name__}",
             )
 
+        # A missing "actions" key means the model invented its own JSON shape
+        # (Fable 5 does this with rich report-style output). Treat it as a
+        # parse error so the correction retry fires — silently returning an
+        # empty plan makes a schema violation look like a deliberate no-op.
+        if "actions" not in data:
+            raise ActionPlanParseError(
+                result.content,
+                'Missing required "actions" key. Respond with EXACTLY this '
+                f"structure: {_ACTION_PLAN_SCHEMA_EXAMPLE} — do not invent a "
+                "different JSON structure",
+            )
+        if not isinstance(data["actions"], list):
+            raise ActionPlanParseError(
+                result.content,
+                f'"actions" must be a list, got {type(data["actions"]).__name__}',
+            )
+
         actions: list[Action] = []
-        for raw_action in data.get("actions", []):
+        for raw_action in data["actions"]:
             action_type = raw_action.get("action_type", "")
             if not action_type:
                 logger.warning("Skipping action with no action_type")
                 continue
-            if action_type not in self.ALLOWED_ACTIONS:
+            # Accept either the raw name or its catalog alias — models often
+            # emit variants like set_work_priority for work_priority.
+            if (
+                action_type not in self.ALLOWED_ACTIONS
+                and resolve_endpoint(action_type) not in self.ALLOWED_ACTIONS
+            ):
                 logger.warning(
                     "Skipping disallowed action %s for role %s",
                     action_type,

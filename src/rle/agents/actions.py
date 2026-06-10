@@ -50,6 +50,8 @@ ACTION_TYPE_ALIASES: dict[str, str] = {
     "set_work_priority": "work_priority",
     "haul_resource": "work_priority",  # haul = set Hauling priority to 1
     "set_growing_zone": "growing_zone",
+    "create_growing_zone": "growing_zone",
+    "create_stockpile_zone": "stockpile_zone",
     "toggle_power": "toggle_power",
     "create_stockpile": "stockpile_zone",
     "job_assign": "job_assign",
