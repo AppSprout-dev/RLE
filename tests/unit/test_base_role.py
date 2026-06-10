@@ -289,6 +289,48 @@ class TestParseActionPlan:
             agent.parse_action_plan(result, tick=1)
         assert "Invalid JSON" in exc_info.value.reason
 
+    def test_aliased_action_type_accepted_via_catalog(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        class _CanonicalAgent(_DummyRoleAgent):
+            ALLOWED_ACTIONS: ClassVar[set[str]] = {"work_priority", "no_action"}
+
+        agent = _CanonicalAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        # Model emits the legacy alias; the canonical key is what's allowed
+        result = self._make_result(
+            '{"actions": [{"action_type": "set_work_priority", '
+            '"target_colonist_id": "181", "parameters": {"Growing": 1}}], '
+            '"summary": "ok", "confidence": 0.9}'
+        )
+        plan = agent.parse_action_plan(result, tick=1)
+        assert len(plan.actions) == 1
+        assert plan.actions[0].action_type == "set_work_priority"
+
+    def test_missing_actions_key_raises(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        # Valid JSON in a model-invented shape (what Fable 5 produced live)
+        result = self._make_result(
+            '{"threat_assessment": {"condition": "GREEN"}, '
+            '"defensive_actions": [{"priority": "HIGH"}]}'
+        )
+        with pytest.raises(ActionPlanParseError) as exc_info:
+            agent.parse_action_plan(result, tick=1)
+        assert '"actions"' in exc_info.value.reason
+        # The retry correction prompt embeds the reason, so it must carry
+        # the full expected schema
+        assert "action_type" in exc_info.value.reason
+
+    def test_actions_not_a_list_raises(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        result = self._make_result('{"actions": {"action_type": "no_action"}}')
+        with pytest.raises(ActionPlanParseError) as exc_info:
+            agent.parse_action_plan(result, tick=1)
+        assert "must be a list" in exc_info.value.reason
+
     def test_unknown_action_type_skipped(
         self, mock_provider: MagicMock, helix: HelixGeometry,
     ) -> None:
