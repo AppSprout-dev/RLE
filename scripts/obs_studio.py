@@ -46,14 +46,9 @@ OVERLAY_INPUT = "RLE Overlay"
 # ?api skips the dashboard's first-run setup screen; ?preset selects the
 # built-in capture layouts (both ship in rimapi-dashboard for fresh browser
 # profiles like OBS's embedded CEF).
-DASHBOARD_URL = (
-    "http://localhost:3000/rimapi-dashboard"
-    "?api=http%3A%2F%2Flocalhost%3A8765%2Fapi%2Fv1&preset=RLE%20Capture"
-)
-DASHBOARD_VERTICAL_URL = (
-    "http://localhost:3000/rimapi-dashboard"
-    "?api=http%3A%2F%2Flocalhost%3A8765%2Fapi%2Fv1&preset=RLE%20Vertical"
-)
+_DASH_BASE = "http://localhost:3000/rimapi-dashboard?api=http%3A%2F%2Flocalhost%3A8765%2Fapi%2Fv1&norefresh=1"
+DASHBOARD_URL = f"{_DASH_BASE}&preset=RLE%20Capture"
+DASHBOARD_VERTICAL_URL = f"{_DASH_BASE}&preset=RLE%20Vertical"
 CANVAS_W, CANVAS_H = 1920, 1080
 VERTICAL_W = 608  # 608x1080 is exactly 9:16 on a 1080p canvas
 
@@ -215,10 +210,15 @@ def cmd_setup(c: obs.ReqClient) -> None:
 
 
 def _latest_tick_file(watch: Path) -> Path | None:
+    # Prefer per-model subdirs (their parent name is the model label). Only
+    # fall back to a root-level latest_tick.json (single-scenario --output, or
+    # the spread mirror file) when no subdir candidates exist — otherwise the
+    # mirror file, written last, always wins and the label reads "spread".
     candidates = list(watch.glob("*/latest_tick.json"))
-    direct = watch / "latest_tick.json"
-    if direct.exists():
-        candidates.append(direct)
+    if not candidates:
+        direct = watch / "latest_tick.json"
+        if direct.exists():
+            candidates = [direct]
     if not candidates:
         return None
     return max(candidates, key=lambda p: p.stat().st_mtime)
