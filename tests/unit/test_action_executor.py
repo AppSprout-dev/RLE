@@ -139,6 +139,50 @@ class TestOutcomes:
         assert [o.target_colonist_id for o in result.outcomes] == ["1", "2"]
 
 
+class TestGrowingZoneIdempotency:
+    """Issue #33: agents re-issue the same growing zone every tick; repeats
+    overlap the first zone's cells and fail. The executor short-circuits
+    overlapping repeats with a clear error instead of doomed RIMAPI calls."""
+
+    def _zone(self, x1: int, z1: int, x2: int, z2: int) -> Action:
+        return Action(
+            action_type="growing_zone",
+            parameters={
+                "map_id": 0, "plant_def": "Plant_Rice",
+                "x1": x1, "z1": z1, "x2": x2, "z2": z2,
+            },
+        )
+
+    async def test_first_growing_zone_succeeds(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        result = await executor.execute(_make_plan(self._zone(132, 137, 139, 144)))
+        assert result.executed == 1
+        client.create_growing_zone.assert_awaited_once()
+
+    async def test_overlapping_repeat_is_rejected(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        # First creation succeeds.
+        await executor.execute(_make_plan(self._zone(132, 137, 139, 144)))
+        # Identical re-issue next tick: overlaps, must be blocked.
+        result = await executor.execute(_make_plan(self._zone(132, 137, 139, 144)))
+        assert result.failed == 1
+        assert result.executed == 0
+        assert result.outcomes[0].error is not None
+        assert "already" in result.outcomes[0].error.lower()
+        # Only the first call reached RIMAPI.
+        client.create_growing_zone.assert_awaited_once()
+
+    async def test_non_overlapping_zone_allowed(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        await executor.execute(_make_plan(self._zone(132, 137, 139, 144)))
+        result = await executor.execute(_make_plan(self._zone(150, 150, 157, 157)))
+        assert result.executed == 1
+        assert client.create_growing_zone.await_count == 2
+
+
 class TestDispatch:
     async def test_set_work_priority(self) -> None:
         client = AsyncMock()

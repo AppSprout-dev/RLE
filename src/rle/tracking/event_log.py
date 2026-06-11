@@ -109,8 +109,11 @@ class EventLog:
             elif event.event_type == EventType.PROVIDER_CALL:
                 pt = event.data.get("prompt_tokens", 0)
                 ct = event.data.get("completion_tokens", 0)
+                rt = event.data.get("reasoning_tokens", 0)
+                if not isinstance(rt, int):
+                    rt = 0
                 if isinstance(pt, int) and isinstance(ct, int):
-                    total_tokens += pt + ct
+                    total_tokens += pt + ct + rt
                 cost = event.data.get("estimated_cost", 0.0)
                 if isinstance(cost, (int, float)):
                     total_cost += float(cost)

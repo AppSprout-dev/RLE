@@ -14,16 +14,31 @@ OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 
 
 class TokenUsage(BaseModel):
-    """Token usage from a single LLM call."""
+    """Token usage from a single LLM call.
+
+    ``reasoning_tokens`` are the hidden chain-of-thought tokens that thinking
+    models (Nemotron, DeepSeek-R1, Gemini-thinking, etc.) emit. OpenRouter
+    reports them in ``usage.completion_tokens_details.reasoning_tokens`` and —
+    critically — does NOT fold them into ``completion_tokens``, yet bills them
+    at the completion rate. Tracking them separately is what closed the gap
+    between our estimates and the OpenRouter dashboard actuals (see issue #33:
+    deepseekv4 was undercounted +187%, gemini35 +35%).
+    """
 
     model_config = ConfigDict(frozen=True)
 
     prompt_tokens: int
     completion_tokens: int
+    reasoning_tokens: int = 0
 
     @property
     def total_tokens(self) -> int:
-        return self.prompt_tokens + self.completion_tokens
+        return self.prompt_tokens + self.completion_tokens + self.reasoning_tokens
+
+    @property
+    def billable_completion_tokens(self) -> int:
+        """Output tokens billed at the completion rate (visible + reasoning)."""
+        return self.completion_tokens + self.reasoning_tokens
 
 
 class CostSnapshot(BaseModel):
@@ -33,6 +48,7 @@ class CostSnapshot(BaseModel):
 
     total_prompt_tokens: int
     total_completion_tokens: int
+    total_reasoning_tokens: int
     total_tokens: int
     estimated_cost_usd: float
     wall_time_s: float
@@ -63,6 +79,7 @@ class CostTracker:
         self._pricing_source = pricing_source
         self._total_prompt = 0
         self._total_completion = 0
+        self._total_reasoning = 0
         self._num_calls = 0
         self._start_time = time.monotonic()
 
@@ -70,22 +87,40 @@ class CostTracker:
         """Record token usage from one LLM call."""
         self._total_prompt += usage.prompt_tokens
         self._total_completion += usage.completion_tokens
+        self._total_reasoning += usage.reasoning_tokens
         self._num_calls += 1
 
-    def record_raw(self, prompt_tokens: int, completion_tokens: int) -> None:
+    def record_raw(
+        self,
+        prompt_tokens: int,
+        completion_tokens: int,
+        reasoning_tokens: int = 0,
+    ) -> None:
         """Record from raw token counts (convenience for dict-based usage)."""
-        self.record(TokenUsage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens))
+        self.record(
+            TokenUsage(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                reasoning_tokens=reasoning_tokens,
+            )
+        )
 
     def snapshot(self) -> CostSnapshot:
-        """Current cumulative cost."""
-        total = self._total_prompt + self._total_completion
+        """Current cumulative cost.
+
+        Reasoning tokens are billed at the completion rate — providers that
+        emit hidden chain-of-thought (OpenRouter, OpenAI o-series) charge them
+        as output but report them outside ``completion_tokens``.
+        """
+        total = self._total_prompt + self._total_completion + self._total_reasoning
         cost = (
             self._total_prompt * self._prompt_price
-            + self._total_completion * self._completion_price
+            + (self._total_completion + self._total_reasoning) * self._completion_price
         )
         return CostSnapshot(
             total_prompt_tokens=self._total_prompt,
             total_completion_tokens=self._total_completion,
+            total_reasoning_tokens=self._total_reasoning,
             total_tokens=total,
             estimated_cost_usd=round(cost, 6),
             wall_time_s=round(time.monotonic() - self._start_time, 2),

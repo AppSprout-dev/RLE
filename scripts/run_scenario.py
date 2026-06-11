@@ -23,6 +23,7 @@ from rle.agents.resource_manager import ResourceManager
 from rle.agents.social_overseer import SocialOverseer
 from rle.config import RLEConfig, bridge_anthropic_key, bridge_openrouter_key
 from rle.docker import wait_for_rimapi
+from rle.orchestration.camera_director import CameraDirector
 from rle.orchestration.game_loop import RLEGameLoop
 from rle.rimapi.client import RimAPIClient
 from rle.rimapi.sse_client import RimAPISSEClient
@@ -276,6 +277,13 @@ async def main(args: argparse.Namespace) -> None:
             except Exception as e:
                 print(f"Setup command {cmd.type} failed: {e}")
 
+        camera_director = None
+        if args.camera_director:
+            camera_director = CameraDirector(
+                client,
+                output_dir=Path(args.output) if args.output else None,
+            )
+
         loop = RLEGameLoop(
             config, client, agents,
             expected_duration_days=scenario.expected_duration_days,
@@ -292,6 +300,8 @@ async def main(args: argparse.Namespace) -> None:
             event_log=event_log,
             cost_tracker=cost_tracker,
             triggered_incidents=scenario.triggered_incidents,
+            auto_dismiss_dialogs=not args.no_dismiss_dialogs,
+            camera_director=camera_director,
         )
         try:
             if visualizer:
@@ -412,6 +422,16 @@ if __name__ == "__main__":
     parser.add_argument(
         "--no-pause", action="store_true",
         help="Don't pause game during deliberation (SSE-driven, game runs continuously)",
+    )
+    parser.add_argument(
+        "--camera-director", action="store_true",
+        help="Drive the game camera to the action each tick for cinematic "
+             "capture (writes camera_cues.jsonl to --output). Issue #34.",
+    )
+    parser.add_argument(
+        "--no-dismiss-dialogs", action="store_true",
+        help="Don't auto-dismiss force-pause popups (colony-name dialog, debug "
+             "log). Dismissal is on by default for unattended runs. Issue #33.",
     )
     parser.add_argument(
         "--seed", type=int, default=None,
