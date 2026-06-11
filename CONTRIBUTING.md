@@ -6,7 +6,7 @@
 git clone https://github.com/AppSprout-dev/RLE.git
 cd RLE
 uv sync --extra dev
-pytest  # should pass 326+ tests
+pytest  # should pass 458+ tests
 ```
 
 Requires Python 3.14+ and [uv](https://docs.astral.sh/uv/).
@@ -16,10 +16,23 @@ Requires Python 3.14+ and [uv](https://docs.astral.sh/uv/).
 1. Create a branch from `master`
 2. Make changes
 3. Run `pytest`, `ruff check src/ tests/ scripts/`, and `mypy src/`
-4. Commit with a descriptive message
-5. Open a PR against `master`
+4. Commit using [Conventional Commits](https://www.conventionalcommits.org/) (see below)
+5. Open a PR against `master` — **regular merge commits, never squash** (preserves per-commit history)
 
 CI runs lint + type check + tests + smoke test on every push/PR.
+
+### Commit messages drive versioning
+
+Versioning is automated by [release-please](https://github.com/googleapis/release-please): commit prefixes determine the version bump and changelog entry. Don't hand-edit `version` in `pyproject.toml`.
+
+| Prefix | Example | Effect (pre-1.0) |
+|--------|---------|------------------|
+| `feat:` | `feat: add toxic fallout scenario` | minor bump |
+| `fix:` | `fix: correct food_security divisor` | patch bump |
+| `feat!:` / `BREAKING CHANGE:` | breaking API change | minor bump (stays <1.0) |
+| `docs:` `chore:` `refactor:` `test:` `ci:` `perf:` | tidy-ups | no release |
+
+release-please keeps an open "release PR" accumulating changes; merging it tags the version and publishes a GitHub release with generated notes.
 
 ## Running locally
 
@@ -130,7 +143,7 @@ docker/                    # HeadlessRim Dockerfile, compose, entrypoint
 
 ## Key dependencies
 
-- [felix-agent-sdk](https://github.com/AppSprout-dev/felix-agent-sdk) >= 0.2.1
+- [felix-agent-sdk](https://github.com/AppSprout-dev/felix-agent-sdk) >= 0.3.0
 - [RIMAPI](https://github.com/IlyaChichkov/RIMAPI) C# mod
 - httpx, pydantic >= 2.0, pyyaml
 - Optional: wandb, huggingface-hub (`uv sync --extra tracking`)

@@ -86,7 +86,7 @@ PROVIDER_BASE_URL=http://localhost:1234/v1
 # OpenRouter (cloud)
 OPENAI_API_KEY=sk-or-v1-your-key-here
 PROVIDER=openai
-MODEL=nvidia/nemotron-3-super-120b-a12b:free
+MODEL=nvidia/nemotron-3-super-120b-a12b
 PROVIDER_BASE_URL=https://openrouter.ai/api/v1
 ```
 
@@ -149,25 +149,32 @@ cd ../rimapi-dashboard && bun run start
 
 ```bash
 # Full benchmark (mock game state, real LLM)
-python scripts/run_benchmark.py --dry-run --ticks 10
+python scripts/run_benchmark.py --smoke-test --ticks 10
 
 # List scenarios
 python scripts/run_scenario.py --list
 
 # Visualize CSV results
 python scripts/visualize_results.py results/ --all
+
+# Cross-model leaderboard vs the pinned baseline (after a spread)
+python scripts/analyze_spread.py --spread-dir results/spread
 ```
 
 ## Benchmark Results
 
-Live game, 10 ticks, Crashlanded scenario:
+**6-model spread** — Crashlanded, 10 ticks, seed 42. **N=1, content-first — not statistically significant; top models advance to N=4.** Ranked by mean composite across the run (endpoint scores are single-event noisy):
 
-| Model | Composite | Survival | Food | Mood | Efficiency |
-|-------|----------|----------|------|------|------------|
-| Nemotron 30B (OpenRouter) | **0.808** | 1.000 | 0.950 | 0.441 | 0.754 |
-| Nemotron 30B (OpenRouter) | **0.794** | 1.000 | 0.850 | 0.510 | 0.894 |
+| # | Model | Mean composite | Cost |
+|---|-------|---------------|------|
+| 1 | Grok 4.3 | **0.831** | $0.38 |
+| 2 | Opus 4.8 | 0.826 | subscription |
+| 3 | Gemini 3.5 Flash | 0.825 | $2.41 |
+| 4 | Fable 5 | 0.803 | subscription |
+| 5 | GPT-5.5 | 0.722 | $3.79 |
+| 6 | DeepSeek V4 Pro | 0.704 | $0.55 |
 
-All colonists alive, buildings on solid ground, no water placement.
+Measured against a pinned no-agent baseline (N=4, colony dead by day 8). Notable finding: all six models repeatedly re-issued research targets that had just failed, despite explicit per-tick error feedback.
 
 ## Scenarios
 
