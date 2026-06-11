@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.2.0...rimworld-learning-environment-v0.3.0) (2026-06-11)
+
+
+### Features
+
+* OBS production studio automation for benchmark capture ([6af463d](https://github.com/AppSprout-dev/RLE/commit/6af463deb4ae5d025fd3c81a7ae28517890a5f4e))
+* OBS production studio automation for benchmark capture ([8bc321d](https://github.com/AppSprout-dev/RLE/commit/8bc321d265b4380a6a9a7b9791bfcbfb9b63ca14))
+
 ## [0.2.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.1.0...rimworld-learning-environment-v0.2.0) (2026-06-11)
 
 
