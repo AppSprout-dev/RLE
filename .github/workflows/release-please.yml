@@ -1,0 +1,22 @@
+name: release-please
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          # Uses the default GITHUB_TOKEN. Note: PRs opened by this action with
+          # GITHUB_TOKEN do not re-trigger ci.yml. If you want CI to run on the
+          # release PR, create a fine-grained PAT (contents+PRs write) as the
+          # RELEASE_PLEASE_TOKEN secret and add `token: ${{ secrets.RELEASE_PLEASE_TOKEN }}`.

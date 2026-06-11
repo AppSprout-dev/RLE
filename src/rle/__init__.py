@@ -3,7 +3,7 @@
 Multi-agent benchmark where Felix Agent SDK agents play RimWorld.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.0"  # x-release-please-version
 
 from rle.agents import (
     Action,

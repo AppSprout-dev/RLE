@@ -377,9 +377,14 @@ src/rle/
 scripts/
 ├── run_scenario.py        # Single scenario CLI (auto-loads save, unforbids items)
 ├── run_benchmark.py       # Full benchmark suite CLI (--docker, --smoke-test, --runs)
+├── run_spread_n1.sh       # N=1 multi-model spread runner (sequential, continue-on-error)
 ├── compare_benchmarks.py  # Paired statistical comparison of benchmark runs
+├── analyze_spread.py      # Cross-model leaderboard vs baseline + failure taxonomy
 ├── visualize_results.py   # Matplotlib CSV plotter
-└── serve_dashboard.py     # CORS-enabled file server for dashboard
+├── serve_dashboard.py     # CORS-enabled file server for dashboard
+├── replay_ticks.py        # Replay a run's tick snapshots into the dashboard (for capture)
+├── record_dashboard.mjs   # Headless Playwright dashboard recording (run with node)
+└── capture_run_media.sh   # During-run game-window stills + tick snapshots
 docker/
 ├── Dockerfile             # HeadlessRim + Xvfb (debian:bookworm-slim)
 ├── docker-compose.yml     # Volume mounts for game files, mods, saves
