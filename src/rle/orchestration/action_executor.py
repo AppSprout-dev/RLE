@@ -99,6 +99,22 @@ class ActionExecutor:
 
     def __init__(self, client: RimAPIClient) -> None:
         self._client = client
+        # Rectangles (x1, z1, x2, z2) of growing zones already created this run.
+        # Agents perseverate — they re-issue the same growing zone every tick.
+        # Each repeat targets cells already owned by the first zone, which RIMAPI
+        # rejects (and historically mislabelled as "Invalid plant definition").
+        # We short-circuit overlapping repeats with an explicit error so the
+        # agent learns the zone exists instead of burning ticks on doomed calls
+        # (issue #33).
+        self._created_growing_zones: list[tuple[int, int, int, int]] = []
+
+    @staticmethod
+    def _rects_overlap(
+        a: tuple[int, int, int, int], b: tuple[int, int, int, int]
+    ) -> bool:
+        ax1, az1, ax2, az2 = a
+        bx1, bz1, bx2, bz2 = b
+        return not (ax2 < bx1 or ax1 > bx2 or az2 < bz1 or az1 > bz2)
 
     async def execute(self, plan: ActionPlan) -> ExecutionResult:
         """Execute all actions in a plan, return summary + per-action outcomes."""
@@ -232,10 +248,17 @@ class ActionExecutor:
         )
 
     async def _h_growing_zone(self, cid: str, params: dict[str, Any]) -> None:
-        x1 = params.get("x1", params.get("x", 0))
-        z1 = params.get("z1", params.get("z", 0))
-        x2 = params.get("x2", x1 + 5)
-        z2 = params.get("z2", z1 + 5)
+        x1 = int(params.get("x1", params.get("x", 0)))
+        z1 = int(params.get("z1", params.get("z", 0)))
+        x2 = int(params.get("x2", x1 + 5))
+        z2 = int(params.get("z2", z1 + 5))
+        rect = (min(x1, x2), min(z1, z2), max(x1, x2), max(z1, z2))
+        if any(self._rects_overlap(rect, prev) for prev in self._created_growing_zones):
+            raise ValueError(
+                "A growing zone already covers these cells — it was created "
+                "earlier this run. Do NOT recreate it; pick a different, "
+                "non-overlapping rectangle or move on to another task."
+            )
         await self._client.create_growing_zone(
             map_id=int(params.get("map_id", 0)),
             plant_def=params.get("plant_def", "Plant_Potato"),
@@ -244,6 +267,7 @@ class ActionExecutor:
             x2=x2,
             z2=z2,
         )
+        self._created_growing_zones.append(rect)
 
     async def _h_stockpile_zone(self, cid: str, params: dict[str, Any]) -> None:
         x1 = params.get("x1", params.get("x", 0))

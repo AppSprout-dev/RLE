@@ -64,6 +64,16 @@ class TestTokenUsage:
         usage = TokenUsage(prompt_tokens=100, completion_tokens=50)
         assert usage.total_tokens == 150
 
+    def test_total_tokens_includes_reasoning(self) -> None:
+        usage = TokenUsage(prompt_tokens=100, completion_tokens=50, reasoning_tokens=200)
+        assert usage.total_tokens == 350
+        assert usage.billable_completion_tokens == 250
+
+    def test_reasoning_defaults_to_zero(self) -> None:
+        usage = TokenUsage(prompt_tokens=100, completion_tokens=50)
+        assert usage.reasoning_tokens == 0
+        assert usage.billable_completion_tokens == 50
+
     def test_frozen(self) -> None:
         usage = TokenUsage(prompt_tokens=10, completion_tokens=5)
         with pytest.raises(Exception):
@@ -97,6 +107,16 @@ class TestCostTrackerRecord:
         assert snap.total_completion_tokens == 100
         assert snap.num_calls == 2
 
+    def test_record_accumulates_reasoning_tokens(self) -> None:
+        tracker = CostTracker("test-model")
+        tracker.record(TokenUsage(prompt_tokens=100, completion_tokens=50, reasoning_tokens=300))
+        tracker.record_raw(prompt_tokens=100, completion_tokens=50, reasoning_tokens=200)
+
+        snap = tracker.snapshot()
+        assert snap.total_reasoning_tokens == 500
+        # total_tokens folds reasoning in: (100+50) + (100+50) + 500
+        assert snap.total_tokens == 800
+
     def test_record_and_record_raw_combined(self) -> None:
         tracker = CostTracker("test-model")
         tracker.record(TokenUsage(prompt_tokens=50, completion_tokens=25))
@@ -125,6 +145,21 @@ class TestCostTrackerSnapshot:
         snap = tracker.snapshot()
         # 1000 * 0.000005 + 500 * 0.000025 = 0.005 + 0.0125 = 0.0175
         assert snap.estimated_cost_usd == pytest.approx(0.0175, rel=1e-5)
+
+    def test_reasoning_tokens_billed_at_completion_rate(self) -> None:
+        tracker = CostTracker(
+            "thinking-model",
+            prompt_price=0.000005,
+            completion_price=0.000025,
+        )
+        tracker.record(
+            TokenUsage(prompt_tokens=1000, completion_tokens=500, reasoning_tokens=4000)
+        )
+
+        snap = tracker.snapshot()
+        # prompt: 1000 * 5e-6 = 0.005
+        # completion + reasoning: (500 + 4000) * 25e-6 = 0.1125
+        assert snap.estimated_cost_usd == pytest.approx(0.1175, rel=1e-5)
 
     def test_snapshot_zero_cost_with_default_prices(self) -> None:
         tracker = CostTracker("free-model")

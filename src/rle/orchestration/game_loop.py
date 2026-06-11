@@ -18,6 +18,7 @@ from rle.agents.base_role import RimWorldRoleAgent
 from rle.config import RLEConfig
 from rle.orchestration.action_executor import ActionExecutor, ExecutionResult
 from rle.orchestration.action_resolver import ActionResolver
+from rle.orchestration.camera_director import CameraDirector
 from rle.orchestration.state_manager import GameStateManager
 from rle.rimapi.client import RimAPIClient
 from rle.rimapi.schemas import GameState
@@ -83,6 +84,8 @@ class RLEGameLoop:
         cost_tracker: CostTracker | None = None,
         triggered_incidents: list[TriggeredIncident] | None = None,
         screenshots_enabled: bool = False,
+        auto_dismiss_dialogs: bool = True,
+        camera_director: CameraDirector | None = None,
     ) -> None:
         self._config = config
         self._client = client
@@ -124,6 +127,8 @@ class RLEGameLoop:
         self._cost_tracker = cost_tracker
         self._triggered_incidents = triggered_incidents or []
         self._screenshots_enabled = screenshots_enabled
+        self._auto_dismiss_dialogs = auto_dismiss_dialogs
+        self._camera_director = camera_director
 
         # Hub-spoke communication — agents read messages from their spokes
         self._hub = CentralPost(max_agents=len(agents))
@@ -143,6 +148,26 @@ class RLEGameLoop:
     @property
     def cost_tracker(self) -> CostTracker | None:
         return self._cost_tracker
+
+    async def _dismiss_blocking_dialogs(self, tick_num: int) -> None:
+        """Close force-pause popups that stall unattended runs (issue #33).
+
+        The colony-name dialog (Dialog_NamePlayerSettlement) force-pauses the
+        game ~once per run; the dev-mode debug-log window auto-opens on RIMAPI
+        errors and obscures footage. Both are dismissed every tick via RIMAPI's
+        window/close endpoint. No-ops gracefully on older RIMAPI builds.
+        """
+        try:
+            result = await self._client.close_windows(force_pause_only=True)
+        except Exception:
+            logger.debug("Dialog dismissal failed", exc_info=True)
+            return
+        closed = result.get("closed_windows") or []
+        if closed:
+            logger.info("Dismissed force-pause window(s): %s", ", ".join(closed))
+            self._emit(
+                EventType.TICK_START, tick_num, dismissed_windows=list(closed),
+            )
 
     def _update_visualizer_agent(
         self, agent: RimWorldRoleAgent, plan: ActionPlan, macro_time: float,
@@ -306,9 +331,12 @@ class RLEGameLoop:
         if usage and isinstance(usage, dict):
             pt = usage.get("prompt_tokens", 0)
             ct = usage.get("completion_tokens", 0)
+            rt = usage.get("reasoning_tokens", 0)
+            if not isinstance(rt, int):
+                rt = 0
             if isinstance(pt, int) and isinstance(ct, int):
                 if self._cost_tracker:
-                    self._cost_tracker.record_raw(pt, ct)
+                    self._cost_tracker.record_raw(pt, ct, rt)
                 raw_output = agent._last_raw_output
                 raw_output_truncated = (
                     raw_output[:_RAW_OUTPUT_CHARS] if raw_output else None
@@ -320,6 +348,7 @@ class RLEGameLoop:
                 self._emit(
                     EventType.PROVIDER_CALL, tick_num, agent=plan.role,
                     prompt_tokens=pt, completion_tokens=ct,
+                    reasoning_tokens=rt,
                     raw_output=raw_output_truncated,
                     raw_output_truncated=was_truncated,
                 )
@@ -482,6 +511,11 @@ class RLEGameLoop:
 
         self._emit(EventType.TICK_START, tick_num)
 
+        # 1a. Dismiss force-pause nuisance windows (colony-name dialog, debug
+        # log) so unattended runs don't stall mid-benchmark (issue #33).
+        if self._auto_dismiss_dialogs:
+            await self._dismiss_blocking_dialogs(tick_num)
+
         # 1b. Fire scheduled incidents (before state read captures effects)
         if self._triggered_incidents:
             await self._fire_scheduled_incidents(tick_num)
@@ -493,6 +527,13 @@ class RLEGameLoop:
             EventType.STATE_REFRESH, tick_num,
             day=state.colony.day, macro_time=current_time,
         )
+
+        # 2b. Drive the cinematic camera to this tick's focus (opt-in capture
+        # runs only; never raises into the tick). Issue #34.
+        if self._camera_director is not None:
+            await self._camera_director.direct(
+                tick_num, state, self._state_manager.pending_events, _time.time(),
+            )
 
         # 3. Route previous tick's messages to agent spokes + broadcast phase changes
         messages_before = self._hub.total_messages_processed

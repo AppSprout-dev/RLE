@@ -115,7 +115,8 @@ _BOOTSTRAP_PLAYBOOK = (
     "- work_priority for EVERY colonist: best Plants→Growing=1, "
     "best Construction→Construction=1, best Intellectual→Research=1\n"
     "- growing_zone: use FARM SITE coordinates from MAP_SUMMARY, "
-    "plant_def=Plant_Rice (fastest food)\n\n"
+    "plant_def=Plant_Rice (fastest food). Create this zone ONCE — if a "
+    "growing zone already exists, do NOT create another (it will fail).\n\n"
     "TICK 2 (SHELTER — most critical):\n"
     "- blueprint Wall: place 5x5 rectangle using SHELTER SITE from MAP_SUMMARY. "
     "Use stuff_def=WoodLog. Leave one gap for a Door.\n"
@@ -247,8 +248,48 @@ class RimWorldRoleAgent(LLMAgent):
 
     def _record_completion(self, result: CompletionResult) -> CompletionResult:
         self._last_raw_output = result.content
-        self._last_usage = result.usage if hasattr(result, "usage") else None
+        usage = dict(result.usage) if getattr(result, "usage", None) else None
+        if usage is not None:
+            # felix's usage dict only carries prompt/completion/total. Thinking
+            # models bill hidden reasoning tokens that OpenRouter/OpenAI report
+            # in usage.completion_tokens_details.reasoning_tokens but leave OUT
+            # of completion_tokens — dig them out of the raw response so the
+            # cost tracker can bill them (issue #33).
+            reasoning = self._extract_reasoning_tokens(getattr(result, "raw_response", None))
+            if reasoning:
+                usage["reasoning_tokens"] = reasoning
+        self._last_usage = usage
         return result
+
+    @staticmethod
+    def _extract_reasoning_tokens(raw_response: Any) -> int:
+        """Pull reasoning-token count from a provider's raw usage payload.
+
+        Handles both the OpenAI SDK object shape
+        (``usage.completion_tokens_details.reasoning_tokens``) and the plain
+        dict shape returned by OpenRouter / OpenAI-compatible servers. Returns
+        0 when absent or unparseable — never raises.
+        """
+        if raw_response is None:
+            return 0
+
+        def _get(obj: Any, key: str) -> Any:
+            if isinstance(obj, dict):
+                return obj.get(key)
+            return getattr(obj, key, None)
+
+        usage = _get(raw_response, "usage")
+        if usage is None:
+            return 0
+        details = _get(usage, "completion_tokens_details")
+        # Some servers attach reasoning_tokens directly on usage.
+        candidate = _get(details, "reasoning_tokens") if details is not None else None
+        if candidate is None:
+            candidate = _get(usage, "reasoning_tokens")
+        try:
+            return int(candidate) if candidate is not None else 0
+        except (TypeError, ValueError):
+            return 0
 
     def _call_provider(
         self,

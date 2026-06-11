@@ -474,6 +474,51 @@ class RimAPIClient:
         except (RimAPIResponseError, RimAPIConnectionError):
             return None
 
+    async def move_camera(self, x: int, z: int) -> Any:
+        """Jump the game camera to a map cell (cinematic capture, issue #34)."""
+        return await self._post(f"/api/v1/camera/change/position?x={int(x)}&y={int(z)}")
+
+    async def set_camera_zoom(self, zoom: int) -> Any:
+        """Set the camera zoom level (smaller = closer)."""
+        return await self._post(f"/api/v1/camera/change/zoom?zoom={int(zoom)}")
+
+    async def jump_camera_to_pawn(self, pawn_id: str | int) -> Any:
+        """Jump/follow the camera to a pawn by id (cinematic capture, issue #34)."""
+        return await self._post(
+            f"/api/v1/camera/follow/pawn?pawn_id={self._int_id(str(pawn_id))}"
+        )
+
+    async def close_windows(
+        self,
+        window_types: list[str] | None = None,
+        force_pause_only: bool = True,
+    ) -> dict[str, Any]:
+        """Dismiss open windows (issue #33).
+
+        With ``window_types`` set, closes windows whose runtime type name
+        contains any of the given substrings (e.g. ``["Log"]`` closes
+        ``EditWindow_Log``). Otherwise closes every force-pause window — the
+        colony-name dialog and debug log that stall unattended benchmark runs.
+        Returns ``{"closed_count": int, "closed_windows": [...]}`` (best effort;
+        empty on older RIMAPI builds without the endpoint).
+        """
+        body: dict[str, Any] = {"force_pause_only": force_pause_only}
+        if window_types:
+            body["window_types"] = window_types
+        try:
+            data = await self._post("/api/v1/ui/window/close", json=body)
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return {"closed_count": 0, "closed_windows": []}
+        return data if isinstance(data, dict) else {"closed_count": 0, "closed_windows": []}
+
+    async def list_windows(self) -> list[dict[str, Any]]:
+        """List currently open windows and whether each force-pauses the game."""
+        try:
+            data = await self._get("/api/v1/ui/windows")
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return []
+        return data if isinstance(data, list) else []
+
     async def get_resources(
         self, power_info: PowerData | None = None,
     ) -> ResourceData:
@@ -1113,7 +1158,17 @@ class RimAPIClient:
 
     @staticmethod
     def _normalize_plant_def(plant_def: str) -> str:
-        """Normalize agent plant names to RimWorld defNames."""
+        """Normalize agent plant names to RimWorld defNames.
+
+        Audited for issue #33: this maps loose names ONTO the canonical defName
+        ("rice"/"PlantRice" → "Plant_Rice"), which is the form RimWorld's
+        DefDatabase actually wants — confirmed against Core defs (Plant_Rice,
+        Plant_Potato, ... are real; bare "rice" is not). It does NOT mangle good
+        names. The spread's "Invalid plant definition: Plant_Rice" failures were
+        NOT a def-name problem: Plant_Rice succeeded on tick 0, then every repeat
+        hit cells already owned by that zone (RIMAPI mislabelled the overlap).
+        The fix lives in the executor's overlap guard + the RIMAPI error message.
+        """
         if plant_def.startswith("Plant_"):
             return plant_def
         # "PlantPotato" → "Plant_Potato", "potato" → "Plant_Potato"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from types import SimpleNamespace
 from typing import Any, ClassVar
 from unittest.mock import MagicMock
 
@@ -454,3 +455,51 @@ class TestADeliberate:
         messages = mock_provider.acomplete.call_args[0][0]
         assert messages[-1].role == MessageRole.ASSISTANT
         assert messages[-1].content == "</think>"
+
+
+# ------------------------------------------------------------------
+# reasoning-token extraction (issue #33: thinking-model cost undercount)
+# ------------------------------------------------------------------
+
+
+class TestReasoningTokenExtraction:
+    def test_none_raw_response(self) -> None:
+        assert RimWorldRoleAgent._extract_reasoning_tokens(None) == 0
+
+    def test_openai_object_shape(self) -> None:
+        details = SimpleNamespace(reasoning_tokens=4096)
+        usage = SimpleNamespace(completion_tokens_details=details)
+        raw = SimpleNamespace(usage=usage)
+        assert RimWorldRoleAgent._extract_reasoning_tokens(raw) == 4096
+
+    def test_openrouter_dict_shape(self) -> None:
+        raw = {"usage": {"completion_tokens_details": {"reasoning_tokens": 1234}}}
+        assert RimWorldRoleAgent._extract_reasoning_tokens(raw) == 1234
+
+    def test_reasoning_directly_on_usage(self) -> None:
+        raw = {"usage": {"reasoning_tokens": 77}}
+        assert RimWorldRoleAgent._extract_reasoning_tokens(raw) == 77
+
+    def test_absent_reasoning_returns_zero(self) -> None:
+        raw = {"usage": {"prompt_tokens": 10, "completion_tokens": 5}}
+        assert RimWorldRoleAgent._extract_reasoning_tokens(raw) == 0
+
+    def test_unparseable_returns_zero(self) -> None:
+        raw = {"usage": {"completion_tokens_details": {"reasoning_tokens": "lots"}}}
+        assert RimWorldRoleAgent._extract_reasoning_tokens(raw) == 0
+
+    def test_record_completion_merges_reasoning_into_usage(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        result = CompletionResult(
+            content="{}",
+            model="mock",
+            usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+            raw_response={"usage": {"completion_tokens_details": {"reasoning_tokens": 900}}},
+        )
+        agent._record_completion(result)
+        assert agent._last_usage is not None
+        assert agent._last_usage["reasoning_tokens"] == 900
+        # original usage dict on the result is not mutated
+        assert "reasoning_tokens" not in result.usage
