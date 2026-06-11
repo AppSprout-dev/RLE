@@ -87,8 +87,9 @@ of every segment (Read the PNGs — never ship an unviewed render).
   data in `src/data.json` regenerated from `leaderboard.json`). Assets must live under
   `public/` (staticFile) — junctions break the bundler.
 - Timelapse source: `ffmpeg -i master.mkv -vf "setpts=PTS/60,fps=24,crop=trunc(iw/2)*2:trunc(ih/2)*2" -an`.
-- **Dashboard clip rig** (source: `scripts/record_dashboard.mjs`) — headless Playwright
-  recording, never screen capture. Four processes, in order:
+- **Dashboard clip rig** (source: `D:\RLE_media\capture\record_dashboard.mjs` — the
+  rle-media repo, which is the set-up scratch dir with playwright already installed) —
+  headless Playwright recording, never screen capture. Four processes, in order:
   1. RimWorld + RIMAPI up (the dashboard's connect gate probes :8765; CORS is fine, but
      the URL field starts EMPTY — the script fills it and clicks Connect).
   2. `./.venv/Scripts/python scripts/serve_dashboard.py results/replay` (CORS server :9000).
@@ -96,11 +97,12 @@ of every segment (Read the PNGs — never ship an unviewed render).
      (Remotion's render server squats on 3000; craco exits "already running" instead of failing loud).
   4. `python scripts/replay_ticks.py --model <name> --interval 2 --loop` (feeds
      results/replay/latest_tick.json from the run's tick_snapshots).
-  Then record: set up a scratch dir once (`bun add playwright && bunx playwright install
-  chromium`), copy record_dashboard.mjs next to it, and run with **node** — Playwright's
-  chromium launch hangs 180s under bun on Windows. The script seeds the 5 RLE widgets via
-  a localStorage `dashboard_presets` preset (fresh browser contexts have no layout, and the
-  RLE widgets aren't in the default). Record 1920x1080 and 1080x1920 passes; trim the
+  Then record from `D:\RLE_media\capture\` (playwright already installed there; if starting
+  fresh elsewhere, `bun add playwright && bunx playwright install chromium` first) and run
+  with **node** — Playwright's chromium launch hangs 180s under bun on Windows. The script
+  seeds the 5 RLE widgets via a localStorage `dashboard_presets` preset (the dashboard now
+  also ships built-in `RLE Capture`/`RLE Vertical` presets selectable via `?preset=`, and
+  `?api=<url>` skips the connect gate — either path works). Record 1920x1080 and 1080x1920 passes; trim the
   connect/load preamble (~8s) when converting webm → mp4
   (`ffmpeg -ss 8 -i in.webm -c:v libx264 -crf 19 -pix_fmt yuv420p -r 30 out.mp4`).
 - Verify every render before calling it done: extract stills of each segment with ffmpeg

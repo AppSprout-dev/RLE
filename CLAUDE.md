@@ -1,4 +1,4 @@
-# RLE — RimWorld Learning Environment
+﻿# RLE — RimWorld Learning Environment
 
 Multi-agent benchmark where 7 Felix Agent SDK role-specialized LLM agents manage a RimWorld colony. Think FLE (Factorio Learning Environment) but for multi-agent coordination under uncertainty.
 
@@ -382,9 +382,11 @@ scripts/
 ├── analyze_spread.py      # Cross-model leaderboard vs baseline + failure taxonomy
 ├── visualize_results.py   # Matplotlib CSV plotter
 ├── serve_dashboard.py     # CORS-enabled file server for dashboard
+├── obs_record.py          # OBS recording start/stop/status via obs-websocket (per-model files)
+├── obs_studio.py          # OBS scene setup (Game/Dashboard/PiP/Vertical) + live score ticker
 ├── replay_ticks.py        # Replay a run's tick snapshots into the dashboard (for capture)
-├── record_dashboard.mjs   # Headless Playwright dashboard recording (run with node)
 └── capture_run_media.sh   # During-run game-window stills + tick snapshots
+# (post-run Playwright dashboard recording lives in the rle-media repo: capture/record_dashboard.mjs)
 docker/
 ├── Dockerfile             # HeadlessRim + Xvfb (debian:bookworm-slim)
 ├── docker-compose.yml     # Volume mounts for game files, mods, saves
