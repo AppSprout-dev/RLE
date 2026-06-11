@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.1.0...rimworld-learning-environment-v0.2.0) (2026-06-11)
+
+
+### Features
+
+* reasoning-token costs, growing-zone overlap guard, auto-dismiss dialogs, camera director ([#33](https://github.com/AppSprout-dev/RLE/issues/33), [#34](https://github.com/AppSprout-dev/RLE/issues/34)) ([c48b408](https://github.com/AppSprout-dev/RLE/commit/c48b408ffff5d89a17f14a9130c100dbc600aa1c))
+* reasoning-token costs, growing-zone overlap guard, auto-dismiss dialogs, camera director ([#33](https://github.com/AppSprout-dev/RLE/issues/33), [#34](https://github.com/AppSprout-dev/RLE/issues/34)) ([563f976](https://github.com/AppSprout-dev/RLE/commit/563f97698a78f84a52d1c1fe977300164676ab76))
+
 ## 0.1.0 (2026-06-11)
 
 First tagged release. RLE is a multi-agent benchmark where 7 Felix Agent SDK
