@@ -385,8 +385,8 @@ scripts/
 ├── obs_record.py          # OBS recording start/stop/status via obs-websocket (per-model files)
 ├── obs_studio.py          # OBS scene setup (Game/Dashboard/PiP/Vertical) + live score ticker
 ├── replay_ticks.py        # Replay a run's tick snapshots into the dashboard (for capture)
-├── record_dashboard.mjs   # Headless Playwright dashboard recording (run with node)
 └── capture_run_media.sh   # During-run game-window stills + tick snapshots
+# (post-run Playwright dashboard recording lives in the rle-media repo: capture/record_dashboard.mjs)
 docker/
 ├── Dockerfile             # HeadlessRim + Xvfb (debian:bookworm-slim)
 ├── docker-compose.yml     # Volume mounts for game files, mods, saves
