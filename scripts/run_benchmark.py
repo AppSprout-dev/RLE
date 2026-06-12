@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import random
 import time
 from pathlib import Path
@@ -35,7 +36,7 @@ from rle.scenarios.schema import ScenarioConfig
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.delta import PairedResult
 from rle.scoring.recorder import TimeSeriesRecorder
-from rle.tracking.cost_tracker import CostTracker, create_cost_tracker
+from rle.tracking.cost_tracker import CostTracker, create_cost_tracker, fetch_billed_costs
 from rle.tracking.event_log import EventLog
 from rle.tracking.hf_logger import HFLogger
 from rle.tracking.history import append_history, get_run_dir, update_baseline
@@ -692,6 +693,19 @@ async def main(args: argparse.Namespace) -> None:
         else:
             _print_leaderboard(results, model=args.model)
 
+        # Reconcile estimates against OpenRouter's billed ground truth
+        # (token-count estimates diverged up to 4x on the v0.3.0 spread).
+        billed_report = None
+        effective_base_url = args.base_url or config.provider_base_url or ""
+        openai_key = os.environ.get("OPENAI_API_KEY", "")
+        generation_ids = cost_tracker.generation_ids
+        if "openrouter.ai" in effective_base_url and openai_key and generation_ids:
+            print(
+                f"\nReconciling billed cost for {len(generation_ids)} "
+                "generations against OpenRouter...",
+            )
+            billed_report = await fetch_billed_costs(generation_ids, openai_key)
+
         # Build enriched summary with metadata
         metadata = collect_metadata(random_seed=args.seed)
         summary: dict[str, Any] = {
@@ -708,6 +722,8 @@ async def main(args: argparse.Namespace) -> None:
             "scenarios": results,
             "cost_snapshot": cost_tracker.snapshot().model_dump(),
         }
+        if billed_report:
+            summary["billed_cost"] = billed_report.model_dump()
         if event_log:
             summary["event_summary"] = event_log.summary().model_dump()
         if is_paired and paired_results:

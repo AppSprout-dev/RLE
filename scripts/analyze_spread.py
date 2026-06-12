@@ -122,6 +122,10 @@ def main() -> None:
         delta = [round(a - b, 4) for a, b in zip(traj, base_slice)]
         ticks_above = sum(1 for x in delta if x > 0)
         c = m["summary"]["cost_snapshot"]
+        # Billed ground truth (run_scenario reconciles via OpenRouter's
+        # generation API) — same schema we hand-patched into the v0.3.0
+        # leaderboard from the dashboard. Estimates stay for comparison.
+        billed = m["summary"].get("billed_cost")
         rows.append({
             "model": m["summary"]["model"],
             "name": name,
@@ -140,6 +144,10 @@ def main() -> None:
             "avg_confidence": m["deliberation"]["avg_confidence"],
             "wall_min": round(c["wall_time_s"] / 60, 1),
             "est_cost_usd": round(c["estimated_cost_usd"], 2),
+            "real_cost_usd": (
+                round(billed["billed_cost_usd"], 3) if billed else None
+            ),
+            "cost_source": billed["source"] if billed else None,
             "trajectory": traj,
             "days": days,
             "baseline_slice": [round(x, 4) for x in base_slice],

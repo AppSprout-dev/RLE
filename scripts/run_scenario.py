@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import logging
+import os
 import random
 import sys
 from pathlib import Path
@@ -31,7 +32,7 @@ from rle.scenarios.evaluator import ScenarioEvaluator
 from rle.scenarios.loader import list_scenarios, load_scenario
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.recorder import TimeSeriesRecorder
-from rle.tracking.cost_tracker import create_cost_tracker
+from rle.tracking.cost_tracker import create_cost_tracker, fetch_billed_costs
 from rle.tracking.event_log import EventLog
 from rle.tracking.history import append_history
 from rle.tracking.metadata import collect_metadata
@@ -78,6 +79,7 @@ def _build_run_summary(  # noqa: PLR0913
     ticks_run: int,
     cost_snapshot_dict: dict[str, object],
     event_summary_dict: dict[str, object] | None,
+    billed_cost_dict: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Compose the per-scenario summary JSON (metadata + config + result)."""
     summary: dict[str, object] = {
@@ -98,6 +100,8 @@ def _build_run_summary(  # noqa: PLR0913
         "ticks_run": ticks_run,
         "cost_snapshot": cost_snapshot_dict,
     }
+    if billed_cost_dict is not None:
+        summary["billed_cost"] = billed_cost_dict
     if event_summary_dict is not None:
         summary["event_summary"] = event_summary_dict
     return summary
@@ -316,6 +320,20 @@ async def main(args: argparse.Namespace) -> None:
     # Output
     _print_results(loop, recorder)
 
+    # Reconcile estimates against OpenRouter's billed ground truth — the
+    # token-count estimator diverged up to 4x in both directions on the
+    # v0.3.0 spread (thinking-model usage shapes, caching discounts).
+    billed_report = None
+    effective_base_url = args.base_url or config.provider_base_url or ""
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    generation_ids = cost_tracker.generation_ids
+    if "openrouter.ai" in effective_base_url and openai_key and generation_ids:
+        print(
+            f"\nReconciling billed cost for {len(generation_ids)} generations "
+            "against OpenRouter...",
+        )
+        billed_report = await fetch_billed_costs(generation_ids, openai_key)
+
     if args.output:
         output_dir = Path(args.output)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -350,6 +368,9 @@ async def main(args: argparse.Namespace) -> None:
             event_summary_dict=(
                 event_log.summary().model_dump() if event_log else None
             ),
+            billed_cost_dict=(
+                billed_report.model_dump() if billed_report else None
+            ),
         )
         summary_path = output_dir / f"{scenario_path.stem}_summary.json"
         summary_path.write_text(json.dumps(summary, indent=2, default=str))
@@ -381,6 +402,16 @@ async def main(args: argparse.Namespace) -> None:
             f"\nTokens: {snap.total_tokens} ({snap.num_calls} calls) "
             f"| Est. cost: ${snap.estimated_cost_usd:.4f} "
             f"| Wall time: {snap.wall_time_s:.1f}s",
+        )
+    if billed_report:
+        unbilled = (
+            f" ({billed_report.missing_generations} unbilled — lower bound)"
+            if billed_report.missing_generations else ""
+        )
+        print(
+            f"Billed cost (OpenRouter ground truth): "
+            f"${billed_report.billed_cost_usd:.4f} over "
+            f"{billed_report.billed_generations} generations{unbilled}",
         )
 
     if event_log:
