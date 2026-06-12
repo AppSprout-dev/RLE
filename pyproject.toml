@@ -59,3 +59,10 @@ strict = true
 [[tool.mypy.overrides]]
 module = ["wandb", "huggingface_hub"]
 ignore_missing_imports = true
+
+# wandb/huggingface_hub ship untyped APIs; when the tracking extra is
+# installed locally, strict mode would otherwise flag every call into them
+# (CI doesn't install the extra, so a type: ignore would be "unused" there).
+[[tool.mypy.overrides]]
+module = ["rle.tracking.wandb_logger", "rle.tracking.hf_logger"]
+disallow_untyped_calls = false
