@@ -545,10 +545,13 @@ async def main(args: argparse.Namespace) -> None:
         )
         return
 
-    # N >= 4 enforcement
+    # N >= 4 advisory (issue #45: N=1 content spreads are valid dataset
+    # entries when labeled as such — the dataset card carries the framing)
     if args.push_hf and num_runs < 4:
-        print("ERROR: Leaderboard submission requires --runs 4 or higher.")
-        return
+        print(
+            "WARNING: --push-hf with --runs < 4 — pushed as a content-spread "
+            "entry, NOT statistically valid.",
+        )
     if num_runs < 4 and not use_mock_rimapi:
         print(f"WARNING: N={num_runs} runs is below minimum (4) for statistical validity.")
     ticks_override = _resolve_ticks(args, use_mock_rimapi)
@@ -767,11 +770,13 @@ async def main(args: argparse.Namespace) -> None:
 
         # HuggingFace Hub push (optional)
         if args.push_hf:
-            hf = HFLogger(enabled=True)
+            hf = HFLogger(
+                repo_id=config.hf_dataset_repo, token=config.hf_token,
+            )
             if hf.enabled:
                 hf.push_results(
                     history_path=history_path,
-                    baselines_dir=Path("results/baselines"),
+                    baselines_dir=Path("results/baseline"),
                     run_dir=output_dir,
                 )
                 print("Results pushed to HuggingFace Hub")

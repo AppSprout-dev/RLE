@@ -52,6 +52,10 @@ class RLEConfig(BaseSettings):
     log_level: str = "INFO"
     docker_image: str = "rle-headless:latest"
     docker_port: int = 8765
+    hf_token: str | None = None
+    """Fine-grained HuggingFace write token (HF_TOKEN in .env) for dataset pushes."""
+    hf_dataset_repo: str = "AppSprout/rle-benchmarks"
+    """Target HF dataset repo (HF_DATASET_REPO in .env to override)."""
 
     def get_helix_config(self) -> HelixConfig:
         """Return the HelixConfig preset matching ``helix_preset``."""
