@@ -503,3 +503,66 @@ class TestReasoningTokenExtraction:
         assert agent._last_usage["reasoning_tokens"] == 900
         # original usage dict on the result is not mutated
         assert "reasoning_tokens" not in result.usage
+
+
+# ------------------------------------------------------------------
+# generation-ID capture (billed-cost reconciliation against OpenRouter)
+# ------------------------------------------------------------------
+
+
+class TestGenerationIdExtraction:
+    def test_none_raw_response(self) -> None:
+        assert RimWorldRoleAgent._extract_generation_id(None) is None
+
+    def test_dict_shape(self) -> None:
+        assert RimWorldRoleAgent._extract_generation_id({"id": "gen-abc123"}) == "gen-abc123"
+
+    def test_object_shape(self) -> None:
+        raw = SimpleNamespace(id="gen-xyz")
+        assert RimWorldRoleAgent._extract_generation_id(raw) == "gen-xyz"
+
+    def test_non_string_id_returns_none(self) -> None:
+        assert RimWorldRoleAgent._extract_generation_id({"id": 12345}) is None
+
+    def test_empty_string_returns_none(self) -> None:
+        assert RimWorldRoleAgent._extract_generation_id({"id": ""}) is None
+
+
+class TestGenerationIdAccumulation:
+    def _result(self, gen_id: str) -> CompletionResult:
+        return CompletionResult(
+            content="{}",
+            model="mock",
+            usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            raw_response={"id": gen_id, "usage": {}},
+        )
+
+    def test_every_completion_accumulates(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        """Parse retries call _record_completion again — both IDs must
+        survive so failed-parse tokens are still billed (issue #04)."""
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        agent._record_completion(self._result("gen-1"))
+        agent._record_completion(self._result("gen-2"))
+        assert agent.drain_generation_ids() == ["gen-1", "gen-2"]
+
+    def test_drain_clears(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        agent._record_completion(self._result("gen-1"))
+        agent.drain_generation_ids()
+        assert agent.drain_generation_ids() == []
+
+    def test_no_id_in_raw_response_is_skipped(
+        self, mock_provider: MagicMock, helix: HelixGeometry,
+    ) -> None:
+        agent = _DummyRoleAgent("d-01", mock_provider, helix, spawn_time=0.0)
+        result = CompletionResult(
+            content="{}", model="mock",
+            usage={"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            raw_response={"usage": {}},
+        )
+        agent._record_completion(result)
+        assert agent.drain_generation_ids() == []

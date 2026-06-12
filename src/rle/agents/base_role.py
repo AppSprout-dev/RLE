@@ -180,6 +180,10 @@ class RimWorldRoleAgent(LLMAgent):
         self._pending_events: list[RimAPIEvent] = []
         self._last_usage: dict[str, int] | None = None
         self._last_raw_output: str | None = None
+        # Provider generation IDs since the last drain — one per completion
+        # call (parse retries included), consumed by the game loop for
+        # billed-cost reconciliation against OpenRouter.
+        self._generation_ids: list[str] = []
         self._weave_op: Any = None  # Set via enable_weave() for LLM call tracing
 
     def set_provider_kwargs(self, **kwargs: Any) -> None:
@@ -259,7 +263,36 @@ class RimWorldRoleAgent(LLMAgent):
             if reasoning:
                 usage["reasoning_tokens"] = reasoning
         self._last_usage = usage
+        gen_id = self._extract_generation_id(getattr(result, "raw_response", None))
+        if gen_id is not None:
+            self._generation_ids.append(gen_id)
         return result
+
+    def drain_generation_ids(self) -> list[str]:
+        """Return and clear generation IDs accumulated since the last drain.
+
+        Captures EVERY provider call — including parse retries and
+        deliberations that later failed to parse — because those bill tokens
+        too. The game loop drains this each tick into the cost tracker.
+        """
+        ids, self._generation_ids = self._generation_ids, []
+        return ids
+
+    @staticmethod
+    def _extract_generation_id(raw_response: Any) -> str | None:
+        """Pull the provider's generation/completion ID from the raw response.
+
+        OpenRouter's chat completion ``id`` (``gen-...``) keys its
+        ``/api/v1/generation`` billing endpoint. Handles both the OpenAI SDK
+        object shape and the plain dict shape. None when absent.
+        """
+        if raw_response is None:
+            return None
+        if isinstance(raw_response, dict):
+            gen_id = raw_response.get("id")
+        else:
+            gen_id = getattr(raw_response, "id", None)
+        return gen_id if isinstance(gen_id, str) and gen_id else None
 
     @staticmethod
     def _extract_reasoning_tokens(raw_response: Any) -> int:

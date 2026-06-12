@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import time as _time
@@ -86,6 +87,7 @@ class RLEGameLoop:
         screenshots_enabled: bool = False,
         auto_dismiss_dialogs: bool = True,
         camera_director: CameraDirector | None = None,
+        speed_keepalive_s: float = 10.0,
     ) -> None:
         self._config = config
         self._client = client
@@ -129,6 +131,7 @@ class RLEGameLoop:
         self._screenshots_enabled = screenshots_enabled
         self._auto_dismiss_dialogs = auto_dismiss_dialogs
         self._camera_director = camera_director
+        self._speed_keepalive_s = speed_keepalive_s
 
         # Hub-spoke communication — agents read messages from their spokes
         self._hub = CentralPost(max_agents=len(agents))
@@ -619,6 +622,15 @@ class RLEGameLoop:
                         },
                     )
 
+            # Capture generation IDs from every provider call this tick —
+            # parse retries and failed deliberations bill tokens too — for
+            # billed-cost reconciliation against OpenRouter (the token-count
+            # estimator diverged up to 4x on the v0.3.0 spread).
+            if self._cost_tracker:
+                for any_agent in self._agents:
+                    for gen_id in any_agent.drain_generation_ids():
+                        self._cost_tracker.record_generation_id(gen_id)
+
             # Resolve conflicts
             resolved, resolver_stats = self._resolver.resolve(plans, state)
             self._metric_context.conflicts_total += resolver_stats.conflicts_total
@@ -745,6 +757,24 @@ class RLEGameLoop:
 
         return result
 
+    async def _speed_keepalive(self) -> None:
+        """Re-assert game speed periodically (no-pause mode only).
+
+        RimWorld force-pauses on threat letters (mad animal, raid). With
+        --no-pause the loop previously re-asserted speed only at tick
+        boundaries, so a slow model left the game frozen for its entire
+        deliberation window (minutes on kimi/qwen in the v0.3.0 spread) —
+        frozen footage and wildly non-uniform game-time per tick. Setting
+        the speed is idempotent, so this just fires every few seconds for
+        the whole run. Cancelled by run().
+        """
+        while True:
+            await asyncio.sleep(self._speed_keepalive_s)
+            try:
+                await self._client.unpause_game()
+            except Exception:
+                logger.debug("Speed keepalive failed", exc_info=True)
+
     async def run(self, max_ticks: int | None = None) -> list[TickResult]:
         """Run the game loop for N ticks or until stopped."""
         self._running = True
@@ -756,26 +786,41 @@ class RLEGameLoop:
                 "the colony-name dialog and dev debug log to need manual "
                 "dismissal.",
             )
+        keepalive: asyncio.Task[None] | None = None
         if self._no_pause:
             await self._client.unpause_game()
+            if self._speed_keepalive_s > 0:
+                keepalive = asyncio.create_task(self._speed_keepalive())
         tick_count = 0
-        while self._running:
-            result = await self.run_tick()
-            tick_count += 1
-            score_str = ""
-            if result.score:
-                score_str = f" | score={result.score.composite:.3f}"
-            logger.info(
-                "Tick %d (day %d): %d actions, %d executed%s",
-                tick_count,
-                result.day,
-                result.execution.total,
-                result.execution.executed,
-                score_str,
-            )
-            if max_ticks and tick_count >= max_ticks:
-                break
-            await asyncio.sleep(self._config.tick_interval)
+        try:
+            while self._running:
+                result = await self.run_tick()
+                tick_count += 1
+                score_str = ""
+                if result.score:
+                    score_str = f" | score={result.score.composite:.3f}"
+                logger.info(
+                    "Tick %d (day %d): %d actions, %d executed%s",
+                    tick_count,
+                    result.day,
+                    result.execution.total,
+                    result.execution.executed,
+                    score_str,
+                )
+                if max_ticks and tick_count >= max_ticks:
+                    break
+                await asyncio.sleep(self._config.tick_interval)
+        finally:
+            if keepalive is not None:
+                keepalive.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await keepalive
+            # Final drain: a deliberation that timed out on the last tick may
+            # have completed in its worker thread after the per-tick drain.
+            if self._cost_tracker:
+                for agent in self._agents:
+                    for gen_id in agent.drain_generation_ids():
+                        self._cost_tracker.record_generation_id(gen_id)
         return self._tick_results
 
     def stop(self) -> None:

@@ -10,10 +10,12 @@ import httpx
 import pytest
 
 from rle.tracking.cost_tracker import (
+    BilledCostReport,
     CostSnapshot,
     CostTracker,
     TokenUsage,
     create_cost_tracker,
+    fetch_billed_costs,
     fetch_pricing,
 )
 
@@ -188,6 +190,127 @@ class TestCostTrackerSnapshot:
         time.sleep(0.05)
         snap2 = tracker.snapshot()
         assert snap2.wall_time_s >= snap1.wall_time_s
+
+
+# ------------------------------------------------------------------
+# Generation-ID accumulation (billed-cost reconciliation)
+# ------------------------------------------------------------------
+
+
+class TestGenerationIds:
+    def test_records_in_order(self) -> None:
+        tracker = CostTracker("model")
+        tracker.record_generation_id("gen-1")
+        tracker.record_generation_id("gen-2")
+        assert tracker.generation_ids == ["gen-1", "gen-2"]
+
+    def test_ignores_none_and_empty(self) -> None:
+        tracker = CostTracker("model")
+        tracker.record_generation_id(None)
+        tracker.record_generation_id("")
+        tracker.record_generation_id("gen-1")
+        assert tracker.generation_ids == ["gen-1"]
+
+    def test_property_returns_copy(self) -> None:
+        tracker = CostTracker("model")
+        tracker.record_generation_id("gen-1")
+        ids = tracker.generation_ids
+        ids.append("gen-tampered")
+        assert tracker.generation_ids == ["gen-1"]
+
+
+# ------------------------------------------------------------------
+# fetch_billed_costs tests (OpenRouter /generation ground truth)
+# ------------------------------------------------------------------
+
+
+def _generation_transport(costs: dict[str, float | None]) -> httpx.MockTransport:
+    """Transport serving /generation?id=... from a gen_id -> total_cost map.
+
+    IDs absent from the map 404 (like OpenRouter does for unknown ids).
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        gen_id = request.url.params.get("id")
+        if gen_id not in costs:
+            return httpx.Response(status_code=404, json={"error": "not found"})
+        return httpx.Response(
+            status_code=200, json={"data": {"id": gen_id, "total_cost": costs[gen_id]}},
+        )
+
+    return httpx.MockTransport(handler)
+
+
+class TestFetchBilledCosts:
+    async def test_empty_ids_returns_none(self) -> None:
+        assert await fetch_billed_costs([], "key") is None
+
+    async def test_sums_billed_costs(self) -> None:
+        transport = _generation_transport({"gen-1": 0.012, "gen-2": 0.03, "gen-3": 0.0005})
+        report = await fetch_billed_costs(
+            ["gen-1", "gen-2", "gen-3"], "key",
+            transport=transport, retry_delay_s=0.0,
+        )
+        assert report is not None
+        assert report.billed_cost_usd == pytest.approx(0.0425)
+        assert report.billed_generations == 3
+        assert report.missing_generations == 0
+        assert report.source == "openrouter_generation_api"
+
+    async def test_missing_generation_counts_as_lower_bound(self) -> None:
+        transport = _generation_transport({"gen-1": 0.01})
+        report = await fetch_billed_costs(
+            ["gen-1", "gen-unknown"], "key",
+            transport=transport, retry_delay_s=0.0,
+        )
+        assert report is not None
+        assert report.billed_cost_usd == pytest.approx(0.01)
+        assert report.billed_generations == 1
+        assert report.missing_generations == 1
+
+    async def test_all_missing_returns_none(self) -> None:
+        transport = _generation_transport({})
+        report = await fetch_billed_costs(
+            ["gen-a", "gen-b"], "key", transport=transport, retry_delay_s=0.0,
+        )
+        assert report is None
+
+    async def test_null_total_cost_treated_as_free(self) -> None:
+        transport = _generation_transport({"gen-free": None})
+        report = await fetch_billed_costs(
+            ["gen-free"], "key", transport=transport, retry_delay_s=0.0,
+        )
+        assert report is not None
+        assert report.billed_cost_usd == 0.0
+        assert report.billed_generations == 1
+
+    async def test_connection_errors_count_as_missing(self) -> None:
+        transport = _make_error_transport()
+        report = await fetch_billed_costs(
+            ["gen-1"], "key", transport=transport, retry_delay_s=0.0,
+        )
+        assert report is None
+
+    async def test_sends_bearer_auth(self) -> None:
+        seen_auth: list[str | None] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            seen_auth.append(request.headers.get("authorization"))
+            return httpx.Response(status_code=200, json={"data": {"total_cost": 0.01}})
+
+        report = await fetch_billed_costs(
+            ["gen-1"], "sk-or-test", transport=httpx.MockTransport(handler),
+            retry_delay_s=0.0,
+        )
+        assert report is not None
+        assert seen_auth == ["Bearer sk-or-test"]
+
+    def test_report_is_frozen(self) -> None:
+        report = BilledCostReport(
+            billed_cost_usd=1.0, billed_generations=2, missing_generations=0,
+        )
+        with pytest.raises(Exception):
+            report.billed_cost_usd = 9.9  # type: ignore[misc]
 
 
 # ------------------------------------------------------------------
