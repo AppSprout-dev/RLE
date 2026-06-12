@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rimworld-learning-environment"
-version = "0.3.0"
+version = "0.4.0"
 description = "Multi-agent benchmark where Felix Agent SDK agents play RimWorld"
 readme = "README.md"
 license = "MIT"
