@@ -183,6 +183,98 @@ class TestGrowingZoneIdempotency:
         assert client.create_growing_zone.await_count == 2
 
 
+class TestStockpileZoneIdempotency:
+    """Stockpile overlaps log one RimWorld error PER CELL ('overwriting slot
+    group square'), spamming the dev log. Same guard as growing zones."""
+
+    def _zone(self, x1: int, z1: int, x2: int, z2: int) -> Action:
+        return Action(
+            action_type="stockpile_zone",
+            parameters={"map_id": 0, "x1": x1, "z1": z1, "x2": x2, "z2": z2},
+        )
+
+    async def test_first_stockpile_succeeds(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        result = await executor.execute(_make_plan(self._zone(132, 134, 136, 140)))
+        assert result.executed == 1
+        client.create_stockpile_zone.assert_awaited_once()
+
+    async def test_overlapping_repeat_is_rejected(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        await executor.execute(_make_plan(self._zone(132, 134, 136, 140)))
+        result = await executor.execute(_make_plan(self._zone(132, 134, 136, 140)))
+        assert result.failed == 1
+        assert result.executed == 0
+        assert result.outcomes[0].error is not None
+        assert "already" in result.outcomes[0].error.lower()
+        client.create_stockpile_zone.assert_awaited_once()
+
+    async def test_non_overlapping_stockpile_allowed(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        await executor.execute(_make_plan(self._zone(132, 134, 136, 140)))
+        result = await executor.execute(_make_plan(self._zone(150, 150, 154, 154)))
+        assert result.executed == 1
+        assert client.create_stockpile_zone.await_count == 2
+
+    async def test_growing_and_stockpile_guards_are_independent(self) -> None:
+        """A stockpile may legitimately sit where no growing zone is — the two
+        guards must not share state."""
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        grow = Action(
+            action_type="growing_zone",
+            parameters={"x1": 10, "z1": 10, "x2": 15, "z2": 15},
+        )
+        await executor.execute(_make_plan(grow))
+        result = await executor.execute(_make_plan(self._zone(10, 10, 15, 15)))
+        assert result.executed == 1
+
+
+class TestStockpilePriorityParsing:
+    """Models emit RimWorld's semantic priority words ('important'); the
+    handler crashed in int() during the 2026-06-11 spread."""
+
+    def _zone_with_priority(self, priority: object) -> Action:
+        return Action(
+            action_type="stockpile_zone",
+            parameters={"x1": 1, "z1": 1, "x2": 4, "z2": 4, "priority": priority},
+        )
+
+    async def test_semantic_priority_word_mapped(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        result = await executor.execute(_make_plan(self._zone_with_priority("important")))
+        assert result.executed == 1
+        assert client.create_stockpile_zone.await_args.kwargs["priority"] == 4
+
+    async def test_priority_word_case_insensitive(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        await executor.execute(_make_plan(self._zone_with_priority(" Critical ")))
+        assert client.create_stockpile_zone.await_args.kwargs["priority"] == 5
+
+    async def test_numeric_priority_passthrough(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        await executor.execute(_make_plan(self._zone_with_priority(2)))
+        assert client.create_stockpile_zone.await_args.kwargs["priority"] == 2
+
+    async def test_numeric_string_priority(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        await executor.execute(_make_plan(self._zone_with_priority("4")))
+        assert client.create_stockpile_zone.await_args.kwargs["priority"] == 4
+
+    async def test_garbage_priority_falls_back_to_default(self) -> None:
+        client = AsyncMock()
+        executor = ActionExecutor(client)
+        await executor.execute(_make_plan(self._zone_with_priority("highest")))
+        assert client.create_stockpile_zone.await_args.kwargs["priority"] == 3
+
+
 class TestDispatch:
     async def test_set_work_priority(self) -> None:
         client = AsyncMock()

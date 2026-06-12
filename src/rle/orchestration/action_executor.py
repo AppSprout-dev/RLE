@@ -107,6 +107,11 @@ class ActionExecutor:
         # agent learns the zone exists instead of burning ticks on doomed calls
         # (issue #33).
         self._created_growing_zones: list[tuple[int, int, int, int]] = []
+        # Same guard for stockpiles: RimWorld logs one "overwriting slot group
+        # square" error PER CELL when a stockpile overlaps an existing one,
+        # which spams the dev log (and pops it over the game when auto-open
+        # is enabled).
+        self._created_stockpile_zones: list[tuple[int, int, int, int]] = []
 
     @staticmethod
     def _rects_overlap(
@@ -269,11 +274,37 @@ class ActionExecutor:
         )
         self._created_growing_zones.append(rect)
 
+    # RimWorld's StoragePriority is semantic; models reasonably emit the
+    # words. Map them instead of crashing in int() (found in the 2026-06-11
+    # spread: fable5 sent priority="important").
+    _STOCKPILE_PRIORITIES = {
+        "unstored": 0, "low": 1, "normal": 2,
+        "preferred": 3, "important": 4, "critical": 5,
+    }
+
+    @classmethod
+    def _parse_stockpile_priority(cls, value: Any) -> int:
+        if isinstance(value, str):
+            named = cls._STOCKPILE_PRIORITIES.get(value.strip().lower())
+            if named is not None:
+                return named
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 3
+
     async def _h_stockpile_zone(self, cid: str, params: dict[str, Any]) -> None:
-        x1 = params.get("x1", params.get("x", 0))
-        z1 = params.get("z1", params.get("z", 0))
-        x2 = params.get("x2", x1 + 5)
-        z2 = params.get("z2", z1 + 5)
+        x1 = int(params.get("x1", params.get("x", 0)))
+        z1 = int(params.get("z1", params.get("z", 0)))
+        x2 = int(params.get("x2", x1 + 5))
+        z2 = int(params.get("z2", z1 + 5))
+        rect = (min(x1, x2), min(z1, z2), max(x1, x2), max(z1, z2))
+        if any(self._rects_overlap(rect, prev) for prev in self._created_stockpile_zones):
+            raise ValueError(
+                "A stockpile zone already covers these cells — it was created "
+                "earlier this run. Do NOT recreate it; pick a different, "
+                "non-overlapping rectangle or move on to another task."
+            )
         await self._client.create_stockpile_zone(
             map_id=int(params.get("map_id", 0)),
             x1=x1,
@@ -281,10 +312,11 @@ class ActionExecutor:
             x2=x2,
             z2=z2,
             name=params.get("name", ""),
-            priority=int(params.get("priority", 3)),
+            priority=self._parse_stockpile_priority(params.get("priority", 3)),
             allowed_item_defs=params.get("allowed_item_defs"),
             allowed_item_categories=params.get("allowed_item_categories"),
         )
+        self._created_stockpile_zones.append(rect)
 
     async def _h_designate_area(self, cid: str, params: dict[str, Any]) -> None:
         x1 = params.get("x1", params.get("x", 0))
