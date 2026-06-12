@@ -519,6 +519,22 @@ class RimAPIClient:
             return []
         return data if isinstance(data, list) else []
 
+    async def window_endpoints_available(self) -> bool:
+        """Probe whether the deployed RIMAPI build has the /ui/window endpoints.
+
+        The 2026-06-11 spread ran an entire 11-model batch with auto-dismiss
+        silently inert because the Workshop DLL predated PR #77 and every
+        window call 404'd inside the swallow-everything error handling. A
+        connection error returns True (can't tell — don't warn spuriously).
+        """
+        try:
+            await self._get("/api/v1/ui/windows")
+        except RimAPIResponseError:
+            return False
+        except RimAPIConnectionError:
+            return True
+        return True
+
     async def get_resources(
         self, power_info: PowerData | None = None,
     ) -> ResourceData:

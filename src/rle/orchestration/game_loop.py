@@ -748,6 +748,14 @@ class RLEGameLoop:
     async def run(self, max_ticks: int | None = None) -> list[TickResult]:
         """Run the game loop for N ticks or until stopped."""
         self._running = True
+        if not await self._client.window_endpoints_available():
+            logger.warning(
+                "RIMAPI build lacks /api/v1/ui/window endpoints (404) — "
+                "auto-dismiss of force-pause dialogs is INERT this run. "
+                "Rebuild and deploy the rle-testing DLL (PR #77), or expect "
+                "the colony-name dialog and dev debug log to need manual "
+                "dismissal.",
+            )
         if self._no_pause:
             await self._client.unpause_game()
         tick_count = 0
