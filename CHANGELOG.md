@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.3.0...rimworld-learning-environment-v0.4.0) (2026-06-12)
+
+
+### Features
+
+* add export_site_data.py website fold-in exporter ([aa71f15](https://github.com/AppSprout-dev/RLE/commit/aa71f15da62fd9ea998026b4ee81cb2dc77d9665))
+* add export_site_data.py website fold-in exporter ([2c27cc4](https://github.com/AppSprout-dev/RLE/commit/2c27cc43d99f7846845683a2b4d8718707631400))
+* HuggingFace dataset integration ([8a20c18](https://github.com/AppSprout-dev/RLE/commit/8a20c18aa79de2d8d6b6c7e3707506b8c407ec81))
+* HuggingFace dataset integration (closes [#45](https://github.com/AppSprout-dev/RLE/issues/45)) ([82911be](https://github.com/AppSprout-dev/RLE/commit/82911be6858f4f548cc2ae871f66ac22e5958a99))
+* spread capture polish — model-labeled ticker, dashboard tick mirror ([53995be](https://github.com/AppSprout-dev/RLE/commit/53995be9076bec28bc6a1003679f592a4ad4b6df))
+* spread capture polish + post-spread harness fixes ([6a84657](https://github.com/AppSprout-dev/RLE/commit/6a846574285604afc91bcca48c40ee1ce43514c7))
+
+
+### Bug Fixes
+
+* billed-cost reconciliation + no-pause speed keepalive ([209b275](https://github.com/AppSprout-dev/RLE/commit/209b275948d131330c5629a5abbecaafc89dcadf))
+* billed-cost reconciliation + no-pause speed keepalive ([ce97a6c](https://github.com/AppSprout-dev/RLE/commit/ce97a6c2cd86b5025f340db8132f103adc57d52a))
+* stockpile overlap guard, semantic priority parsing, window preflight ([6b33521](https://github.com/AppSprout-dev/RLE/commit/6b33521a79c47ab7c98a62703ba8a7646191fb82))
+
 ## [0.3.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.2.0...rimworld-learning-environment-v0.3.0) (2026-06-11)
 
 
