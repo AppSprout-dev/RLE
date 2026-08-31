@@ -163,18 +163,23 @@ python scripts/analyze_spread.py --spread-dir results/spread
 
 ## Benchmark Results
 
-**6-model spread** — Crashlanded, 10 ticks, seed 42. **N=1, content-first — not statistically significant; top models advance to N=4.** Ranked by mean composite across the run (endpoint scores are single-event noisy):
+**11-model spread** — Crashlanded, 10 ticks, seed 42, 2026-06-11. **N=1, content-first — not statistically valid (no confidence intervals). Winners advance to N=4; N=4 is not published.** Ranked by mean composite across the run. Featured numbers live on the [HF card](https://huggingface.co/datasets/AppSprout/rle-benchmarks) and [rle.appsprout.dev](https://rle.appsprout.dev) (same `site_data.json` payload).
 
-| # | Model | Mean composite | Cost |
-|---|-------|---------------|------|
-| 1 | Grok 4.3 | **0.831** | $0.38 |
-| 2 | Opus 4.8 | 0.826 | subscription |
-| 3 | Gemini 3.5 Flash | 0.825 | $2.41 |
-| 4 | Fable 5 | 0.803 | subscription |
-| 5 | GPT-5.5 | 0.722 | $3.79 |
-| 6 | DeepSeek V4 Pro | 0.704 | $0.55 |
+| # | Model | Mean | Final | vs baseline | Cost |
+|---|-------|------|-------|-------------|------|
+| 1 | Grok 4.3 | **0.836** | 0.804 | −0.004 | $0.36 |
+| 2 | Mistral Medium 3.5 | 0.827 | 0.804 | −0.004 | $0.73 |
+| 3 | Gemini 3.5 Flash | 0.815 | 0.774 | −0.013 | $2.28 |
+| 4 | Qwen3.7 Max | 0.805 | 0.783 | −0.011 | $0.75 |
+| 5 | Claude Fable 5 | 0.805 | 0.721 | −0.015 | ~$5.48 |
+| 6 | Nemotron 3 Super 120B | 0.804 | 0.793 | −0.006 | $0.12 |
+| 7 | Claude Opus 4.8 | 0.801 | 0.710 | −0.009 | ~$1.83 |
+| 8 | GLM-5.1 | 0.782 | 0.740 | +0.028 | $0.94 |
+| 9 | GPT-5.5 | 0.764 | 0.624 | −0.015 | $4.00 |
+| 10 | DeepSeek-V4 Pro | 0.716 | 0.610 | −0.021 | $0.52 |
+| 11 | Kimi K2.6 | 0.686 | 0.638 | −0.034 | $1.22 |
 
-Measured against a pinned no-agent baseline (N=4, colony dead by day 8). Notable finding: all six models repeatedly re-issued research targets that had just failed, despite explicit per-tick error feedback.
+Measured against a pinned no-agent baseline (4 seeds, mean time-to-end 8.0 days). **1 of 11 models beat the no-agent baseline** (GLM-5.1). Highest mean composite is not the same as beating baseline. Costs marked `~` are token-count estimates (subscription-billed); unmarked costs are OpenRouter billed.
 
 ## Scenarios
 
