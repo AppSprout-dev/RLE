@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.4.0...rimworld-learning-environment-v0.4.1) (2026-08-31)
+
+
+### Documentation
+
+* replace stale 6-model README benchmark table with public 11-model spread ([#48](https://github.com/AppSprout-dev/RLE/issues/48)) ([d656db3](https://github.com/AppSprout-dev/RLE/commit/d656db32876f17b4b3f245d5ceb0fc17e5d71ae2))
+
 ## [0.4.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.3.0...rimworld-learning-environment-v0.4.0) (2026-06-12)
 
 
