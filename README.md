@@ -1,5 +1,9 @@
 # RLE — RimWorld Learning Environment
 
+## ELI5
+
+RLE is a public research benchmark — not a product — where AI agent setups try to keep a RimWorld colony alive. The published leaderboard is one 11-model Crashlanded run (2026-06-11, N=1, seed 42, 10 ticks) on the `felix` harness at scoring 1.1 — Grok 4.3 leads at mean composite 0.836; it is content-first and not statistically valid. Winners advance to N=4; N=4 is not published. Those rows are not comparable to scoring 1.2. Harness × model and scoring 1.2 are how the code works now; that matrix is not a published result yet. Full table: [Benchmark Results](#benchmark-results).
+
 A **harness × model** benchmark: swappable agent harnesses manage a RimWorld colony under uncertainty and are scored on the same footing against an unmanaged baseline. Think [FLE](https://github.com/chenhao-wang/FLE) (Factorio Learning Environment) but stochastic, multi-agent-capable, and with the *harness* — not just the model — as a first-class variable.
 
 ## What makes this different
