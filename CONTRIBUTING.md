@@ -55,27 +55,51 @@ LM Studio settings: Flash Attention ON, Context 10000, GPU Offload max, Keep in 
 ### Quick test (no RimWorld needed)
 
 ```bash
-# Smoke test — tests the full pipeline with fake game state
-python scripts/run_benchmark.py --smoke-test --ticks 3
+# Smoke test — full pipeline with fake game state and each harness's mock agent
+# (no LLM calls; proves plumbing, not colony management)
+python scripts/run_benchmark.py --smoke-test --ticks 3 --harness felix --harness baseline
 
-# Smoke test with real LLM (needs LM Studio running)
-OPENAI_API_KEY=lm-studio python scripts/run_benchmark.py \
-  --smoke-test --provider openai \
-  --model unsloth/nvidia-nemotron-3-nano-4b \
-  --base-url http://localhost:1234/v1 \
-  --no-think --ticks 3
+# Which harnesses are installed and usable here
+python scripts/run_benchmark.py --harness list
+
+# Run the suite as CI does, with and without the felix extra
+uv sync --extra dev --extra felix --extra mcp && pytest
+UV_PROJECT_ENVIRONMENT=.venv-nofelix uv sync --extra dev --extra mcp && \
+  UV_PROJECT_ENVIRONMENT=.venv-nofelix uv run --no-sync pytest
+python scripts/check_harness_boundary.py
 ```
+
+`--smoke-test` always uses mock LLMs. To exercise a real model against the fake game state, run a real harness with `--ticks` small against a live RIMAPI instead (below).
 
 ### Live game test
 
 ```bash
 # Start RimWorld with RIMAPI mod, load a colony, then:
 OPENAI_API_KEY=lm-studio python scripts/run_scenario.py crashlanded_survival \
+  --harness felix \
   --provider openai \
   --model unsloth/nvidia-nemotron-3-nano-4b \
   --base-url http://localhost:1234/v1 \
   --no-think --visualize --ticks 10
+
+# Same scenario, a coding-agent harness (needs the plugin + its binary installed)
+uv pip install git+https://github.com/AppSprout-dev/rle-harness-opencode
+python scripts/run_scenario.py crashlanded_survival --harness opencode --model openai/gpt-4o --ticks 10
 ```
+
+### Testing a harness plugin
+
+External plugins depend on RLE core and use `rle.testing`:
+
+```python
+from rle.testing import run_harness_smoke
+
+async def test_smoke() -> None:
+    report = await run_harness_smoke("your-harness", ticks=3)
+    assert report.ok
+```
+
+`run_harness_smoke` builds `plugin.smoke(...)`, drives it through `RLEGameLoop` against `MockRimAPI`, and returns the tick results plus every POST the harness made. Coding-agent plugins return `rle.testing.scripted_agent.ScriptedMcpHarness` from `smoke()` so the MCP round trip is covered without the binary. See [rle-harness-template](https://github.com/AppSprout-dev/rle-harness-template) for the full layout.
 
 ### Docker benchmark (headless, no display)
 
@@ -83,8 +107,8 @@ OPENAI_API_KEY=lm-studio python scripts/run_scenario.py crashlanded_survival \
 # Build image (see docker/README.md for prerequisites)
 docker compose -f docker/docker-compose.yml up -d
 
-# Run benchmark against container
-python scripts/run_benchmark.py --docker --runs 4 --output results/docker/
+# Run a harness x model matrix against the container, 4 paired runs each
+python scripts/run_benchmark.py --docker --runs 4 --harness felix --harness baseline --output results/docker/
 ```
 
 ### OpenRouter (cloud, no local GPU needed)
