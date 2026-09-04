@@ -38,6 +38,13 @@ tracking = [
     "huggingface-hub>=0.20",
 ]
 
+# Harness registry. Only RLE-authored harnesses live in this tree; harnesses
+# wrapping third-party tools (OpenCode, Grok Build, ...) ship as their own
+# packages and register under the same group.
+[project.entry-points."rle.harnesses"]
+baseline = "rle.harness.baseline:PLUGIN"
+felix = "rle.harness.felix:PLUGIN"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/rle"]
 
