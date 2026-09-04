@@ -226,7 +226,7 @@ Every harness receives the same neutral brief (`rle.harness.brief`: scenario goa
 
 ### MapAnalyst + Spatial Awareness
 
-MapAnalyst runs before the other 6 agents each tick. It reads terrain data from RIMAPI (`/api/v1/map/terrain`) and produces a deterministic spatial analysis:
+The deterministic spatial analysis is core (`rle.harness.brief.build_map_summary`, from RIMAPI `/api/v1/map/terrain`) and every harness gets it in its brief. In the Felix harness, MapAnalyst runs before the other 6 agents each tick and narrates it:
 
 - **MAP_SUMMARY** — compact ~500 token text injected into every agent's context
 - **SHELTER_SITE** — verified 7x7 rectangle on solid ground near colony center
@@ -236,9 +236,9 @@ MapAnalyst runs before the other 6 agents each tick. It reads terrain data from 
 
 All role agents are told: "MUST use coordinates from MAP_SUMMARY, do NOT invent coordinates."
 
-### Bootstrap Playbook (day < 3)
+### Bootstrap Playbook (day < 3) — Felix only
 
-Tick-specific priorities injected into all agents:
+Tick-specific priorities injected into all Felix agents (other harnesses get no playbook; that is their harness's problem to solve):
 - Tick 1: Stockpile + work priorities + growing zone (Plant_Rice)
 - Tick 2: 5x5 shelter walls + door + 3 beds (WoodLog)
 - Tick 3: Campfire/stove + research bench + research target
@@ -257,34 +257,36 @@ Tick-specific priorities injected into all agents:
 
 The 5 advanced saves (first_winter, toxic_fallout, raid_defense, plague_response, ship_launch) are built via `scripts/create_scenario_saves.py` — declarative RIMAPI calls that load the base crashlanded save, spawn items/pawns, trigger incidents, and write each scenario. Requires RimWorld running with a map loaded. Saves land in AppData and are mirrored to `docker/saves/`. Use `--only <name>` for a single rebuild or `--difficulty-only` for offline byte-patching.
 
-## CentralPost Hub-Spoke Communication
+## Felix harness: CentralPost Hub-Spoke Communication
 
-Agents communicate through Felix SDK's CentralPost, not through the orchestrator:
+Felix agents communicate through Felix SDK's CentralPost, owned by `FelixHarness` (the loop knows nothing about it):
 
 - **Before deliberation**: `process_all_messages()` routes previous tick's messages to agent spoke inbound queues. Agents read via `_get_spoke_context()`.
 - **MapAnalyst first**: Deliberates, sends TASK_COMPLETE with spatial analysis. Messages routed immediately so role agents see it.
 - **After deliberation**: Each role agent sends `TASK_COMPLETE` with role, summary, confidence, action types.
-- **After scoring**: Hub broadcasts `STATUS_UPDATE` with composite score + all 10 metrics.
+- **After scoring** (`on_tick_end`): Hub broadcasts `STATUS_UPDATE` with the composite score + all metrics, and a `STATUS_UPDATE` listing last tick's failed writes ("DO NOT REPEAT").
 - **On phase change**: Hub broadcasts `PHASE_ANNOUNCE` when macro_time crosses 0.4 (exploration→analysis) or 0.7 (analysis→synthesis).
+
+Message and conflict counts are emitted on the `CONFLICT` event as diagnostics; since scoring 1.2 they do not feed the composite.
 
 ## SSE Events
 
 RimAPISSEClient connects to `/api/v1/events` and buffers real-time game events (raids, deaths, mental breaks). Each tick:
 
 1. GameStateManager drains SSE buffer → `pending_events`
-2. Game loop injects events into all agents via `set_pending_events()`
-3. Each agent's `filter_game_state()` includes role-relevant events as `"recent_events"`
+2. The loop passes them to `harness.step(state, tick, macro_time, events)`; the brief carries the most recent ones as `recent_events`
+3. Felix: `FelixHarness` injects them into every agent via `set_pending_events()`, and each agent's `filter_game_state()` includes role-relevant events as `"recent_events"`
 
-## Conflict Resolution (4 rules)
+## Felix harness: Conflict Resolution (4 rules)
 
 1. Emergency roles promoted during crises (DefenseCommander during raids, MedicalOfficer during plague)
 2. Same-pawn conflicts: lowest action priority number wins
 3. Role priority tiebreak (ResourceManager=3, DefenseCommander=3, MedicalOfficer=4, MapAnalyst=10, others=5)
 4. Final tiebreak: highest plan confidence score
 
-## Helix Phase Adaptation
+## Felix harness: Helix Phase Adaptation
 
-Macro helix: `t = min(1.0, game_day / expected_duration_days)` drives agent behavior:
+`macro_time = min(1.0, game_day / expected_duration_days)` is computed by the loop and handed to every harness. Felix maps it onto helix phases that drive agent temperature and prompt directives:
 - **Exploration** (t < 0.4): High temperature, diverse strategies
 - **Analysis** (0.4 <= t < 0.7): Medium temp, evaluate trade-offs
 - **Synthesis** (t >= 0.7): Low temperature, decisive actions
@@ -320,28 +322,31 @@ Scenarios can override weights. TimeSeriesRecorder exports per-tick CSV.
 
 Each defines victory/failure conditions, scoring weight overrides, and max ticks.
 
-## Provider Configuration
+## Provider / Model Configuration
 
-Provider-agnostic via felix-agent-sdk. CLI flags: `--provider`, `--model`, `--base-url`.
+`--provider`, `--model`, `--base-url` (and the matching `.env` fields) are plain strings on `RLEConfig`; the selected harness interprets them. Model naming therefore follows the harness:
 
-| Provider | Model | Command |
-|----------|-------|---------|
-| LM Studio (local) | Nemotron Nano 4B | `--provider openai --model unsloth/nvidia-nemotron-3-nano-4b --base-url http://localhost:1234/v1` |
-| OpenRouter (cloud) | Nemotron 30B | `OPENAI_API_KEY=<key> --provider openai --model nvidia/nemotron-3-nano-30b-a3b --base-url https://openrouter.ai/api/v1` |
-| Anthropic | Claude | `--provider anthropic --model claude-sonnet-4-5` |
-| OpenAI | GPT-4o | `--provider openai --model gpt-4o` |
+| Harness | Provider/model meaning | Example |
+|---------|------------------------|---------|
+| `felix` | Felix SDK provider registry (`anthropic`, `openai`, `local`, `claude-code`) in `rle/harness/felix/provider_factory.py` | `--provider openai --model unsloth/nvidia-nemotron-3-nano-4b --base-url http://localhost:1234/v1` |
+| `felix` | | `OPENAI_API_KEY=<key> --provider openai --model nvidia/nemotron-3-nano-30b-a3b --base-url https://openrouter.ai/api/v1` |
+| `felix` | | `--provider anthropic --model claude-sonnet-4-5` |
+| `opencode` | OpenCode's `provider/model` ids, credentials from `opencode auth` | `--model openai/gpt-4o`, `--model anthropic/claude-sonnet-4-5` |
+| `grok-build` | Grok Build's `-m` model id, auth via `XAI_API_KEY` or cached login | `--model grok-4.6` |
 
-Use `--no-think` for thinking models (Qwen3.5, Nemotron) — injects `</think>` assistant prefix to skip reasoning chain.
+Felix-only: `--no-think` (or `--harness-opt no_think=true`) injects a `</think>` assistant prefill so thinking models (Qwen3.5, Nemotron) skip the reasoning chain. Leaderboard rows are `harness/model`, so the same model under two harnesses is two rows.
 
 ## Conventions
 
 - Python 3.14+, `uv` for package management, `hatchling` build backend
 - Async-first (httpx AsyncClient, async game loop)
-- Parallel-first: MapAnalyst runs first (sequential), then 6 role agents deliberate concurrently via `asyncio.to_thread` + `asyncio.gather` (`--sequential` to disable)
+- Core is framework-free: `felix_agent_sdk` is imported only under `src/rle/harness/felix/`; everything else runs with the `felix` extra uninstalled (CI `test-no-felix` job + `scripts/check_harness_boundary.py`). Third-party harnesses never live in this tree (ADR-004).
+- Harness-agnostic scoring: metrics read the executed write stream, never a harness's internal messaging
+- Felix harness: MapAnalyst runs first (sequential), then 6 role agents deliberate concurrently via `asyncio.gather` (`--sequential` / `--harness-opt parallel=false` to disable)
 - Pydantic v2 models with frozen=True for game state and results
-- mypy strict mode — all code must pass `mypy src/` with `strict = true`
+- mypy strict mode — all code must pass `mypy src/` with `strict = true`; `py.typed` is shipped so external harness packages type-check against RLE
 - No scipy/numpy — stdlib only for statistics (random, math). See ADR-003 for rationale
-- Felix Agent SDK for providers, agents, helix geometry, CentralPost communication
+- Felix Agent SDK (inside the `felix` harness only) for providers, agents, helix geometry, CentralPost communication
 - JSON repair + parse retry for LLM output resilience (strips think tags, trailing commas, extracts first JSON object)
 - Real RIMAPI data via state adapters + deterministic terrain analysis
 - Tests use pytest-asyncio with auto mode
@@ -350,7 +355,7 @@ Use `--no-think` for thinking models (Qwen3.5, Nemotron) — injects `</think>` 
 
 GitHub Actions workflows in `.github/workflows/`:
 
-- **ci.yml** — On every push/PR: ruff lint, mypy strict, pytest, smoke-test
+- **ci.yml** — On every push/PR: ruff lint, mypy strict, harness boundary check, pytest (with `felix`+`mcp` extras), `test-no-felix` (core + `mcp` only: suite, `--harness list`, baseline smoke), `smoke-test` (felix + baseline matrix), `external-plugin-contract` (installs `rle-harness-template` from GitHub, asserts it lists and passes smoke)
 - **benchmark.yml** — Manual dispatch + weekly schedule: Docker benchmark template (requires self-hosted runner with game files)
 
 ## Package Structure
