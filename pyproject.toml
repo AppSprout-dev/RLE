@@ -27,7 +27,7 @@ openai = ["felix-agent-sdk[openai]"]
 local = ["felix-agent-sdk[local]"]
 all = ["felix-agent-sdk[all]"]
 # RimAPI MCP server for tool-using harnesses (`rle-mcp`).
-mcp = ["mcp>=1.2"]
+mcp = ["mcp>=2.1"]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.24",
@@ -50,6 +50,9 @@ tracking = [
 [project.entry-points."rle.harnesses"]
 baseline = "rle.harness.baseline:PLUGIN"
 felix = "rle.harness.felix:PLUGIN"
+
+[project.scripts]
+rle-mcp = "rle.mcp.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rle"]

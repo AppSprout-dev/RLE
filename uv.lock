@@ -1296,7 +1296,7 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.24" },
     { name = "huggingface-hub", marker = "extra == 'tracking'", specifier = ">=0.20" },
     { name = "matplotlib", marker = "extra == 'viz'", specifier = ">=3.5" },
-    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.2" },
+    { name = "mcp", marker = "extra == 'mcp'", specifier = ">=2.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pydantic-settings", specifier = ">=2.0" },

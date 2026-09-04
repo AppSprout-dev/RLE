@@ -16,7 +16,7 @@ from rle.agents.actions import (
 from rle.rimapi.api_catalog import WRITE_CATALOG
 from rle.rimapi.client import RimAPIClient, RimAPIResponseError
 
-__all__ = ["ActionExecutor", "ActionOutcome", "ExecutionResult"]
+__all__ = ["NEEDS_PAWN", "ActionExecutor", "ActionOutcome", "ExecutionResult"]
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,8 @@ _NEEDS_PAWN: frozenset[str] = frozenset({
     "bed_rest",
     "tend",
 })
+# Public alias for callers that validate before dispatch (MCP tools).
+NEEDS_PAWN = _NEEDS_PAWN
 
 
 def _extract_rimapi_error(detail: str) -> str:
