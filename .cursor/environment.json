@@ -1,0 +1,5 @@
+{
+  "name": "RLE (RimWorld Learning Environment)",
+  "user": "ubuntu",
+  "install": "bash .cursor/install.sh"
+}
