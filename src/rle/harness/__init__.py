@@ -12,6 +12,14 @@ Register a harness under the ``rle.harnesses`` entry-point group; see
 ``docs/harness-plugins.md``.
 """
 
+from rle.harness.cli import (
+    add_harness_args,
+    exit_with_harness_error,
+    format_harness_table,
+    harness_options_for,
+    maybe_handle_harness_list,
+    selected_harnesses,
+)
 from rle.harness.protocol import (
     Availability,
     BaseHarness,
@@ -50,10 +58,16 @@ __all__ = [
     "HarnessUnavailableError",
     "StepResult",
     "TickObserver",
+    "add_harness_args",
     "create_harness",
+    "exit_with_harness_error",
+    "format_harness_table",
     "get_plugin",
     "harness_names",
+    "harness_options_for",
     "list_harnesses",
+    "maybe_handle_harness_list",
     "parse_option_pairs",
+    "selected_harnesses",
     "validate_options",
 ]

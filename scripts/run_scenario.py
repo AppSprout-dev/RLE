@@ -11,21 +11,22 @@ import random
 import sys
 from pathlib import Path
 
-from felix_agent_sdk.core import HelixConfig
-from felix_agent_sdk.visualization import HelixVisualizer
-
-from rle.agents import AGENT_DISPLAY
-from rle.agents.construction_planner import ConstructionPlanner
-from rle.agents.defense_commander import DefenseCommander
-from rle.agents.map_analyst import MapAnalyst
-from rle.agents.medical_officer import MedicalOfficer
-from rle.agents.research_director import ResearchDirector
-from rle.agents.resource_manager import ResourceManager
-from rle.agents.social_overseer import SocialOverseer
-from rle.config import RLEConfig, bridge_anthropic_key, bridge_openrouter_key
-from rle.docker import wait_for_rimapi
+from rle.config import RLEConfig
+from rle.harness import (
+    HarnessContext,
+    HarnessNotFoundError,
+    HarnessOptionsError,
+    HarnessUnavailableError,
+    add_harness_args,
+    create_harness,
+    exit_with_harness_error,
+    harness_options_for,
+    maybe_handle_harness_list,
+    selected_harnesses,
+)
 from rle.orchestration.camera_director import CameraDirector
 from rle.orchestration.game_loop import RLEGameLoop
+from rle.orchestration.save_loader import load_save_and_settle
 from rle.rimapi.client import RimAPIClient
 from rle.rimapi.sse_client import RimAPISSEClient
 from rle.scenarios.evaluator import ScenarioEvaluator
@@ -68,36 +69,38 @@ def _write_deliberations_jsonl(
 
 def _build_run_summary(  # noqa: PLR0913
     args: argparse.Namespace,
-    config_model: str,
-    config_provider: str,
-    config_tick_interval: float,
+    config: RLEConfig,
+    harness_name: str,
+    harness_options: dict[str, object],
+    harness_describe: dict[str, str],
     scenario_name: str,
     scenario_save_name: str,
     max_ticks: int | None,
     outcome: str,
     final_score: float | None,
     ticks_run: int,
+    mean_step_latency_s: float | None,
     cost_snapshot_dict: dict[str, object],
     event_summary_dict: dict[str, object] | None,
     billed_cost_dict: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Compose the per-scenario summary JSON (metadata + config + result)."""
     summary: dict[str, object] = {
-        **collect_metadata(random_seed=args.seed),
+        **collect_metadata(random_seed=args.seed, harness_describe=harness_describe),
         "scenario": scenario_name,
         "scenario_save_name": scenario_save_name,
-        "model": args.model or config_model,
-        "provider": args.provider or config_provider,
-        "base_url": args.base_url or None,
-        "no_think": args.no_think,
-        "parallel": not args.sequential,
-        "no_agent": args.no_agent,
+        "harness": harness_name,
+        "harness_options": harness_options,
+        "model": config.model,
+        "provider": config.provider,
+        "base_url": config.provider_base_url,
         "no_pause": args.no_pause,
-        "tick_interval": config_tick_interval,
+        "tick_interval": config.tick_interval,
         "max_ticks": max_ticks,
         "outcome": outcome,
         "final_score": final_score,
         "ticks_run": ticks_run,
+        "mean_step_latency_s": mean_step_latency_s,
         "cost_snapshot": cost_snapshot_dict,
     }
     if billed_cost_dict is not None:
@@ -105,21 +108,6 @@ def _build_run_summary(  # noqa: PLR0913
     if event_summary_dict is not None:
         summary["event_summary"] = event_summary_dict
     return summary
-
-
-def _create_agents(provider, helix):  # type: ignore[no-untyped-def]
-    """Create all 7 role agents (MapAnalyst + 6 domain agents)."""
-    return [
-        MapAnalyst("map_analyst", provider, helix, spawn_time=0.0, velocity=1.0),
-        ResourceManager("resource_manager", provider, helix, spawn_time=0.0, velocity=1.0),
-        DefenseCommander("defense_commander", provider, helix, spawn_time=0.0, velocity=1.0),
-        ResearchDirector("research_director", provider, helix, spawn_time=0.0, velocity=1.0),
-        SocialOverseer("social_overseer", provider, helix, spawn_time=0.0, velocity=1.0),
-        ConstructionPlanner(
-            "construction_planner", provider, helix, spawn_time=0.0, velocity=1.0,
-        ),
-        MedicalOfficer("medical_officer", provider, helix, spawn_time=0.0, velocity=1.0),
-    ]
 
 
 def _print_results(loop: RLEGameLoop, recorder: TimeSeriesRecorder) -> None:
@@ -147,6 +135,9 @@ async def main(args: argparse.Namespace) -> None:
         format="%(asctime)s %(name)s %(levelname)s %(message)s",
     )
 
+    if maybe_handle_harness_list(args):
+        return
+
     # Seed RLE-side stochasticity (resolver tiebreaks, json_repair fallbacks).
     # RimWorld's RNG is unaffected — see metadata.collect_metadata docstring.
     if args.seed is not None:
@@ -173,7 +164,7 @@ async def main(args: argparse.Namespace) -> None:
     print(f"Duration: {scenario.expected_duration_days} days, max {scenario.max_ticks} ticks")
 
     # Setup
-    overrides: dict[str, str] = {}
+    overrides: dict[str, object] = {}
     if args.provider:
         overrides["provider"] = args.provider
     if args.model:
@@ -181,29 +172,18 @@ async def main(args: argparse.Namespace) -> None:
     if args.base_url:
         overrides["provider_base_url"] = args.base_url
     if args.tick_interval is not None:
-        overrides["tick_interval"] = str(args.tick_interval)
-    config = RLEConfig(**overrides) if overrides else RLEConfig()
-    bridge_openrouter_key(config)
-    bridge_anthropic_key(config)
-    provider = config.get_provider()
-    helix = HelixConfig.default().to_geometry()
-    agents = _create_agents(provider, helix)
-    if args.no_think:
-        for agent in agents:
-            agent.set_no_think(True)
+        overrides["tick_interval"] = args.tick_interval
+    if args.tick_timeout is not None:
+        overrides["tick_timeout_s"] = args.tick_timeout
+    config = RLEConfig(**overrides) if overrides else RLEConfig()  # type: ignore[arg-type]
+
+    harness_name = selected_harnesses(args, config)[0]
+    harness_options = harness_options_for(harness_name, args, config)
+    print(f"Harness: {harness_name} {harness_options or ''}".rstrip())
 
     scorer = CompositeScorer(scenario.scoring_weights or None)
     recorder = TimeSeriesRecorder()
     evaluator = ScenarioEvaluator(scenario)
-
-    visualizer = None
-    if args.visualize:
-        visualizer = HelixVisualizer(helix, title="R L E")
-        for agent in agents:
-            display = AGENT_DISPLAY[agent.agent_id]
-            visualizer.register_agent(
-                agent.agent_id, label=display["label"], color=display["color"],
-            )
 
     if args.until_death:
         # Natural-conclusion mode (Phase B): no scenario tick cap — the run
@@ -221,7 +201,7 @@ async def main(args: argparse.Namespace) -> None:
         Path(args.output).mkdir(parents=True, exist_ok=True)
         event_log = EventLog(Path(args.output) / "events.jsonl")
     cost_tracker = await create_cost_tracker(
-        args.model or config.model,
+        config.model,
         prompt_price_override=_per_mtok_to_per_token(args.prompt_price_per_mtok),
         completion_price_override=_per_mtok_to_per_token(args.completion_price_per_mtok),
     )
@@ -235,29 +215,9 @@ async def main(args: argparse.Namespace) -> None:
         if scenario.save_name:
             print(f"Loading save: {scenario.save_name}")
             try:
-                await client.load_game(scenario.save_name)
-                # Wait for RIMAPI to respond, then poll until colonists are loaded.
-                # Then wait ~10s of stable state before any writes: RIMAPI returns
-                # HTTP 200 before Unity's main thread has finished applying the load,
-                # and writes that race the settle window get 500'd.
-                await wait_for_rimapi(config.rimapi_url, timeout=30.0)
-                stable_count = 0
-                last_population = -1
-                for _ in range(30):
-                    await asyncio.sleep(2)
-                    try:
-                        colony = await client.get_colony()
-                        if colony.population > 0 and colony.population == last_population:
-                            stable_count += 1
-                            if stable_count >= 5:
-                                break
-                        else:
-                            stable_count = 0
-                        last_population = colony.population
-                    except Exception:
-                        stable_count = 0
-                # Unforbid all starting items so colonists can use them
-                unforbid_count = await client.unforbid_all_items()
+                unforbid_count = await load_save_and_settle(
+                    client, config.rimapi_url, scenario.save_name,
+                )
                 if unforbid_count:
                     print(f"Unforbid {unforbid_count} items.")
                 print("Save loaded, game ready.")
@@ -288,31 +248,45 @@ async def main(args: argparse.Namespace) -> None:
                 output_dir=Path(args.output) if args.output else None,
             )
 
+        harness_ctx = HarnessContext(
+            config=config,
+            client=client,
+            expected_duration_days=scenario.expected_duration_days,
+            initial_population=scenario.initial_population,
+            scenario=scenario,
+            event_log=event_log,
+            cost_tracker=cost_tracker,
+            tick_timeout_s=config.tick_timeout_s,
+        )
+        try:
+            harness = create_harness(harness_name, harness_ctx, harness_options)
+        except (HarnessNotFoundError, HarnessUnavailableError, HarnessOptionsError) as exc:
+            sse.stop()
+            sse_task.cancel()
+            exit_with_harness_error(exc)
+            return
+
         loop = RLEGameLoop(
-            config, client, agents,
+            config, client,
             expected_duration_days=scenario.expected_duration_days,
             scorer=scorer,
             recorder=recorder,
             evaluator=evaluator,
             initial_population=scenario.initial_population,
-            visualizer=visualizer,
-            parallel=not args.sequential,
             sse_client=sse,
             dashboard_export_dir=Path(args.output) if args.output else None,
-            no_agent=args.no_agent,
             no_pause=args.no_pause,
             event_log=event_log,
             cost_tracker=cost_tracker,
             triggered_incidents=scenario.triggered_incidents,
             auto_dismiss_dialogs=not args.no_dismiss_dialogs,
             camera_director=camera_director,
+            harness=harness,
+            harness_context=harness_ctx,
+            scenario=scenario,
         )
         try:
-            if visualizer:
-                with visualizer.live():
-                    await loop.run(max_ticks=max_ticks)
-            else:
-                await loop.run(max_ticks=max_ticks)
+            await loop.run(max_ticks=max_ticks)
         finally:
             sse.stop()
             sse_task.cancel()
@@ -324,7 +298,7 @@ async def main(args: argparse.Namespace) -> None:
     # token-count estimator diverged up to 4x in both directions on the
     # v0.3.0 spread (thinking-model usage shapes, caching discounts).
     billed_report = None
-    effective_base_url = args.base_url or config.provider_base_url or ""
+    effective_base_url = config.provider_base_url or ""
     openai_key = os.environ.get("OPENAI_API_KEY", "")
     generation_ids = cost_tracker.generation_ids
     if "openrouter.ai" in effective_base_url and openai_key and generation_ids:
@@ -347,12 +321,14 @@ async def main(args: argparse.Namespace) -> None:
             await asyncio.to_thread(_write_deliberations_jsonl, log_path, deliberation_log)
             print(f"Deliberations exported to {log_path}")
 
+        latencies = [t.step_latency_s for t in loop.tick_results]
         # Replay-grade scenario summary with full metadata + cost + score.
         summary = _build_run_summary(
             args=args,
-            config_model=config.model,
-            config_provider=config.provider,
-            config_tick_interval=config.tick_interval,
+            config=config,
+            harness_name=harness.name,
+            harness_options=harness_options,
+            harness_describe=harness.describe(),
             scenario_name=scenario.name,
             scenario_save_name=scenario.save_name,
             max_ticks=max_ticks,
@@ -364,6 +340,9 @@ async def main(args: argparse.Namespace) -> None:
                 recorder.snapshots[-1].composite if recorder.snapshots else None
             ),
             ticks_run=len(loop.tick_results),
+            mean_step_latency_s=(
+                round(sum(latencies) / len(latencies), 3) if latencies else None
+            ),
             cost_snapshot_dict=cost_tracker.snapshot().model_dump(),
             event_summary_dict=(
                 event_log.summary().model_dump() if event_log else None
@@ -423,27 +402,22 @@ if __name__ == "__main__":
     parser.add_argument("scenario", nargs="?", help="Scenario name or number prefix")
     parser.add_argument("--list", action="store_true", help="List available scenarios")
     parser.add_argument(
-        "--provider", choices=["anthropic", "openai", "local", "claude-code"],
-        help="LLM provider (default: from config)",
+        "--provider",
+        help="LLM provider name passed to the harness (felix: anthropic|openai|local|claude-code)",
     )
     parser.add_argument("--model", help="Model name (e.g. unsloth/nvidia-nemotron-3-nano-4b)")
     parser.add_argument("--base-url", help="Provider API base URL")
+    add_harness_args(parser)
     parser.add_argument("--ticks", type=int, help="Override max ticks")
     parser.add_argument(
         "--tick-interval", type=float,
         help="Seconds between ticks (default: 1.0, use 30-60 for live game)",
     )
+    parser.add_argument(
+        "--tick-timeout", type=float, default=None,
+        help="Loop-level cap in seconds on a whole harness step (default: none).",
+    )
     parser.add_argument("--output", help="Output directory for CSV results")
-    parser.add_argument("--visualize", action="store_true", help="Show live helix visualization")
-    parser.add_argument(
-        "--sequential", action="store_true",
-        help="Run agents sequentially (default: parallel)",
-    )
-    parser.add_argument("--no-think", action="store_true", help="Skip reasoning tokens")
-    parser.add_argument(
-        "--no-agent", action="store_true",
-        help="Baseline mode: no agent deliberation, colony runs unmanaged",
-    )
     parser.add_argument(
         "--until-death", action="store_true",
         help="Ignore the scenario tick cap; run until the evaluator reaches "

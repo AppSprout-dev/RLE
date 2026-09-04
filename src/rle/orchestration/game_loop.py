@@ -91,11 +91,14 @@ class RLEGameLoop:
         speed_keepalive_s: float = 10.0,
         *,
         harness: BaseHarness | None = None,
+        harness_context: HarnessContext | None = None,
         scenario: ScenarioConfig | None = None,
     ) -> None:
-        """``harness`` is the modern entry point. ``agents`` / ``no_agent`` /
-        ``parallel`` / ``visualizer`` are legacy arguments that build a Felix
-        or baseline harness for you (see ``rle.harness.compat``)."""
+        """``harness`` is the modern entry point (pass the ``harness_context``
+        it was created with so both sides share one client/event log).
+        ``agents`` / ``no_agent`` / ``parallel`` / ``visualizer`` are legacy
+        arguments that build a Felix or baseline harness for you (see
+        ``rle.harness.compat``)."""
         if harness is not None and agents:
             raise ValueError("Pass either harness= or the legacy agents= argument, not both")
         self._config = config
@@ -129,16 +132,29 @@ class RLEGameLoop:
             visualizer=visualizer,
             role_timeout_s=config.role_timeout_s,
         )
-        self._harness_ctx = HarnessContext(
-            config=config,
-            client=client,
-            expected_duration_days=expected_duration_days,
-            initial_population=initial_population,
-            scenario=scenario,
-            event_log=event_log,
-            cost_tracker=cost_tracker,
-            tick_timeout_s=config.tick_timeout_s,
-        )
+        if harness_context is None:
+            harness_context = HarnessContext(
+                config=config,
+                client=client,
+                expected_duration_days=expected_duration_days,
+                initial_population=initial_population,
+                scenario=scenario,
+                event_log=event_log,
+                cost_tracker=cost_tracker,
+                tick_timeout_s=config.tick_timeout_s,
+            )
+        else:
+            # The loop is authoritative for run-shaped facts the caller may
+            # not have known when it built the context.
+            harness_context.expected_duration_days = expected_duration_days
+            harness_context.initial_population = initial_population
+            if scenario is not None:
+                harness_context.scenario = scenario
+            if harness_context.event_log is None:
+                harness_context.event_log = event_log
+            if harness_context.cost_tracker is None:
+                harness_context.cost_tracker = cost_tracker
+        self._harness_ctx = harness_context
         self._setup_done = False
 
     # ------------------------------------------------------------------

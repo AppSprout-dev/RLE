@@ -34,13 +34,21 @@ _RIMAPI_DLL_DEFAULT_PATH = Path(
 )
 
 
-def collect_metadata(random_seed: int | None = None) -> dict[str, object]:
+def collect_metadata(
+    random_seed: int | None = None,
+    harness_describe: dict[str, str] | None = None,
+) -> dict[str, object]:
     """Gather reproducibility metadata for a benchmark run.
 
     The random_seed argument is the seed the caller passed to ``random.seed``
     (or None if no seed was set). It controls only RLE-side stochasticity
     (json_repair fallbacks, resolver tiebreaks); RimWorld's own RNG is
     unaffected — that lives inside the game and is not reproducible from here.
+
+    ``harness_describe`` is whatever the harness reports about itself
+    (``BaseHarness.describe()``): SDK versions, agent roster, external tool
+    versions. Recorded as ``harness_versions`` so a leaderboard row can be
+    traced to the exact harness build, whichever framework it used.
     """
     dll_path = _rimapi_dll_path()
     return {
@@ -50,7 +58,7 @@ def collect_metadata(random_seed: int | None = None) -> dict[str, object]:
         "git_branch": _git("branch", "--show-current"),
         "git_dirty": _git("status", "--porcelain") != "",
         "rle_version": _version("rimworld-learning-environment"),
-        "felix_sdk_version": _version("felix-agent-sdk"),
+        "harness_versions": dict(harness_describe or {}),
         "platform": sys.platform,
         "python_version": platform.python_version(),
         "docker_mode": False,
