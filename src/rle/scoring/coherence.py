@@ -12,8 +12,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from typing import Any
 
-from rle.agents.actions import resolve_endpoint
-from rle.orchestration.action_executor import ActionOutcome
+from rle.agents.actions import ActionOutcome, resolve_endpoint
 
 Rect = tuple[int, int, int, int]
 

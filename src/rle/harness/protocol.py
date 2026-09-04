@@ -19,8 +19,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict
 
-from rle.agents.actions import ActionPlan
-from rle.orchestration.action_executor import ExecutionResult
+from rle.agents.actions import ActionPlan, ExecutionResult
 from rle.rimapi.client import RimAPIClient
 from rle.rimapi.schemas import GameState
 from rle.rimapi.sse_client import RimAPIEvent

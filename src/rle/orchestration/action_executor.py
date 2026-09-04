@@ -6,11 +6,17 @@ import json
 import logging
 from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict
-
-from rle.agents.actions import Action, ActionPlan, resolve_endpoint
+from rle.agents.actions import (
+    Action,
+    ActionOutcome,
+    ActionPlan,
+    ExecutionResult,
+    resolve_endpoint,
+)
 from rle.rimapi.api_catalog import WRITE_CATALOG
 from rle.rimapi.client import RimAPIClient, RimAPIResponseError
+
+__all__ = ["ActionExecutor", "ActionOutcome", "ExecutionResult"]
 
 logger = logging.getLogger(__name__)
 
@@ -25,32 +31,6 @@ _NEEDS_PAWN: frozenset[str] = frozenset({
     "bed_rest",
     "tend",
 })
-
-
-class ActionOutcome(BaseModel):
-    """Per-action execution result. Captures failure detail so the next
-    tick's deliberation context can surface it to the agent that proposed it.
-    """
-
-    model_config = ConfigDict(frozen=True)
-
-    action_type: str
-    endpoint: str
-    target_colonist_id: str | None = None
-    success: bool
-    error: str | None = None
-    parameters: dict[str, Any] = {}
-
-
-class ExecutionResult(BaseModel):
-    """Summary of action execution for one tick."""
-
-    model_config = ConfigDict(frozen=True)
-
-    executed: int
-    failed: int
-    total: int
-    outcomes: tuple[ActionOutcome, ...] = ()
 
 
 def _extract_rimapi_error(detail: str) -> str:

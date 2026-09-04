@@ -1,14 +1,15 @@
 # RLE — RimWorld Learning Environment
 
-Multi-agent benchmark where 7 Felix Agent SDK role-specialized LLM agents manage a RimWorld colony. Think [FLE](https://github.com/chenhao-wang/FLE) (Factorio Learning Environment) but for **multi-agent coordination under uncertainty**.
+A **harness × model** benchmark: swappable agent harnesses manage a RimWorld colony under uncertainty and are scored on the same footing against an unmanaged baseline. Think [FLE](https://github.com/chenhao-wang/FLE) (Factorio Learning Environment) but stochastic, multi-agent-capable, and with the *harness* — not just the model — as a first-class variable.
 
 ## What makes this different
 
-- **7 agents, not 1** — MapAnalyst (spatial reasoning), ResourceManager, DefenseCommander, ResearchDirector, SocialOverseer, ConstructionPlanner, MedicalOfficer coordinate through a hub-spoke communication network
-- **Spatial awareness** — deterministic terrain analysis from the game map tells agents exactly where to build, farm, and mine
-- **Stochastic environment** — raids, plague, mental breaks, weather. Agents adapt, not just optimize
-- **Helix-driven strategy** — agents shift from exploration (diverse strategies) to synthesis (decisive actions) as the colony progresses
-- **Provider-agnostic** — runs on a free local 4B model or a cloud 30B, same architecture
+- **Harnesses are swappable like models** — `--harness felix` (the original 7-agent Felix SDK stack), `--harness baseline` (unmanaged colony), or any harness package installed from PyPI/GitHub (`rle-harness-<tool>`); the core never imports an agent framework
+- **Harness-agnostic scoring** — process metrics read the writes that reached the game, not any harness's internal messaging; scenarios, saves and the composite are identical for every harness
+- **Spatial awareness** — deterministic terrain analysis from the game map gives every harness verified build/farm/stockpile coordinates (MAP_SUMMARY)
+- **Stochastic environment** — raids, plague, mental breaks, weather. Harnesses adapt, not just optimize
+- **Paired against a real baseline** — every run is compared to RimWorld's own pawn AI on the same save
+- **Provider-agnostic** — runs on a free local 4B model or a cloud 30B, same environment
 
 ## Architecture
 
@@ -17,15 +18,23 @@ RimWorld (game)
     ↕ Harmony patches
 RIMAPI mod (C# REST :8765 + SSE events)
     ↕ httpx async + SSE
-RLE Orchestrator
-    ↕ CentralPost hub-spoke
-    MapAnalyst → spatial analysis (runs first)
-    6 Role Agents (parallel deliberation)
-    ↕ OpenAI-compatible API
-LLM (Nemotron 4B local / 30B cloud / Anthropic / OpenAI)
+RLEGameLoop (environment: pause → state → harness.step → execute → score → unpause)
+    ↕ Harness protocol (rle.harness) — discovered via the `rle.harnesses` entry-point group
+    ├─ felix     MapAnalyst → 6 role agents over CentralPost, merged by ActionResolver   [in tree, extra `felix`]
+    ├─ baseline  unmanaged colony                                                        [in tree]
+    └─ <tool>    external coding agents attached over the RimAPI MCP server (rle-mcp)    [own repos]
+    ↕ OpenAI-compatible / Anthropic / local API (provider + model are strings; the harness interprets them)
+LLM
 ```
 
-## The 7 Agents
+```bash
+python scripts/run_benchmark.py --harness list          # what is installed
+python scripts/run_benchmark.py --harness felix --harness baseline --smoke-test
+```
+
+Writing a harness: see [docs/harness-plugins.md](docs/harness-plugins.md). Third-party harnesses (OpenCode, Grok Build, ...) live in their own `AppSprout-dev/rle-harness-*` repos and are installed with `pip`, never committed here.
+
+## The Felix harness: 7 agents
 
 | Agent | Domain | Key Actions |
 |-------|--------|-------------|
@@ -63,8 +72,11 @@ curl http://localhost:1234/v1/models            # LM Studio (if using local)
 ```bash
 git clone https://github.com/AppSprout-dev/RLE.git
 cd RLE
-uv sync --extra dev
+uv sync --extra dev --extra felix     # core + the Felix harness
+# add --extra mcp for the RimAPI MCP server used by external coding-agent harnesses
 ```
+
+Core is framework-free; `felix-agent-sdk` is an optional extra. Without it, `--harness felix` shows as unavailable in `--harness list` and everything else still runs.
 
 ### Configure `.env`
 
@@ -127,9 +139,12 @@ The scenario will:
 | `--no-pause` | Game runs continuously via SSE. Without this, game pauses each tick. |
 | `--output DIR` | Exports `latest_tick.json` for the dashboard. |
 | `--tick-interval N` | Seconds between ticks. 30s recommended for cloud models. |
-| `--visualize` | Shows terminal helix visualization. |
-| `--no-agent` | Baseline mode — no agents, colony runs unmanaged. |
-| `--sequential` | Agents deliberate one at a time instead of in parallel. |
+| `--harness NAME` | Which harness decides (default `felix`; `--harness list` shows installed plugins). |
+| `--harness-opt K=V` | Harness-specific option, validated by the plugin (e.g. `role_timeout_s=90`). |
+| `--no-agent` | Baseline mode — alias for `--harness baseline`, colony runs unmanaged. |
+| `--visualize` | [felix] Shows terminal helix visualization. |
+| `--sequential` | [felix] Agents deliberate one at a time instead of in parallel. |
+| `--tick-timeout N` | Loop-level cap on a whole harness step (seconds). |
 
 ### Dashboard (optional, 3 terminals)
 

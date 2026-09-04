@@ -13,7 +13,7 @@ from felix_agent_sdk.core import HelixGeometry
 from felix_agent_sdk.providers.types import CompletionResult, MessageRole
 
 from rle.agents.actions import ActionPlan, ActionPlanParseError
-from rle.agents.base_role import RimWorldRoleAgent
+from rle.harness.felix.agents.base_role import RimWorldRoleAgent
 from rle.rimapi.schemas import GameState
 
 # ------------------------------------------------------------------

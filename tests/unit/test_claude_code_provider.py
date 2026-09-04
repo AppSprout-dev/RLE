@@ -12,7 +12,7 @@ import pytest
 from felix_agent_sdk.providers.errors import ProviderError
 from felix_agent_sdk.providers.types import ChatMessage, MessageRole
 
-from rle.providers.claude_code import ClaudeCodeProvider
+from rle.harness.felix.providers.claude_code import ClaudeCodeProvider
 
 MESSAGES = [
     ChatMessage(role=MessageRole.SYSTEM, content="You are a test agent."),
@@ -52,8 +52,8 @@ def _run_complete(
 ) -> tuple[Any, MagicMock]:
     """Call provider.complete with mocked CLI resolution + subprocess."""
     with patch(
-        "rle.providers.claude_code.shutil.which", return_value="claude",
-    ), patch("rle.providers.claude_code.subprocess.run") as mock_run:
+        "rle.harness.felix.providers.claude_code.shutil.which", return_value="claude",
+    ), patch("rle.harness.felix.providers.claude_code.subprocess.run") as mock_run:
         if side_effect is not None:
             mock_run.side_effect = side_effect
         else:
@@ -131,7 +131,7 @@ class TestComplete:
 
     def test_missing_cli_raises(self) -> None:
         provider = ClaudeCodeProvider()
-        with patch("rle.providers.claude_code.shutil.which", return_value=None):
+        with patch("rle.harness.felix.providers.claude_code.shutil.which", return_value=None):
             with pytest.raises(ProviderError, match="not found on PATH"):
                 provider.complete(MESSAGES)
 
@@ -142,8 +142,8 @@ class TestComplete:
             ChatMessage(role=MessageRole.ASSISTANT, content="</think>"),
         ]
         with patch(
-            "rle.providers.claude_code.shutil.which", return_value="claude",
-        ), patch("rle.providers.claude_code.subprocess.run") as mock_run:
+            "rle.harness.felix.providers.claude_code.shutil.which", return_value="claude",
+        ), patch("rle.harness.felix.providers.claude_code.subprocess.run") as mock_run:
             mock_run.return_value = _mock_proc(_cli_envelope())
             provider.complete(messages)
         assert mock_run.call_args[1]["input"] == "Do the thing."
@@ -167,9 +167,9 @@ class TestAcomplete:
         provider = ClaudeCodeProvider()
         proc = _mock_async_proc(_cli_envelope(result="hello", input_tokens=50, output_tokens=7))
         with patch(
-            "rle.providers.claude_code.shutil.which", return_value="claude",
+            "rle.harness.felix.providers.claude_code.shutil.which", return_value="claude",
         ), patch(
-            "rle.providers.claude_code.asyncio.create_subprocess_exec",
+            "rle.harness.felix.providers.claude_code.asyncio.create_subprocess_exec",
             new=AsyncMock(return_value=proc),
         ):
             result = await provider.acomplete(MESSAGES)
@@ -180,9 +180,9 @@ class TestAcomplete:
         provider = ClaudeCodeProvider()
         proc = _mock_async_proc("", returncode=1, stderr="boom")
         with patch(
-            "rle.providers.claude_code.shutil.which", return_value="claude",
+            "rle.harness.felix.providers.claude_code.shutil.which", return_value="claude",
         ), patch(
-            "rle.providers.claude_code.asyncio.create_subprocess_exec",
+            "rle.harness.felix.providers.claude_code.asyncio.create_subprocess_exec",
             new=AsyncMock(return_value=proc),
         ):
             with pytest.raises(ProviderError, match="exited with code 1"):
@@ -193,9 +193,9 @@ class TestAcomplete:
         proc = _mock_async_proc("")
         proc.communicate = AsyncMock(side_effect=asyncio.TimeoutError)
         with patch(
-            "rle.providers.claude_code.shutil.which", return_value="claude",
+            "rle.harness.felix.providers.claude_code.shutil.which", return_value="claude",
         ), patch(
-            "rle.providers.claude_code.asyncio.create_subprocess_exec",
+            "rle.harness.felix.providers.claude_code.asyncio.create_subprocess_exec",
             new=AsyncMock(return_value=proc),
         ):
             with pytest.raises(ProviderError, match="timed out"):
@@ -212,9 +212,9 @@ class TestAcomplete:
 
         proc.communicate = AsyncMock(side_effect=_hang)
         with patch(
-            "rle.providers.claude_code.shutil.which", return_value="claude",
+            "rle.harness.felix.providers.claude_code.shutil.which", return_value="claude",
         ), patch(
-            "rle.providers.claude_code.asyncio.create_subprocess_exec",
+            "rle.harness.felix.providers.claude_code.asyncio.create_subprocess_exec",
             new=AsyncMock(return_value=proc),
         ):
             task = asyncio.ensure_future(provider.acomplete(MESSAGES))
@@ -229,8 +229,8 @@ class TestStreamAndTokens:
     def test_stream_yields_content_then_final(self) -> None:
         provider = ClaudeCodeProvider()
         with patch(
-            "rle.providers.claude_code.shutil.which", return_value="claude",
-        ), patch("rle.providers.claude_code.subprocess.run") as mock_run:
+            "rle.harness.felix.providers.claude_code.shutil.which", return_value="claude",
+        ), patch("rle.harness.felix.providers.claude_code.subprocess.run") as mock_run:
             mock_run.return_value = _mock_proc(_cli_envelope(result="streamed"))
             chunks = list(provider.stream(MESSAGES))
         assert chunks[0].text == "streamed"

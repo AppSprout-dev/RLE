@@ -1,7 +1,7 @@
 """Harness discovery via the ``rle.harnesses`` entry-point group.
 
 Built-in harnesses (``baseline``, ``felix``) and third-party packages
-(``rle-harness-opencode``, ...) register the same way, so adding a harness is
+(``rle-harness-<tool>``) register the same way, so adding a harness is
 ``pip install <package>`` — never a change to RLE core.
 """
 
@@ -73,7 +73,7 @@ def get_plugin(name: str) -> HarnessPlugin:
     if ep is None:
         raise HarnessNotFoundError(
             f"Unknown harness {name!r}. Installed: {', '.join(sorted(eps)) or '(none)'}. "
-            "Install a harness package (e.g. rle-harness-opencode) or check the name.",
+            "Install a harness package (rle-harness-<tool>) or check the name.",
         )
     return cast(HarnessPlugin, ep.load())
 

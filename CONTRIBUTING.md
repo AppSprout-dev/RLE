@@ -5,7 +5,7 @@
 ```bash
 git clone https://github.com/AppSprout-dev/RLE.git
 cd RLE
-uv sync --extra dev
+uv sync --extra dev --extra felix
 pytest  # should pass 458+ tests
 ```
 

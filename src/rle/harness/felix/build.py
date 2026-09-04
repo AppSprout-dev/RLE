@@ -9,16 +9,16 @@ from felix_agent_sdk.providers.base import BaseProvider
 from felix_agent_sdk.visualization import HelixVisualizer
 from pydantic import BaseModel
 
-from rle.agents import AGENT_DISPLAY
-from rle.agents.base_role import RimWorldRoleAgent
-from rle.agents.construction_planner import ConstructionPlanner
-from rle.agents.defense_commander import DefenseCommander
-from rle.agents.map_analyst import MapAnalyst
-from rle.agents.medical_officer import MedicalOfficer
-from rle.agents.research_director import ResearchDirector
-from rle.agents.resource_manager import ResourceManager
-from rle.agents.social_overseer import SocialOverseer
 from rle.config import bridge_anthropic_key, bridge_openrouter_key
+from rle.harness.felix.agents import AGENT_DISPLAY
+from rle.harness.felix.agents.base_role import RimWorldRoleAgent
+from rle.harness.felix.agents.construction_planner import ConstructionPlanner
+from rle.harness.felix.agents.defense_commander import DefenseCommander
+from rle.harness.felix.agents.map_analyst import MapAnalyst
+from rle.harness.felix.agents.medical_officer import MedicalOfficer
+from rle.harness.felix.agents.research_director import ResearchDirector
+from rle.harness.felix.agents.resource_manager import ResourceManager
+from rle.harness.felix.agents.social_overseer import SocialOverseer
 from rle.harness.felix.harness import FelixHarness
 from rle.harness.felix.options import FelixOptions
 from rle.harness.felix.provider_factory import build_helix, build_provider

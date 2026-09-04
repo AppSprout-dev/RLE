@@ -35,16 +35,23 @@ tags:
 
 # RLE — RimWorld Learning Environment Benchmarks
 
-Can 7 role-specialized LLM agents keep a RimWorld colony alive? RLE is a
-multi-agent coordination benchmark: MapAnalyst + 6 domain agents
-(resources, defense, research, social, construction, medical) manage a
-live colony through a REST API, scored on a 10-metric weighted composite
-against a no-agent baseline (RimWorld's built-in pawn AI, static
-4-seed reference).
+Can an LLM agent harness keep a RimWorld colony alive? RLE is a
+harness x model benchmark: a swappable harness (the Felix 7-agent stack,
+a coding agent attached over MCP, ...) manages a live colony through a
+REST API and is scored on a weighted composite against the unmanaged
+baseline (RimWorld's built-in pawn AI). Rows are keyed by harness and
+model; scoring is harness-agnostic (see SCORING_VERSION in each run).
 
 - Site + featured runs: https://rle.appsprout.dev
-- Harness: https://github.com/AppSprout-dev/RLE
+- Environment + harness registry: https://github.com/AppSprout-dev/RLE
 """
+
+
+def _row_label(row: dict[str, Any]) -> str:
+    """``harness/model`` when the row knows its harness, else just the model."""
+    harness = row.get("harness")
+    model = str(row.get("model", "?"))
+    return f"{harness}/{model}" if harness else model
 
 
 def build_dataset_card(board: dict[str, Any], date: str) -> str:
@@ -66,14 +73,14 @@ def build_dataset_card(board: dict[str, Any], date: str) -> str:
         f"Baseline: no-agent, {baseline.get('n_runs', '?')} seeds, mean "
         f"time-to-end {baseline.get('mean_time_to_end_days', '?')} days.",
         "",
-        "| # | model | mean | final | vs baseline | ticks > base | action ok | cost |",
-        "|---|-------|------|-------|-------------|--------------|-----------|------|",
+        "| # | harness/model | mean | final | vs baseline | ticks > base | action ok | cost |",
+        "|---|---------------|------|-------|-------------|--------------|-----------|------|",
     ]
     for i, r in enumerate(rows, 1):
         real = r.get("real_cost_usd")
         cost = f"${real:.2f}" if real is not None else f"~${r.get('est_cost_usd', 0):.2f}"
         lines.append(
-            f"| {i} | {r['model']} | {r['mean_composite']:.3f} "
+            f"| {i} | {_row_label(r)} | {r['mean_composite']:.3f} "
             f"| {r['final_composite']:.3f} | {r['vs_baseline_mean_delta']:+.3f} "
             f"| {r['ticks_above_baseline']} | {r['raw_action_success']:.0%} | {cost} |"
         )
@@ -81,9 +88,9 @@ def build_dataset_card(board: dict[str, Any], date: str) -> str:
     above = [r for r in rows if r.get("vs_baseline_mean_delta", 0) > 0]
     lines += [
         "",
-        f"**{len(above)} of {len(rows)} models beat the no-agent baseline.**"
+        f"**{len(above)} of {len(rows)} harness/model rows beat the unmanaged baseline.**"
         + (
-            " (" + ", ".join(r["model"] for r in above) + ")"
+            " (" + ", ".join(_row_label(r) for r in above) + ")"
             if above else ""
         ),
         "",

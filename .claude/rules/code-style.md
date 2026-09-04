@@ -1,6 +1,6 @@
 # Code Style Rules
 
-- Python 3.14+. Use `uv sync --extra dev` to install.
+- Python 3.14+. Use `uv sync --extra dev --extra felix` to install.
 - mypy strict mode. All code must pass `mypy src/` with `strict = true`.
 - No `Any` type annotations for dataclass fields. Use `TYPE_CHECKING` imports to break circular dependencies.
 - `from __future__ import annotations` at top of every Python file.

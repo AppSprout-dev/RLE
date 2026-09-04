@@ -19,10 +19,9 @@ from typing import Any, ClassVar
 from felix_agent_sdk.communication import CentralPost, MessageType, SpokeManager
 from felix_agent_sdk.providers import ProviderError
 
-from rle.agents.actions import ActionPlan, ActionPlanParseError
-from rle.agents.base_role import RimWorldRoleAgent
+from rle.agents.actions import ActionPlan, ActionPlanParseError, ExecutionResult
+from rle.harness.felix.agents.base_role import RimWorldRoleAgent
 from rle.harness.protocol import BaseHarness, HarnessContext, StepResult
-from rle.orchestration.action_executor import ExecutionResult
 from rle.orchestration.action_resolver import ActionResolver
 from rle.rimapi.schemas import GameState
 from rle.rimapi.sse_client import RimAPIEvent

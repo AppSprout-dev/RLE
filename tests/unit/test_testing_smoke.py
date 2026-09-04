@@ -5,9 +5,12 @@ from __future__ import annotations
 import pytest
 
 from rle.testing import MockRimAPI, run_harness_smoke
+from tests.conftest import requires_felix
 
 
-@pytest.mark.parametrize("name", ["baseline", "felix"])
+@pytest.mark.parametrize(
+    "name", ["baseline", pytest.param("felix", marks=requires_felix)],
+)
 async def test_builtin_plugins_pass_smoke(name: str) -> None:
     report = await run_harness_smoke(name, ticks=2)
     assert report.ok

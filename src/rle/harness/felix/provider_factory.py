@@ -10,7 +10,7 @@ from felix_agent_sdk.providers import (
     OpenAIProvider,
 )
 
-from rle.providers.claude_code import ClaudeCodeProvider
+from rle.harness.felix.providers.claude_code import ClaudeCodeProvider
 
 HELIX_PRESETS: dict[str, HelixConfig] = {
     "default": HelixConfig.default(),

@@ -12,13 +12,13 @@ from felix_agent_sdk.core import HelixConfig
 from felix_agent_sdk.providers.base import BaseProvider
 from felix_agent_sdk.providers.types import CompletionResult
 
-from rle.agents.construction_planner import ConstructionPlanner
-from rle.agents.defense_commander import DefenseCommander
-from rle.agents.medical_officer import MedicalOfficer
-from rle.agents.research_director import ResearchDirector
-from rle.agents.resource_manager import ResourceManager
-from rle.agents.social_overseer import SocialOverseer
 from rle.config import RLEConfig
+from rle.harness.felix.agents.construction_planner import ConstructionPlanner
+from rle.harness.felix.agents.defense_commander import DefenseCommander
+from rle.harness.felix.agents.medical_officer import MedicalOfficer
+from rle.harness.felix.agents.research_director import ResearchDirector
+from rle.harness.felix.agents.resource_manager import ResourceManager
+from rle.harness.felix.agents.social_overseer import SocialOverseer
 from rle.orchestration.game_loop import RLEGameLoop
 from rle.rimapi.client import RimAPIClient
 from rle.scenarios.evaluator import ScenarioEvaluator

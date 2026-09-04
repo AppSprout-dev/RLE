@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, ClassVar
 
-from rle.agents.base_role import RimWorldRoleAgent
+from rle.harness.felix.agents.base_role import RimWorldRoleAgent
 from rle.rimapi.schemas import GameState
 
 

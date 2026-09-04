@@ -61,7 +61,7 @@ class TestBuildDatasetCard:
 
     def test_baseline_beaters_called_out(self) -> None:
         card = build_dataset_card(_BOARD, "2026-06-11")
-        assert "1 of 3 models beat the no-agent baseline." in card
+        assert "1 of 3 harness/model rows beat the unmanaged baseline." in card
         assert "(z-ai/glm-5.1)" in card
 
     def test_date_and_baseline_framing(self) -> None:
@@ -76,4 +76,19 @@ class TestBuildDatasetCard:
             "rows": [r for r in _BOARD["rows"] if r["model"] != "z-ai/glm-5.1"],
         }
         card = build_dataset_card(board, "2026-06-11")
-        assert "0 of 2 models beat the no-agent baseline." in card
+        assert "0 of 2 harness/model rows beat the unmanaged baseline." in card
+
+
+class TestHarnessRows:
+    def test_rows_with_harness_are_labelled_harness_slash_model(self) -> None:
+        board = {
+            "baseline": _BOARD["baseline"],
+            "rows": [
+                {**_BOARD["rows"][1], "harness": "felix"},
+                {**_BOARD["rows"][0], "harness": "some-tool"},
+            ],
+        }
+        card = build_dataset_card(board, "2026-09-04")
+        assert "| felix/z-ai/glm-5.1 |" in card
+        assert "| some-tool/x-ai/grok-4.3 |" in card
+        assert "(felix/z-ai/glm-5.1)" in card

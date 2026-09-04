@@ -1,6 +1,6 @@
 ﻿# RLE — RimWorld Learning Environment
 
-Multi-agent benchmark where 7 Felix Agent SDK role-specialized LLM agents manage a RimWorld colony. Think FLE (Factorio Learning Environment) but for multi-agent coordination under uncertainty.
+A harness × model benchmark: swappable agent harnesses (the original 7-agent Felix Agent SDK stack, an unmanaged baseline, or external coding agents installed as `rle-harness-*` packages) manage a RimWorld colony and are scored identically. Think FLE (Factorio Learning Environment) but for multi-agent coordination under uncertainty, with the harness as a first-class benchmark variable.
 
 ## Prerequisites
 
@@ -56,7 +56,7 @@ curl http://localhost:1234/v1/models
 
 ## Commands
 
-- Install: `uv sync --extra dev`
+- Install: `uv sync --extra dev --extra felix` (add `--extra mcp` for the RimAPI MCP server; core alone has no agent framework)
 - Test: `pytest`
 - Lint: `ruff check src/ tests/ scripts/`
 - Type check: `mypy src/`
@@ -114,7 +114,8 @@ python scripts/run_scenario.py crashlanded \
 **Important flags:**
 - `--no-think` — Required for thinking models (Nemotron, Qwen). Injects `</think>` prefix.
 - `--no-pause` — Game runs continuously via SSE. Without this, game pauses each tick.
-- `--no-agent` — Baseline mode: no LLM deliberation, colony runs unmanaged (for comparison).
+- `--harness NAME` — Which harness decides (default `felix`; `--harness list` shows installed plugins; `--harness-opt key=value` for plugin options).
+- `--no-agent` — Baseline mode: alias for `--harness baseline`; colony runs unmanaged (for comparison).
 - `--output results/live` — Exports `latest_tick.json` for the dashboard.
 - `--tick-interval 30` — Seconds between ticks. 30s gives agents time to deliberate.
 

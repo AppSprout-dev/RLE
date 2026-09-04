@@ -7,8 +7,6 @@ import os
 import pytest
 
 from rle.config import RLEConfig, bridge_anthropic_key, bridge_openrouter_key
-from rle.harness.felix.provider_factory import build_provider
-from rle.providers.claude_code import ClaudeCodeProvider
 
 
 class TestBridgeAnthropicKey:
@@ -33,17 +31,6 @@ class TestBridgeAnthropicKey:
         config = RLEConfig(anthropic_api_key=None)
         bridge_anthropic_key(config)
         assert "ANTHROPIC_API_KEY" not in os.environ
-
-
-class TestProviderRegistry:
-    def test_claude_code_provider_registered(self) -> None:
-        provider = build_provider("claude-code", "claude-fable-5")
-        assert isinstance(provider, ClaudeCodeProvider)
-        assert provider.model == "claude-fable-5"
-
-    def test_unknown_provider_lists_choices(self) -> None:
-        with pytest.raises(ValueError, match="anthropic"):
-            build_provider("nope", "x")
 
 
 class TestConfigIsFrameworkFree:

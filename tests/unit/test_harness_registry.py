@@ -30,6 +30,7 @@ from rle.harness.compat import build_legacy_harness
 from rle.rimapi.client import RimAPIClient
 from rle.rimapi.schemas import GameState
 from rle.rimapi.sse_client import RimAPIEvent
+from tests.conftest import FELIX_AVAILABLE, requires_felix
 
 
 def _ctx(**overrides: object) -> HarnessContext:
@@ -50,8 +51,10 @@ class TestBuiltinRegistration:
         infos = {i.name: i for i in list_harnesses()}
         assert infos["baseline"].availability.ok
         assert infos["baseline"].package == "rimworld-learning-environment"
-        assert infos["felix"].availability.ok  # felix extra installed in dev
+        assert infos["felix"].availability.ok is FELIX_AVAILABLE
         assert "Felix" in infos["felix"].description
+        if not FELIX_AVAILABLE:
+            assert "extra felix" in infos["felix"].availability.reason
 
     def test_unknown_name_lists_installed(self) -> None:
         with pytest.raises(HarnessNotFoundError, match="baseline"):
@@ -62,11 +65,13 @@ class TestBuiltinRegistration:
         assert isinstance(harness, BaselineHarness)
         assert harness.name == "baseline"
 
+    @requires_felix
     def test_create_felix_smoke_builds_seven_agents(self) -> None:
         harness = create_harness("felix", _ctx(), {"no_think": True}, smoke=True)
         assert harness.name == "felix"
         assert len(harness.agents) == 7  # type: ignore[attr-defined]
 
+    @requires_felix
     def test_felix_options_validated(self) -> None:
         with pytest.raises(HarnessOptionsError, match="bogus"):
             create_harness("felix", _ctx(), {"bogus": 1}, smoke=True)
@@ -157,6 +162,7 @@ class TestCompatShim:
         assert isinstance(build_legacy_harness([], no_agent=True), BaselineHarness)
         assert isinstance(build_legacy_harness(None), BaselineHarness)
 
+    @requires_felix
     def test_agents_build_felix(self) -> None:
         felix = create_harness("felix", _ctx(), smoke=True)
         rebuilt = build_legacy_harness(felix.agents, parallel=False)  # type: ignore[attr-defined]

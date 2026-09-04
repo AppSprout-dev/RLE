@@ -9,8 +9,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import ClassVar
 
-import httpx
-
 from rle.agents.actions import Action, ActionPlan
 from rle.config import RLEConfig
 from rle.harness import BaseHarness, HarnessStepError, StepResult
@@ -23,16 +21,14 @@ from rle.rimapi.sse_client import RimAPIEvent
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.metrics import NEUTRAL
 from rle.scoring.recorder import TimeSeriesRecorder
+from rle.testing import MockRimAPI
 from rle.tracking.event_log import EventLog, EventType
-from tests.integration.test_game_loop import _make_transport
 
 
 @asynccontextmanager
 async def _client() -> AsyncIterator[RimAPIClient]:
-    async with RimAPIClient("http://test") as client:
-        client._client = httpx.AsyncClient(
-            transport=_make_transport(), base_url="http://test",
-        )
+    async with RimAPIClient("http://mock") as client:
+        MockRimAPI().attach(client)
         yield client
 
 
