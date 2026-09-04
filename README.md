@@ -34,6 +34,27 @@ python scripts/run_benchmark.py --harness felix --harness baseline --smoke-test
 
 Writing a harness: see [docs/harness-plugins.md](docs/harness-plugins.md). Third-party harnesses (OpenCode, Grok Build, ...) live in their own `AppSprout-dev/rle-harness-*` repos and are installed with `pip`, never committed here.
 
+## Harnesses
+
+The benchmark has two axes. `--model` picks the LLM; `--harness` picks the decision architecture around it. Every harness gets the same scenarios, saves, neutral scenario brief (goals, state, MAP_SUMMARY, action catalog) and scoring, and is paired against the same unmanaged baseline. Leaderboard rows are `harness/model`.
+
+| Harness | Where | What it is | Install |
+|---------|-------|------------|---------|
+| `felix` | this repo (extra `felix`) | MapAnalyst + 6 role agents over Felix SDK CentralPost, merged by ActionResolver — the original RLE stack | `uv sync --extra felix` |
+| `baseline` | this repo | Unmanaged colony (RimWorld's own pawn AI) — the paired control | built in |
+| `opencode` | [rle-harness-opencode](https://github.com/AppSprout-dev/rle-harness-opencode) | [OpenCode](https://opencode.ai) coding agent, one prompt per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-opencode` |
+| `grok-build` | [rle-harness-grok-build](https://github.com/AppSprout-dev/rle-harness-grok-build) | [Grok Build](https://github.com/xai-org/grok-build) coding agent, headless `grok -p` per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-grok-build` |
+| `template` | [rle-harness-template](https://github.com/AppSprout-dev/rle-harness-template) | Copy-me starting point for your own harness | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-template` |
+
+```bash
+python scripts/run_benchmark.py --harness list                                  # installed plugins + availability
+python scripts/run_benchmark.py --harness felix --harness opencode --model openai/gpt-4o --runs 4
+python scripts/run_scenario.py crashlanded --harness grok-build --model grok-4.6 --tick-interval 30
+python scripts/run_scenario.py crashlanded --harness felix --harness-opt no_think=true --harness-opt parallel=false
+```
+
+Coding-agent harnesses attach to RLE over MCP: RLE hosts a RimAPI tool server in-process (`rle.mcp`, extra `mcp`), the agent calls `get_brief`, then write tools (`work_priority`, `blueprint`, ...), then `end_turn`; the writes that reached the game are what gets scored. `--smoke-test` needs none of the binaries — each plugin ships a scripted stand-in that plays the same round trip.
+
 ## The Felix harness: 7 agents
 
 | Agent | Domain | Key Actions |
@@ -163,11 +184,15 @@ cd ../rimapi-dashboard && bun run start
 ### Other commands
 
 ```bash
-# Full benchmark (mock game state, real LLM)
-python scripts/run_benchmark.py --smoke-test --ticks 10
+# Smoke test: mock game state + each harness's mock agent (no LLM, no RimWorld)
+python scripts/run_benchmark.py --smoke-test --ticks 10 --harness felix --harness baseline
 
-# List scenarios
+# Harness matrix against a live game, 4 paired runs each
+python scripts/run_benchmark.py --harness felix --harness opencode --runs 4 --output results/matrix/
+
+# List scenarios / harnesses
 python scripts/run_scenario.py --list
+python scripts/run_benchmark.py --harness list
 
 # Visualize CSV results
 python scripts/visualize_results.py results/ --all
@@ -178,7 +203,9 @@ python scripts/analyze_spread.py --spread-dir results/spread
 
 ## Benchmark Results
 
-**11-model spread** — Crashlanded, 10 ticks, seed 42, 2026-06-11. **N=1, content-first — not statistically valid (no confidence intervals). Winners advance to N=4; N=4 is not published.** Ranked by mean composite across the run. Featured numbers live on the [HF card](https://huggingface.co/datasets/AppSprout/rle-benchmarks) and [rle.appsprout.dev](https://rle.appsprout.dev) (same `site_data.json` payload).
+**11-model spread, `felix` harness, scoring 1.1** — Crashlanded, 10 ticks, seed 42, 2026-06-11. **N=1, content-first — not statistically valid (no confidence intervals). Winners advance to N=4; N=4 is not published.** Ranked by mean composite across the run. Featured numbers live on the [HF card](https://huggingface.co/datasets/AppSprout/rle-benchmarks) and [rle.appsprout.dev](https://rle.appsprout.dev) (same `site_data.json` payload).
+
+These rows predate the harness axis and scoring 1.2: they were all produced by the Felix harness and include the since-removed `coordination` / `communication_efficiency` metrics, so they are not comparable to 1.2 runs. The next published spread will be a harness × model matrix at scoring 1.2.
 
 | # | Model | Mean | Final | vs baseline | Cost |
 |---|-------|------|-------|-------------|------|
@@ -225,21 +252,32 @@ Measured against a pinned no-agent baseline (4 seeds, mean time-to-end 8.0 days)
 
 Both process metrics (`efficiency`, `plan_coherence`) are computed from the writes that actually reached RIMAPI, so any harness is scored the same way, and both return a neutral 0.5 for ticks with no writes so the unmanaged baseline earns no free points. The pre-1.2 `coordination` / `communication_efficiency` metrics were removed because they were ≈1.0 by construction (issue #51).
 
+`plan_coherence` is measured after whatever coordination a harness does internally, so it is a floor a competent harness clears rather than a way to rank harnesses against each other; the colony outcome metrics (86% of the weight) are what separate them. Harness-internal process data (Felix's CentralPost traffic, resolver conflicts, a coding agent's tool-call count) is recorded in the event log as diagnostics, not scored.
+
+Every run also records `harness`, `harness_options`, `harness_versions`, per-tick step latency and cost, and a `harness_failed` flag when RIMAPI plumbing errors (null-ref cascades, invalid plant defs) occurred; quarantined runs are excluded from leaderboard means.
+
 ## Development
 
 ```bash
-pytest                              # Run all tests
-ruff check src/ tests/ scripts/     # Lint
-mypy src/                           # Type check
+uv sync --extra dev --extra felix --extra mcp
+pytest                                      # Run all tests (Felix-only modules skip without the extra)
+ruff check src/ tests/ scripts/             # Lint
+mypy src/                                   # Type check
+python scripts/check_harness_boundary.py    # felix confined to harness/felix; no third-party harness code in tree
 ```
+
+CI runs the suite twice — with and without the `felix` extra — plus a contract job that installs [rle-harness-template](https://github.com/AppSprout-dev/rle-harness-template) from GitHub and checks it appears in `--harness list` and passes `--smoke-test`.
 
 ## Related Repos
 
 | Repo | What | Notes |
 |------|------|-------|
-| [felix-agent-sdk](https://github.com/AppSprout-dev/felix-agent-sdk) | Agent framework (LLMAgent, CentralPost, HelixGeometry, providers) | pip dependency |
+| [rle-harness-template](https://github.com/AppSprout-dev/rle-harness-template) | Template for a harness plugin | Start here to add a harness; RLE CI installs it as the plugin-API contract test |
+| [rle-harness-opencode](https://github.com/AppSprout-dev/rle-harness-opencode) | OpenCode as a harness | `opencode serve` + HTTP API over the RLE MCP server |
+| [rle-harness-grok-build](https://github.com/AppSprout-dev/rle-harness-grok-build) | Grok Build as a harness | headless `grok -p`, session resumed per tick, over the RLE MCP server |
+| [felix-agent-sdk](https://github.com/AppSprout-dev/felix-agent-sdk) | Agent framework behind the `felix` harness (LLMAgent, CentralPost, HelixGeometry, providers) | optional extra `felix` |
 | [RIMAPI](https://github.com/IlyaChichkov/RIMAPI) | C# RimWorld mod (REST API + SSE) | We contribute upstream. [Our fork](https://github.com/AppSprout-dev/RIMAPI) has `rle-testing` branch. |
-| [rimapi-dashboard](https://github.com/AppSprout-dev/rimapi-dashboard) | React dashboard with RLE widgets | Runs on :3000, reads tick data from :9000 |
+| [rimapi-dashboard](https://github.com/AppSprout-dev/rimapi-dashboard) | React dashboard with RLE widgets | Runs on :3000, reads tick data from :9000 (`latest_tick.json` now carries `harness` + `extras`) |
 
 ## License
 

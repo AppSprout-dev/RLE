@@ -201,7 +201,18 @@ python scripts/run_benchmark.py --harness felix --harness baseline --smoke-test
 python scripts/run_scenario.py crashlanded --harness felix --harness-opt no_think=true --harness-opt parallel=false
 ```
 
-## Agents (map to roles, not colonists)
+## Harnesses
+
+| Harness | Where | What |
+|---------|-------|------|
+| `felix` | in tree, extra `felix` (`src/rle/harness/felix/`) | MapAnalyst + 6 role agents over CentralPost, merged by ActionResolver; helix phases; the original stack. Everything in the next four sections describes this harness only. |
+| `baseline` | in tree | Unmanaged colony — paired control for every run. |
+| `opencode` / `grok-build` | own repos (`AppSprout-dev/rle-harness-*`) | Coding agents driven via `HeadlessCliHarness`: one prompt per tick, act through the RLE MCP tools, `end_turn`; the ledger of writes is scored. |
+| `template` | own repo | Starting point for new harnesses; RLE CI installs it as the plugin-API contract test. |
+
+Every harness receives the same neutral brief (`rle.harness.brief`: scenario goals, state snapshot, MAP_SUMMARY, action catalog). Anything beyond that — role splits, bootstrap playbook, helix temperature, tool framing — is the harness's own prompt engineering and is part of what is measured. Options are per plugin (`--harness-opt key=value`, validated by its pydantic schema); Felix's are `parallel`, `no_think`, `helix_preset`, `role_timeout_s`, `exclude_agent`, `provider_kwargs`, `visualize`.
+
+## Felix harness: agents (map to roles, not colonists)
 
 | Agent | Domain | Key Actions |
 |-------|--------|-------------|
