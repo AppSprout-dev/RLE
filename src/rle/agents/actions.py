@@ -35,6 +35,32 @@ class ActionPlan(BaseModel):
     confidence: float = 0.5
 
 
+class ActionOutcome(BaseModel):
+    """Per-action execution result. Captures failure detail so the next
+    tick's deliberation context can surface it to whoever proposed it.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    action_type: str
+    endpoint: str
+    target_colonist_id: str | None = None
+    success: bool
+    error: str | None = None
+    parameters: dict[str, Any] = {}
+
+
+class ExecutionResult(BaseModel):
+    """Summary of action execution for one tick."""
+
+    model_config = ConfigDict(frozen=True)
+
+    executed: int
+    failed: int
+    total: int
+    outcomes: tuple[ActionOutcome, ...] = ()
+
+
 class ActionPlanParseError(Exception):
     """Raised when LLM output cannot be parsed into an ActionPlan."""
 

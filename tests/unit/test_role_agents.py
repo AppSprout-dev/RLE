@@ -7,16 +7,16 @@ from unittest.mock import MagicMock
 from felix_agent_sdk import AgentFactory
 from felix_agent_sdk.core import HelixConfig, HelixGeometry
 
-from rle.agents import register_rle_agents
 from rle.agents.actions import ActionPlan
-from rle.agents.base_role import _SHARED_SYSTEM_PREFIX
-from rle.agents.construction_planner import ConstructionPlanner
-from rle.agents.defense_commander import DefenseCommander
-from rle.agents.map_analyst import MapAnalyst
-from rle.agents.medical_officer import MedicalOfficer
-from rle.agents.research_director import ResearchDirector
-from rle.agents.resource_manager import ResourceManager
-from rle.agents.social_overseer import SocialOverseer
+from rle.harness.felix.agents import register_rle_agents
+from rle.harness.felix.agents.base_role import _SHARED_SYSTEM_PREFIX
+from rle.harness.felix.agents.construction_planner import ConstructionPlanner
+from rle.harness.felix.agents.defense_commander import DefenseCommander
+from rle.harness.felix.agents.map_analyst import MapAnalyst
+from rle.harness.felix.agents.medical_officer import MedicalOfficer
+from rle.harness.felix.agents.research_director import ResearchDirector
+from rle.harness.felix.agents.resource_manager import ResourceManager
+from rle.harness.felix.agents.social_overseer import SocialOverseer
 from rle.rimapi.schemas import GameState
 
 # ==================================================================

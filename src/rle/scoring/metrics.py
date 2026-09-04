@@ -6,9 +6,15 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from rle.rimapi.schemas import GameState, ThreatData
+from rle.scoring.coherence import count_contradictions
 
 if TYPE_CHECKING:
     from rle.orchestration.game_loop import TickResult
+
+# Value returned by process metrics when there is nothing to judge (no ticks
+# yet, or a tick that issued zero writes). Neutral rather than 1.0 so an
+# unmanaged baseline does not bank free points on process metrics (#51).
+NEUTRAL = 0.5
 
 
 @dataclass
@@ -24,11 +30,6 @@ class MetricContext:
     # Response delay in loop ticks per threat, recorded when a draft executes
     first_draft_tick: dict[str, int] = field(default_factory=dict)
     initial_wealth: float = 0.0
-    # Process metrics (populated by game loop after conflict resolution)
-    conflicts_total: int = 0
-    conflicts_resolved: int = 0
-    messages_sent: int = 0
-    messages_acted_on: int = 0
 
 
 def survival(state: GameState, ctx: MetricContext) -> float:
@@ -93,31 +94,33 @@ def self_sufficiency(state: GameState, ctx: MetricContext) -> float:
 
 
 def efficiency(state: GameState, ctx: MetricContext) -> float:
-    """Average action execution rate across all ticks."""
+    """Average action execution rate across ticks. Ticks with no writes are neutral."""
     if not ctx.tick_results:
-        return 1.0
+        return NEUTRAL
     rates = []
     for tr in ctx.tick_results:
         total = tr.execution.total
         if total > 0:
             rates.append(tr.execution.executed / total)
         else:
-            rates.append(1.0)
+            rates.append(NEUTRAL)
     return sum(rates) / len(rates)
 
 
-def coordination(state: GameState, ctx: MetricContext) -> float:
-    """Ratio of conflicts resolved peacefully. 1.0 = no conflicts or all resolved."""
-    if ctx.conflicts_total == 0:
-        return 1.0
-    return min(1.0, ctx.conflicts_resolved / ctx.conflicts_total)
-
-
-def communication_efficiency(state: GameState, ctx: MetricContext) -> float:
-    """Ratio of inter-agent messages that led to action changes. 1.0 = all useful."""
-    if ctx.messages_sent == 0:
-        return 1.0
-    return min(1.0, ctx.messages_acted_on / ctx.messages_sent)
+def plan_coherence(state: GameState, ctx: MetricContext) -> float:
+    """Fraction of executed writes that did not contradict another write in
+    the same tick, averaged across ticks. Harness-agnostic: computed from what
+    reached RIMAPI, not from any harness's internal messaging (#51)."""
+    if not ctx.tick_results:
+        return NEUTRAL
+    scores = []
+    for tr in ctx.tick_results:
+        contradictory, executed = count_contradictions(tr.execution.outcomes)
+        if executed == 0:
+            scores.append(NEUTRAL)
+        else:
+            scores.append(1.0 - contradictory / executed)
+    return sum(scores) / len(scores)
 
 
 ALL_METRICS = {
@@ -129,6 +132,5 @@ ALL_METRICS = {
     "research": research,
     "self_sufficiency": self_sufficiency,
     "efficiency": efficiency,
-    "coordination": coordination,
-    "communication_efficiency": communication_efficiency,
+    "plan_coherence": plan_coherence,
 }

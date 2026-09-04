@@ -5,7 +5,7 @@
 ```bash
 git clone https://github.com/AppSprout-dev/RLE.git
 cd RLE
-uv sync --extra dev
+uv sync --extra dev --extra felix
 pytest  # should pass 458+ tests
 ```
 
@@ -105,37 +105,51 @@ OPENAI_API_KEY=<your-openrouter-key> python scripts/run_benchmark.py \
 - **Pydantic v2** — frozen models for all data structures
 - **No `Any` types** in metric contexts — use `TYPE_CHECKING` imports to break circular deps
 - **No scipy/numpy** — stdlib only for statistics (see ADR-003)
-- **Parallel by default** — agents deliberate concurrently via `asyncio.to_thread`
+- **Core is framework-free** — `felix_agent_sdk` is imported only under `src/rle/harness/felix/`; everything else must run with the `felix` extra uninstalled (the `test-no-felix` CI job checks this)
+- **Harness-agnostic scoring** — metrics read the executed write stream, never a harness's internal messaging
+- **Parallel by default (felix)** — role agents deliberate concurrently
 - **JSON repair** — LLM output goes through `json_repair.py` before parsing
-- **CentralPost for inter-agent context** — not orchestrator-passed lists
-- **SSE events in agent context** — each role agent gets relevant events in `filter_game_state()`
+- **CentralPost for inter-agent context (felix)** — not orchestrator-passed lists
+- **SSE events in agent context** — the loop passes each tick's events to `harness.step()`; Felix role agents get relevant ones in `filter_game_state()`
 
-## Adding a new agent
+## Adding a new harness
 
-1. Create `src/rle/agents/your_agent.py` subclassing `RimWorldRoleAgent`
+Harnesses are plugins discovered through the `rle.harnesses` entry-point group. Only
+RLE-authored harnesses (`baseline`, `felix`) live in this repo; a harness that wraps a
+third-party tool gets its own repo — start from
+[rle-harness-template](https://github.com/AppSprout-dev/rle-harness-template) and read
+`docs/harness-plugins.md`. `scripts/check_harness_boundary.py` (CI) rejects third-party
+harness code and stray `felix_agent_sdk` imports in this tree.
+
+## Adding a new Felix role agent
+
+1. Create `src/rle/harness/felix/agents/your_agent.py` subclassing `RimWorldRoleAgent`
 2. Set `ROLE_NAME`, `ALLOWED_ACTIONS`, `TEMPERATURE_RANGE` class vars
 3. Implement `filter_game_state()`, `_get_task_description()`, `_get_role_description()`
 4. Add `"recent_events": self._format_events("relevant_event_type")` to `filter_game_state()`
-5. Register in `src/rle/agents/__init__.py` — add to `_ROLE_AGENTS` and `AGENT_DISPLAY`
+5. Register in `src/rle/harness/felix/agents/__init__.py` (`_ROLE_AGENTS`, `AGENT_DISPLAY`) and the roster in `src/rle/harness/felix/build.py`
 6. Add tests in `tests/unit/test_role_agents.py`
 
 ## Adding a new scenario
 
 1. Create `src/rle/scenarios/definitions/NN_your_scenario.yaml`
-2. Follow the schema: name, description, difficulty, expected_duration_days, initial_population, victory_conditions, failure_conditions, max_ticks, scoring_weights (include all 10 metrics)
+2. Follow the schema: name, description, difficulty, expected_duration_days, initial_population, victory_conditions, failure_conditions, max_ticks, scoring_weights (all 9 metrics, summing to 1.0)
 3. The loader auto-discovers YAML files — no registration needed
 
 ## Project structure
 
 ```
 src/rle/
-├── config.py              # RLEConfig (env vars, provider, helix preset)
+├── config.py              # RLEConfig (env vars; provider/model/harness as strings)
 ├── docker.py              # Docker container lifecycle + RIMAPI health checks
 ├── rimapi/                # RIMAPI client + SSE + schemas
-├── agents/                # 7 agents (MapAnalyst + 6 role) + base class + JSON repair
-├── orchestration/         # Game loop, state manager, executor, resolver
-├── scoring/               # 10 metrics, composite scorer, bootstrap CIs, CSV recorder
-├── tracking/              # Cost tracking, event log, leaderboard, W&B/HF loggers
+├── agents/                # Harness-neutral action vocabulary + JSON repair
+├── harness/               # Harness protocol, registry, CLI glue, brief, baseline, felix/ (extra), cli_base
+├── mcp/                   # RimAPI as an MCP tool server + per-tick ledger (extra `mcp`)
+├── testing/               # MockRimAPI, run_harness_smoke, ScriptedMcpHarness (for plugin authors)
+├── orchestration/         # Game loop, save loader, state manager, executor, resolver
+├── scoring/               # 9 metrics, coherence, composite scorer, bootstrap CIs, CSV recorder
+├── tracking/              # Cost tracking, event log, leaderboard (harness×model), W&B/HF loggers
 └── scenarios/             # YAML schema, loader, evaluator, 6 definitions
 docker/                    # HeadlessRim Dockerfile, compose, entrypoint
 .github/workflows/         # CI (lint+test+smoke) and benchmark (Docker) workflows

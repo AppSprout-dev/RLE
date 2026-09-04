@@ -72,7 +72,7 @@ class TestToMarkdown:
         md = lb.to_markdown(entries)
         lines = md.strip().split("\n")
         assert len(lines) >= 3  # header + separator + at least 1 row
-        assert "| Model |" in lines[0]
+        assert "| Harness | Model |" in lines[0]
         assert "---" in lines[1]
 
     def test_includes_cost_column(self) -> None:
@@ -130,3 +130,38 @@ class TestParetoFrontier:
     def test_empty(self) -> None:
         lb = Leaderboard()
         assert lb.pareto_frontier([]) == []
+
+
+class TestHarnessKeys:
+    def test_same_model_two_harnesses_are_two_rows(self) -> None:
+        history = [
+            {**_history_entry("gpt-4o", [_scenario("S1", 0.8)]), "harness": "felix"},
+            {**_history_entry("gpt-4o", [_scenario("S1", 0.6)]), "harness": "some-tool"},
+        ]
+        entries = Leaderboard().from_history(history)
+        keys = {(e.harness, e.model) for e in entries}
+        assert keys == {("felix", "gpt-4o"), ("some-tool", "gpt-4o")}
+        assert entries[0].label == "felix/gpt-4o"
+
+    def test_legacy_entries_default_to_felix(self) -> None:
+        entries = Leaderboard().from_history(HISTORY)
+        assert all(e.harness == "felix" for e in entries)
+
+    def test_quarantined_scenarios_excluded_and_counted(self) -> None:
+        run = _history_entry("m", [
+            {"name": "S1", "score": 0.9, "mean_step_latency_s": 2.0},
+            {"name": "S2", "score": 0.1, "harness_failed": True, "mean_step_latency_s": 50.0},
+        ])
+        entry = Leaderboard().from_history([run])[0]
+        assert entry.scenarios == {"S1": 0.9}
+        assert entry.composite_score == 0.9
+        assert entry.n_quarantined == 1
+        assert entry.mean_step_latency_s == 2.0
+        md = Leaderboard().to_markdown([entry])
+        assert "1 (1 quarantined)" in md and "s/step" in md
+
+    def test_reads_cost_snapshot_block(self) -> None:
+        run = {**_history_entry("m", [_scenario("S1", 0.5)])}
+        run["cost_snapshot"] = run.pop("cost")
+        run["cost_snapshot"]["estimated_cost_usd"] = 3.5
+        assert Leaderboard().from_history([run])[0].total_cost_usd == 3.5

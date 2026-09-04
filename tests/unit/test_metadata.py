@@ -17,7 +17,7 @@ def test_scoring_version_pins_a_string() -> None:
     that requires this test (and the dataset card) to be updated."""
     assert isinstance(SCORING_VERSION, str)
     assert SCORING_VERSION
-    assert SCORING_VERSION == "1.1"
+    assert SCORING_VERSION == "1.2"
 
 
 def test_file_sha256_returns_none_for_missing_path() -> None:
@@ -46,7 +46,7 @@ def test_collect_metadata_includes_scoring_version_and_seed() -> None:
         "git_branch",
         "git_dirty",
         "rle_version",
-        "felix_sdk_version",
+        "harness_versions",
         "platform",
         "python_version",
         "rimapi_dll_path",
@@ -54,6 +54,12 @@ def test_collect_metadata_includes_scoring_version_and_seed() -> None:
         "rimapi_fork_commit",
     ):
         assert key in md, f"missing metadata field: {key}"
+
+
+def test_collect_metadata_records_harness_describe() -> None:
+    md = collect_metadata(harness_describe={"harness": "x", "tool": "1.2"})
+    assert md["harness_versions"] == {"harness": "x", "tool": "1.2"}
+    assert collect_metadata()["harness_versions"] == {}
 
 
 def test_collect_metadata_default_seed_is_none() -> None:

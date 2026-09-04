@@ -15,13 +15,17 @@ from pathlib import Path
 # metric implementations, or composite math change in a way that makes scores
 # from older runs not directly comparable. The leaderboard re-scores artifacts
 # at the current version on render; mismatches are surfaced, not silently
-# elided. 1.1 (issue #25): threat_response now tracks actual draft responses
+# elided.
+# 1.1 (issue #25): threat_response now tracks actual draft responses
 # (first_draft_tick wired, was permanently 0.0 once any threat registered)
 # and null incident placeholders (enemy_count=0, threat_level=0.0) no longer
-# count as threats — 1.0 scores with non-empty threats_seen are not
-# comparable. coordination + communication_efficiency remain the broken
-# implementations to be repaired in Phase C.
-SCORING_VERSION = "1.1"
+# count as threats.
+# 1.2 (issue #51, "Phase C"): coordination + communication_efficiency removed
+# (both were ~1.0 by construction and Felix-specific); plan_coherence added
+# (contradictory executed writes per tick, harness-agnostic); efficiency and
+# plan_coherence return a neutral 0.5 for ticks with no writes so an unmanaged
+# baseline no longer banks free process points; weights redistributed.
+SCORING_VERSION = "1.2"
 
 # Conventional install path for the RIMAPI Workshop mod we deploy our fork DLL
 # over. Best-effort — if Steam lives elsewhere set the RIMAPI_DLL_PATH env var.
@@ -30,13 +34,21 @@ _RIMAPI_DLL_DEFAULT_PATH = Path(
 )
 
 
-def collect_metadata(random_seed: int | None = None) -> dict[str, object]:
+def collect_metadata(
+    random_seed: int | None = None,
+    harness_describe: dict[str, str] | None = None,
+) -> dict[str, object]:
     """Gather reproducibility metadata for a benchmark run.
 
     The random_seed argument is the seed the caller passed to ``random.seed``
     (or None if no seed was set). It controls only RLE-side stochasticity
     (json_repair fallbacks, resolver tiebreaks); RimWorld's own RNG is
     unaffected — that lives inside the game and is not reproducible from here.
+
+    ``harness_describe`` is whatever the harness reports about itself
+    (``BaseHarness.describe()``): SDK versions, agent roster, external tool
+    versions. Recorded as ``harness_versions`` so a leaderboard row can be
+    traced to the exact harness build, whichever framework it used.
     """
     dll_path = _rimapi_dll_path()
     return {
@@ -46,7 +58,7 @@ def collect_metadata(random_seed: int | None = None) -> dict[str, object]:
         "git_branch": _git("branch", "--show-current"),
         "git_dirty": _git("status", "--porcelain") != "",
         "rle_version": _version("rimworld-learning-environment"),
-        "felix_sdk_version": _version("felix-agent-sdk"),
+        "harness_versions": dict(harness_describe or {}),
         "platform": sys.platform,
         "python_version": platform.python_version(),
         "docker_mode": False,

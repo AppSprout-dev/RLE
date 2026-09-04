@@ -12,14 +12,14 @@ from felix_agent_sdk.core import HelixConfig
 from felix_agent_sdk.providers.base import BaseProvider
 from felix_agent_sdk.providers.types import CompletionResult
 
-from rle.agents.construction_planner import ConstructionPlanner
-from rle.agents.defense_commander import DefenseCommander
-from rle.agents.map_analyst import MapAnalyst
-from rle.agents.medical_officer import MedicalOfficer
-from rle.agents.research_director import ResearchDirector
-from rle.agents.resource_manager import ResourceManager
-from rle.agents.social_overseer import SocialOverseer
 from rle.config import RLEConfig
+from rle.harness.felix.agents.construction_planner import ConstructionPlanner
+from rle.harness.felix.agents.defense_commander import DefenseCommander
+from rle.harness.felix.agents.map_analyst import MapAnalyst
+from rle.harness.felix.agents.medical_officer import MedicalOfficer
+from rle.harness.felix.agents.research_director import ResearchDirector
+from rle.harness.felix.agents.resource_manager import ResourceManager
+from rle.harness.felix.agents.social_overseer import SocialOverseer
 from rle.orchestration.game_loop import RLEGameLoop, TickResult
 from rle.rimapi.client import RimAPIClient
 from rle.scenarios.evaluator import ScenarioEvaluator
@@ -593,8 +593,8 @@ class TestParallelDeliberation:
 
         assert provider.acomplete.call_count == 7  # 1 MapAnalyst + 6 role agents
         assert result.plan.role == "orchestrator"
-        assert loop._parse_successes == 7
-        assert loop._parse_failures == 0
+        assert loop.parse_successes == 7
+        assert loop.parse_failures == 0
 
     async def test_spoke_messages_routed_after_tick(self) -> None:
         """After tick 1, agents should have TASK_COMPLETE messages from other agents."""
@@ -615,7 +615,7 @@ class TestParallelDeliberation:
             await loop.run_tick()
 
         # Verify hub processed messages (6 TASK_COMPLETE from tick 1 + 6 from tick 2)
-        assert loop._hub.total_messages_processed >= 6
+        assert loop.harness.hub.total_messages_processed >= 6
 
     async def test_sequential_mode_still_works(self) -> None:
         provider = _make_mock_provider()
@@ -631,7 +631,7 @@ class TestParallelDeliberation:
 
         assert provider.acomplete.call_count == 7  # 1 MapAnalyst + 6 role agents
         assert result.plan.role == "orchestrator"
-        assert loop._parse_successes == 7
+        assert loop.parse_successes == 7
 
     async def test_sequential_3_ticks(self) -> None:
         provider = _make_mock_provider()
@@ -684,8 +684,8 @@ class TestHubSpokeCommunication:
             await loop.run_tick()
 
         # 7 agents sent TASK_COMPLETE messages
-        assert loop._hub.message_queue_size >= 0  # may have been processed
-        assert loop._hub.total_messages_processed >= 0
+        assert loop.harness.hub.message_queue_size >= 0  # may have been processed
+        assert loop.harness.hub.total_messages_processed >= 0
         # Each agent's spoke should have sent at least 1 message
         for agent in agents:
             assert agent._spoke.messages_sent >= 1
@@ -704,7 +704,7 @@ class TestHubSpokeCommunication:
             await loop.run_tick()
 
         # First tick should have broadcast an initial phase
-        assert loop._last_phase != ""
+        assert loop.harness.last_phase != ""
 
     async def test_score_broadcast(self) -> None:
         """STATUS_UPDATE with scores should broadcast after scoring."""

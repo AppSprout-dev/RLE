@@ -1,6 +1,6 @@
 ﻿# RLE — RimWorld Learning Environment
 
-Multi-agent benchmark where 7 Felix Agent SDK role-specialized LLM agents manage a RimWorld colony. Think FLE (Factorio Learning Environment) but for multi-agent coordination under uncertainty.
+A harness × model benchmark: swappable agent harnesses (the original 7-agent Felix Agent SDK stack, an unmanaged baseline, or external coding agents installed as `rle-harness-*` packages) manage a RimWorld colony and are scored identically. Think FLE (Factorio Learning Environment) but for multi-agent coordination under uncertainty, with the harness as a first-class benchmark variable.
 
 ## Prerequisites
 
@@ -56,12 +56,14 @@ curl http://localhost:1234/v1/models
 
 ## Commands
 
-- Install: `uv sync --extra dev`
+- Install: `uv sync --extra dev --extra felix` (add `--extra mcp` for the RimAPI MCP server; core alone has no agent framework)
 - Test: `pytest`
 - Lint: `ruff check src/ tests/ scripts/`
 - Type check: `mypy src/`
 - List scenarios: `python scripts/run_scenario.py --list`
-- Smoke test: `python scripts/run_benchmark.py --smoke-test --ticks 5`
+- Smoke test: `python scripts/run_benchmark.py --smoke-test --ticks 5 --harness felix --harness baseline`
+- Harness boundary: `python scripts/check_harness_boundary.py`
+- List harnesses: `python scripts/run_benchmark.py --harness list`
 - Compare runs: `python scripts/compare_benchmarks.py results/run1 results/run2`
 
 ### Configure `.env`
@@ -114,7 +116,8 @@ python scripts/run_scenario.py crashlanded \
 **Important flags:**
 - `--no-think` — Required for thinking models (Nemotron, Qwen). Injects `</think>` prefix.
 - `--no-pause` — Game runs continuously via SSE. Without this, game pauses each tick.
-- `--no-agent` — Baseline mode: no LLM deliberation, colony runs unmanaged (for comparison).
+- `--harness NAME` — Which harness decides (default `felix`; `--harness list` shows installed plugins; `--harness-opt key=value` for plugin options).
+- `--no-agent` — Baseline mode: alias for `--harness baseline`; colony runs unmanaged (for comparison).
 - `--output results/live` — Exports `latest_tick.json` for the dashboard.
 - `--tick-interval 30` — Seconds between ticks. 30s gives agents time to deliberate.
 
@@ -169,26 +172,33 @@ RIMAPI mod (REST :8765 + SSE /api/v1/events)
     ↕
 RimAPIClient (httpx async) + RimAPISSEClient (event stream)
     ↕
-RLEGameLoop
-  unpause → read state → drain SSE → inject events → route spoke messages
-  → MapAnalyst deliberates FIRST (spatial analysis)
-  → broadcast MapAnalyst output via CentralPost
-  → 6 role agents deliberate (parallel) → resolve conflicts → execute actions
-  → score → broadcast score → export tick JSON → render helix
+RLEGameLoop (environment — no agent framework imports)
+  pause → read state → drain SSE → harness.step(state, tick, macro_time, events)
+  → execute StepResult.plan (unless the harness already applied its writes)
+  → score → harness.on_tick_end → export tick JSON → unpause → evaluate
+    ↕ Harness protocol (rle.harness.BaseHarness), discovered via `rle.harnesses` entry points
+    ├── felix     (in tree, extra `felix`)  CentralPost hub-spoke → MapAnalyst FIRST →
+    │             6 role agents (parallel) → ActionResolver → merged ActionPlan → helix viz
+    ├── baseline  (in tree)                 unmanaged colony — the paired control
+    └── <tool>    (own repos: rle-harness-template / -opencode / -grok-build)
+                  HeadlessCliHarness → RLE MCP server (rle.mcp, in-process HTTP) →
+                  coding agent acts through tools during its turn → TickLedger → StepResult.execution
     ↕
-CentralPost hub-spoke (TASK_COMPLETE, STATUS_UPDATE, PHASE_ANNOUNCE)
- ↕  ↕  ↕  ↕  ↕  ↕  ↕
-7 Agents (MapAnalyst + 6 Role Agents)
+ActionExecutor → RIMAPI write calls (shared by every harness; MCP tools call it too)
     ↕
-ActionResolver → merged ActionPlan
-    ↕
-ActionExecutor → RIMAPI write calls
-    ↕
-CompositeScorer → ScoreSnapshot per tick
+CompositeScorer (scoring 1.2: outcomes + efficiency + plan_coherence) → ScoreSnapshot per tick
     ↕
 ScenarioEvaluator → victory/defeat/timeout
     ↕
-HelixVisualizer (terminal) + Dashboard (React :3000 via latest_tick.json :9000)
+Dashboard (React :3000 via latest_tick.json :9000; `harness` + `extras` fields are harness-neutral)
+```
+
+**Repo boundary rule:** only RLE-authored harnesses (`baseline`, `felix`) live here. Harnesses wrapping third-party tools ship as their own `AppSprout-dev/rle-harness-*` packages and register under the same entry-point group. `scripts/check_harness_boundary.py` (run in CI) fails on any `felix_agent_sdk` import outside `src/rle/harness/felix/` and on any third-party harness name in `src/`, `tests/`, `scripts/`. Writing a harness: `docs/harness-plugins.md`; design rationale: ADR-004.
+
+```bash
+python scripts/run_benchmark.py --harness list                     # installed plugins + availability
+python scripts/run_benchmark.py --harness felix --harness baseline --smoke-test
+python scripts/run_scenario.py crashlanded --harness felix --harness-opt no_think=true --harness-opt parallel=false
 ```
 
 ## Agents (map to roles, not colonists)
@@ -268,22 +278,21 @@ Macro helix: `t = min(1.0, game_day / expected_duration_days)` drives agent beha
 - **Analysis** (0.4 <= t < 0.7): Medium temp, evaluate trade-offs
 - **Synthesis** (t >= 0.7): Low temperature, decisive actions
 
-## Scoring (10 metrics, weighted composite)
+## Scoring (9 metrics, weighted composite, SCORING_VERSION 1.2)
 
 | Metric | Default Weight | Source |
 |--------|---------------|--------|
-| survival | 0.25 | alive/started colonists |
-| threat_response | 0.15 | draft response speed |
-| mood | 0.15 | avg colonist mood (from real RIMAPI data) |
+| survival | 0.24 | alive/started colonists |
+| threat_response | 0.14 | draft response speed |
+| mood | 0.12 | avg colonist mood (from real RIMAPI data) |
 | food_security | 0.10 | food count / 10 (from /api/v1/resources/summary) |
-| wealth | 0.10 | wealth growth ratio |
-| research | 0.10 | % research tree completed |
+| wealth | 0.08 | wealth growth ratio |
+| research | 0.08 | % research tree completed |
 | self_sufficiency | 0.10 | power + food + population stability |
-| efficiency | 0.05 | action execution rate |
-| coordination | 0.00* | conflicts resolved / total conflicts |
-| communication_efficiency | 0.00* | messages acted on / total messages |
+| efficiency | 0.06 | executed / proposed writes per tick (neutral 0.5 when no writes) |
+| plan_coherence | 0.08 | 1 − contradictory executed writes / executed writes per tick (neutral 0.5 when no writes); see `scoring/coherence.py` |
 
-*Process metrics have 0.0 weight until game loop wires MetricContext counters. Target: coordination=0.12, communication_efficiency=0.08.
+Process metrics are harness-agnostic: they read the executed write stream (`ExecutionResult.outcomes`), never CentralPost or resolver counters. Those Felix-specific counts are still emitted on the `CONFLICT` event as diagnostics. `coordination` / `communication_efficiency` were removed in 1.2 (issue #51) because they were ≈1.0 by construction. Bump `SCORING_VERSION` in `tracking/metadata.py` whenever weights or metric implementations change; pinned `.baseline.json` sidecars are rejected on mismatch until recalibrated with `scripts/calibrate_baseline.py`.
 
 Scenarios can override weights. TimeSeriesRecorder exports per-tick CSV.
 
@@ -337,29 +346,47 @@ GitHub Actions workflows in `.github/workflows/`:
 
 ```
 src/rle/
-├── config.py              # RLEConfig (pydantic-settings)
+├── config.py              # RLEConfig (pydantic-settings; framework-free: provider/model/harness are strings)
+├── py.typed               # external harness packages type-check against RLE
 ├── rimapi/                # RIMAPI async HTTP client + SSE + Pydantic schemas
 │   ├── client.py          # RimAPIClient (REST read/write + state adapters + terrain analysis)
 │   ├── schemas.py         # GameState, MapData, TerrainSummary, ZoneData, etc.
 │   └── sse_client.py      # RimAPISSEClient (real-time event stream)
-├── agents/                # 7 agents (MapAnalyst + 6 role agents) + base class
-│   ├── base_role.py       # RimWorldRoleAgent (spoke context, SSE events, MAP_SUMMARY, bootstrap)
-│   ├── actions.py         # Action, ActionPlan, resolve_endpoint()
-│   ├── json_repair.py     # Strip think tags, trailing commas, extract JSON
-│   ├── map_analyst.py     # MapAnalyst (spatial analysis, runs first)
-│   ├── resource_manager.py
-│   ├── defense_commander.py
-│   ├── research_director.py
-│   ├── social_overseer.py
-│   ├── construction_planner.py
-│   └── medical_officer.py
-├── orchestration/         # Game loop, state manager, action executor/resolver
-│   ├── game_loop.py       # RLEGameLoop (MapAnalyst-first, parallel deliberation, CentralPost)
+├── agents/                # Harness-neutral action vocabulary (NO agent framework here)
+│   ├── actions.py         # Action, ActionPlan, ActionOutcome, ExecutionResult, resolve_endpoint()
+│   └── json_repair.py     # Strip think tags, trailing commas, extract JSON
+├── harness/               # Swappable harnesses
+│   ├── protocol.py        # BaseHarness, StepResult, HarnessContext, HarnessPlugin, Availability
+│   ├── registry.py        # entry-point discovery (`rle.harnesses`), option validation, create_harness()
+│   ├── cli.py             # --harness / --harness list / --harness-opt argparse glue
+│   ├── brief.py           # harness-neutral scenario brief (goals, state, MAP_SUMMARY, action catalog)
+│   ├── baseline.py        # BaselineHarness (unmanaged colony) + PLUGIN
+│   ├── compat.py          # RLEGameLoop(agents=..., no_agent=...) legacy shim
+│   ├── cli_base.py        # HeadlessCliHarness: scaffold for CLI coding agents over MCP (extra `mcp`)
+│   └── felix/             # The Felix multi-agent harness (extra `felix`; only place felix_agent_sdk is imported)
+│       ├── plugin.py      # PLUGIN (lazy SDK imports), harness.py (FelixHarness), build.py, options.py
+│       ├── provider_factory.py  # Felix providers + helix presets (moved off RLEConfig)
+│       ├── agents/        # RimWorldRoleAgent + MapAnalyst + 6 role agents
+│       └── providers/     # ClaudeCodeProvider (claude -p)
+├── mcp/                   # RimAPI as an MCP tool server (extra `mcp`)
+│   ├── ledger.py          # TickLedger: writes made during a turn → StepResult
+│   ├── session.py         # tool logic: act()/read()/brief (framework-free)
+│   ├── server.py          # MCPServer: one tool per WRITE_CATALOG entry + get_brief/end_turn/...
+│   ├── host.py            # in-process streamable-HTTP host (shared ledger with the loop)
+│   └── __main__.py        # `rle-mcp` stdio server for manual play
+├── testing/               # Exported for plugin authors
+│   ├── mock_rimapi.py     # MockRimAPI transport (records POSTs)
+│   ├── smoke.py           # run_harness_smoke(plugin) — the plugin contract test
+│   └── scripted_agent.py  # ScriptedMcpHarness: fake coding agent over a real MCP client
+├── orchestration/         # Environment: game loop, state manager, executor/resolver
+│   ├── game_loop.py       # RLEGameLoop (harness-agnostic; pause/state/step/execute/score)
+│   ├── save_loader.py     # load_save_and_settle() shared by both CLIs
 │   ├── state_manager.py   # GameStateManager (SSE drain, macro time, history)
 │   ├── action_executor.py # Routes actions to RIMAPI write endpoints
-│   └── action_resolver.py # 4-rule conflict resolution
-├── scoring/               # 10 metrics, composite scorer, bootstrap CIs, CSV recorder
-│   ├── metrics.py         # 10 individual metric functions (8 colony + 2 process)
+│   └── action_resolver.py # 4-rule conflict resolution (used by FelixHarness)
+├── scoring/               # 9 metrics, composite scorer, bootstrap CIs, CSV recorder
+│   ├── metrics.py         # 9 metric functions (7 colony + efficiency + plan_coherence); NEUTRAL = 0.5
+│   ├── coherence.py       # contradiction detection over a tick's executed writes
 │   ├── composite.py       # CompositeScorer (weighted aggregation)
 │   ├── bootstrap.py       # BootstrapCI, bootstrap_ci(), bootstrap_paired_delta()
 │   ├── delta.py           # PairedResult (agent vs baseline stats, Welch's t-test)
@@ -367,16 +394,17 @@ src/rle/
 ├── tracking/              # Benchmark history, cost tracking, observability
 │   ├── cost_tracker.py    # CostTracker + OpenRouter pricing API
 │   ├── event_log.py       # Structured JSONL event log (deliberations, actions, errors)
-│   ├── leaderboard.py     # Model×scenario matrix, Pareto frontier
-│   ├── history.py         # JSONL run history + per-model baselines
+│   ├── leaderboard.py     # Harness×model×scenario matrix (quarantine-aware), Pareto frontier
+│   ├── history.py         # JSONL run history + per-harness×model baselines
 │   ├── metadata.py        # Git commit, versions, reproducibility metadata
 │   ├── wandb_logger.py    # Weights & Biases integration (optional)
 │   └── hf_logger.py       # HuggingFace Hub export (optional)
 ├── docker.py              # DockerGameServer lifecycle + wait_for_rimapi()
 └── scenarios/             # YAML schema, loader, evaluator, 6 definitions
 scripts/
-├── run_scenario.py        # Single scenario CLI (auto-loads save, unforbids items)
-├── run_benchmark.py       # Full benchmark suite CLI (--docker, --smoke-test, --runs)
+├── run_scenario.py        # Single scenario CLI (auto-loads save, unforbids items, --harness)
+├── run_benchmark.py       # Full benchmark suite CLI (--docker, --smoke-test, --runs, repeatable --harness)
+├── check_harness_boundary.py  # CI guard: felix confined to harness/felix; no third-party harness code in tree
 ├── run_spread_n1.sh       # N=1 multi-model spread runner (sequential, continue-on-error)
 ├── compare_benchmarks.py  # Paired statistical comparison of benchmark runs
 ├── analyze_spread.py      # Cross-model leaderboard vs baseline + failure taxonomy
@@ -398,6 +426,9 @@ docker/
 - [felix-agent-sdk](https://github.com/AppSprout-dev/felix-agent-sdk) — Agent framework (LLMAgent, CentralPost, HelixGeometry, providers)
 - [RIMAPI](https://github.com/IlyaChichkov/RIMAPI) — C# RimWorld mod (REST API + SSE). [Our fork](https://github.com/AppSprout-dev/RIMAPI) has the `rle-testing` branch with extra endpoints pending upstream merge.
 - [rimapi-dashboard](https://github.com/AppSprout-dev/rimapi-dashboard) — React dashboard with 5 RLE widgets. Runs on :3000, reads from :9000.
+- [rle-harness-template](https://github.com/AppSprout-dev/rle-harness-template) — Template repo for a harness plugin (RLE CI installs it as the plugin-API contract test).
+- [rle-harness-opencode](https://github.com/AppSprout-dev/rle-harness-opencode) — OpenCode (`opencode serve` + HTTP API) as a harness over the RLE MCP server.
+- [rle-harness-grok-build](https://github.com/AppSprout-dev/rle-harness-grok-build) — Grok Build (headless `grok -p`, session resumed per tick) as a harness over the RLE MCP server.
 
 ## RIMAPI Fork Status
 

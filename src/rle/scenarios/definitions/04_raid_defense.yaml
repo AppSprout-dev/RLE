@@ -25,14 +25,13 @@ triggered_incidents:
   incident_parms:
     points: 500
 scoring_weights:
-  survival: 0.2
-  threat_response: 0.24
+  survival: 0.26
+  threat_response: 0.3
   mood: 0.08
   food_security: 0.04
   wealth: 0.04
   research: 0.04
   self_sufficiency: 0.08
   efficiency: 0.08
-  coordination: 0.15
-  communication_efficiency: 0.05
+  plan_coherence: 0.08
 save_sha256: c11ff2d4476d7f4da7c3bdcbb07f96610ae7588c642af3f5696278c0530666e2

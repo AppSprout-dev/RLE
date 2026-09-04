@@ -5,12 +5,14 @@ build-backend = "hatchling.build"
 [project]
 name = "rimworld-learning-environment"
 version = "0.4.1"
-description = "Multi-agent benchmark where Felix Agent SDK agents play RimWorld"
+description = "Harness x model benchmark: swappable agent harnesses manage a RimWorld colony"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.14"
+# Core is framework-free: the environment (RIMAPI client, loop, scoring,
+# scenarios, tracking, harness registry) runs any harness. Agent frameworks
+# arrive through extras / external harness packages.
 dependencies = [
-    "felix-agent-sdk>=0.3.0",
     "httpx>=0.24",
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
@@ -18,10 +20,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The original Felix multi-agent harness (`--harness felix`).
+felix = ["felix-agent-sdk>=0.3.0"]
 anthropic = ["felix-agent-sdk[anthropic]"]
 openai = ["felix-agent-sdk[openai]"]
 local = ["felix-agent-sdk[local]"]
 all = ["felix-agent-sdk[all]"]
+# RimAPI MCP server for tool-using harnesses (`rle-mcp`).
+mcp = ["mcp>=2.1"]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.24",
@@ -37,6 +43,16 @@ tracking = [
     "wandb>=0.15",
     "huggingface-hub>=0.20",
 ]
+
+# Harness registry. Only RLE-authored harnesses live in this tree; harnesses
+# wrapping third-party tools (OpenCode, Grok Build, ...) ship as their own
+# packages and register under the same group.
+[project.entry-points."rle.harnesses"]
+baseline = "rle.harness.baseline:PLUGIN"
+felix = "rle.harness.felix:PLUGIN"
+
+[project.scripts]
+rle-mcp = "rle.mcp.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/rle"]
@@ -57,7 +73,7 @@ python_version = "3.14"
 strict = true
 
 [[tool.mypy.overrides]]
-module = ["wandb", "huggingface_hub"]
+module = ["wandb", "huggingface_hub", "mcp", "mcp.*"]
 ignore_missing_imports = true
 
 # wandb/huggingface_hub ship untyped APIs; when the tracking extra is

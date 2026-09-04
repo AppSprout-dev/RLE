@@ -33,14 +33,16 @@ class TestBridgeAnthropicKey:
         assert "ANTHROPIC_API_KEY" not in os.environ
 
 
-class TestProviderRegistry:
-    def test_claude_code_provider_registered(self) -> None:
-        from rle.providers.claude_code import ClaudeCodeProvider
+class TestConfigIsFrameworkFree:
+    def test_harness_defaults(self) -> None:
+        config = RLEConfig()
+        assert config.harness == "felix"
+        assert config.harness_options == {}
+        assert config.tick_timeout_s is None
 
-        config = RLEConfig(provider="claude-code", model="claude-fable-5")
-        provider = config.get_provider()
-        assert isinstance(provider, ClaudeCodeProvider)
-        assert provider.model == "claude-fable-5"
+    def test_no_felix_symbols_on_config(self) -> None:
+        assert not hasattr(RLEConfig(), "get_provider")
+        assert not hasattr(RLEConfig(), "get_helix_config")
 
 
 class TestBridgeOpenRouterKey:

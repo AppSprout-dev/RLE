@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from rle.agents.base_role import RimWorldRoleAgent
+from rle.harness.felix.agents.base_role import RimWorldRoleAgent
 
 if TYPE_CHECKING:
     from felix_agent_sdk.agents.llm_agent import LLMTask

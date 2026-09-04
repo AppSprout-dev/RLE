@@ -43,16 +43,21 @@ def load_history() -> list[dict[str, object]]:
 
 
 def update_baseline(summary: dict[str, Any]) -> tuple[bool, float | None]:
-    """Update baseline if this run's avg score is a new best for the model.
+    """Update baseline if this run's avg score is a new best for the
+    harness x model pair. Quarantined (harness-failure) scenarios are ignored.
 
     Returns (is_new_best, previous_score_or_None).
     """
     BASELINES_DIR.mkdir(parents=True, exist_ok=True)
-    model = summary.get("model", "unknown")
-    slug = re.sub(r"[^\w\-]", "_", model)
+    model = str(summary.get("model", "unknown"))
+    harness = str(summary.get("harness") or "felix")
+    slug = re.sub(r"[^\w\-]", "_", f"{harness}__{model}" if harness != "felix" else model)
     baseline_path = BASELINES_DIR / f"{slug}.json"
 
-    scenarios = summary.get("scenarios", [])
+    scenarios = [
+        s for s in summary.get("scenarios", [])
+        if isinstance(s, dict) and not s.get("harness_failed")
+    ]
     if not scenarios:
         return False, None
     avg_score = sum(s.get("score", 0) for s in scenarios) / len(scenarios)
@@ -66,6 +71,7 @@ def update_baseline(summary: dict[str, Any]) -> tuple[bool, float | None]:
 
     baseline = {
         "model": model,
+        "harness": harness,
         "avg_score": round(avg_score, 4),
         "timestamp": summary.get("timestamp", ""),
         "git_commit": summary.get("git_commit", ""),

@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import json
+from importlib.util import find_spec
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from felix_agent_sdk.core import HelixConfig, HelixGeometry
-from felix_agent_sdk.providers.base import BaseProvider
-from felix_agent_sdk.providers.types import CompletionResult
 
 from rle.config import RLEConfig
 from rle.rimapi.schemas import (
@@ -23,6 +22,28 @@ from rle.rimapi.schemas import (
     WeatherData,
 )
 
+# The Felix harness is an optional extra. Tests that need it either live in
+# a module listed below (skipped from collection entirely) or carry the
+# `requires_felix` marker; core tests must pass without it.
+FELIX_AVAILABLE = find_spec("felix_agent_sdk") is not None
+requires_felix = pytest.mark.skipif(
+    not FELIX_AVAILABLE, reason="felix-agent-sdk not installed (uv sync --extra felix)",
+)
+
+# Modules that import the Felix SDK (or rle.harness.felix internals) at
+# module level. Without the extra they cannot even be collected, so they are
+# excluded wholesale; the zero-Felix CI job runs everything else.
+_FELIX_ONLY_TEST_MODULES = [
+    "unit/test_base_role.py",
+    "unit/test_claude_code_provider.py",
+    "unit/test_felix_provider_factory.py",
+    "unit/test_role_agents.py",
+    "unit/test_visualizer_integration.py",
+    "integration/test_game_loop.py",
+    "integration/test_scenario_run.py",
+]
+collect_ignore = [] if FELIX_AVAILABLE else list(_FELIX_ONLY_TEST_MODULES)
+
 # ------------------------------------------------------------------
 # Config
 # ------------------------------------------------------------------
@@ -35,7 +56,6 @@ def mock_config() -> RLEConfig:
         provider="anthropic",
         model="claude-sonnet-4-5",
         tick_interval=0.5,
-        helix_preset="default",
         max_agents=7,
         log_level="DEBUG",
     )
@@ -283,15 +303,18 @@ def sample_action_plan_json() -> str:
 
 
 @pytest.fixture
-def helix() -> HelixGeometry:
-    return HelixConfig.default().to_geometry()
+def helix() -> Any:
+    felix_core = pytest.importorskip("felix_agent_sdk.core")
+    return felix_core.HelixConfig.default().to_geometry()
 
 
 @pytest.fixture
 def mock_provider() -> MagicMock:
-    """Provider mock that returns a valid JSON action plan."""
-    provider = MagicMock(spec=BaseProvider)
-    provider.complete.return_value = CompletionResult(
+    """Felix provider mock that returns a valid JSON action plan."""
+    providers_base = pytest.importorskip("felix_agent_sdk.providers.base")
+    providers_types = pytest.importorskip("felix_agent_sdk.providers.types")
+    provider = MagicMock(spec=providers_base.BaseProvider)
+    provider.complete.return_value = providers_types.CompletionResult(
         content=SAMPLE_ACTION_PLAN_JSON,
         model="mock-model",
         usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},

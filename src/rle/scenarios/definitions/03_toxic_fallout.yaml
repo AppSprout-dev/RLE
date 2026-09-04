@@ -23,14 +23,13 @@ triggered_incidents:
 - tick_offset: 1
   name: ToxicFallout
 scoring_weights:
-  survival: 0.28
-  food_security: 0.12
-  mood: 0.16
+  survival: 0.32
+  food_security: 0.16
+  mood: 0.2
   self_sufficiency: 0.08
   wealth: 0.04
   research: 0.04
   threat_response: 0.04
   efficiency: 0.04
-  coordination: 0.12
-  communication_efficiency: 0.08
+  plan_coherence: 0.08
 save_sha256: c8a73b3beb3a6df4988ed4c100886584c376cd61814831ffe78fec9b30228ba5

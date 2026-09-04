@@ -3,34 +3,19 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
-from felix_agent_sdk.core import HelixConfig
-from felix_agent_sdk.providers import (
-    AnthropicProvider,
-    BaseProvider,
-    LocalProvider,
-    OpenAIProvider,
-)
 from pydantic_settings import BaseSettings
-
-from rle.providers.claude_code import ClaudeCodeProvider
-
-_HELIX_PRESETS: dict[str, HelixConfig] = {
-    "default": HelixConfig.default(),
-    "research_heavy": HelixConfig.research_heavy(),
-    "fast_convergence": HelixConfig.fast_convergence(),
-}
-
-_PROVIDER_CLASSES: dict[str, type[BaseProvider]] = {
-    "anthropic": AnthropicProvider,
-    "openai": OpenAIProvider,
-    "local": LocalProvider,
-    "claude-code": ClaudeCodeProvider,
-}
 
 
 class RLEConfig(BaseSettings):
-    """Top-level configuration for the RimWorld Learning Environment."""
+    """Top-level configuration for the RimWorld Learning Environment.
+
+    Deliberately framework-free: provider/model/harness are strings, and the
+    harness that gets built from them (see ``rle.harness``) decides what they
+    mean. Felix-only knobs (helix preset, no-think, parallelism) live in
+    ``FelixOptions`` and arrive via ``harness_options``.
+    """
 
     model_config = {"env_prefix": "", "env_file": ".env", "extra": "ignore"}
 
@@ -41,13 +26,21 @@ class RLEConfig(BaseSettings):
     openrouter_api_key: str | None = None
     anthropic_api_key: str | None = None
     tick_interval: float = 1.0
+    harness: str = "felix"
+    """Which harness decides the colony's actions. Resolved through the
+    ``rle.harnesses`` entry-point registry (``--harness list``)."""
+    harness_options: dict[str, Any] = {}
+    """Harness-specific options validated against the plugin's schema
+    (``RLE_HARNESS_OPTIONS`` as JSON, or ``--harness-opt key=value``)."""
+    tick_timeout_s: float | None = None
+    """Loop-level cap on a whole harness step. ``None`` = no cap (the Felix
+    harness applies its own per-agent ``role_timeout_s``)."""
     role_timeout_s: float = 60.0
-    """Max wall-clock seconds for a single agent's deliberation. Hung LLM
+    """Max wall-clock seconds for a single Felix agent's deliberation. Hung LLM
     calls beyond this fire a deliberation_timeout ERROR event and the agent
-    contributes no actions for the tick. The hung thread eventually unwinds
-    via the provider's own timeout (Python threads can't be force-killed).
-    Docker-benchmark average is ~7s per deliberation; 60s leaves ~8x headroom."""
-    helix_preset: str = "default"
+    contributes no actions for the tick. Kept on RLEConfig for the legacy
+    ``RLEGameLoop(agents=...)`` path; ``--harness-opt role_timeout_s=`` is the
+    modern spelling."""
     max_agents: int = 7
     log_level: str = "INFO"
     docker_image: str = "rle-headless:latest"
@@ -56,30 +49,6 @@ class RLEConfig(BaseSettings):
     """Fine-grained HuggingFace write token (HF_TOKEN in .env) for dataset pushes."""
     hf_dataset_repo: str = "AppSprout/rle-benchmarks"
     """Target HF dataset repo (HF_DATASET_REPO in .env to override)."""
-
-    def get_helix_config(self) -> HelixConfig:
-        """Return the HelixConfig preset matching ``helix_preset``."""
-        try:
-            return _HELIX_PRESETS[self.helix_preset]
-        except KeyError:
-            raise ValueError(
-                f"Unknown helix preset {self.helix_preset!r}. "
-                f"Choose from: {list(_HELIX_PRESETS)}"
-            ) from None
-
-    def get_provider(self) -> BaseProvider:
-        """Construct an LLM provider from the current config."""
-        cls = _PROVIDER_CLASSES.get(self.provider)
-        if cls is None:
-            raise ValueError(
-                f"Unknown provider {self.provider!r}. "
-                f"Choose from: {list(_PROVIDER_CLASSES)}"
-            )
-        kwargs: dict[str, str] = {"model": self.model}
-        if self.provider_base_url:
-            kwargs["base_url"] = self.provider_base_url
-        return cls(**kwargs)  # type: ignore[arg-type]  # subclasses accept kwargs
-
 
 def bridge_openrouter_key(config: RLEConfig) -> None:
     """If OPENROUTER_API_KEY is set but OPENAI_API_KEY isn't, bridge them."""

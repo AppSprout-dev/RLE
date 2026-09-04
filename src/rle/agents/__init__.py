@@ -1,57 +1,20 @@
-"""RLE role agents and registration."""
+"""Harness-neutral action vocabulary.
 
-from felix_agent_sdk import AgentFactory
+``Action`` / ``ActionPlan`` are what every harness hands the environment;
+``json_repair`` is a generic LLM-output cleaner any LLM-backed harness can
+reuse. The Felix role agents that used to live here are now
+``rle.harness.felix.agents`` — this package must stay importable without
+``felix-agent-sdk``.
+"""
 
 from rle.agents.actions import Action, ActionPlan, ActionPlanParseError, resolve_endpoint
-from rle.agents.base_role import RimWorldRoleAgent
-from rle.agents.construction_planner import ConstructionPlanner
-from rle.agents.defense_commander import DefenseCommander
-from rle.agents.map_analyst import MapAnalyst
-from rle.agents.medical_officer import MedicalOfficer
-from rle.agents.research_director import ResearchDirector
-from rle.agents.resource_manager import ResourceManager
-from rle.agents.social_overseer import SocialOverseer
-
-AGENT_DISPLAY: dict[str, dict[str, str]] = {
-    "map_analyst":          {"label": "MA", "color": "blue"},
-    "resource_manager":     {"label": "RM", "color": "green"},
-    "defense_commander":    {"label": "DC", "color": "red"},
-    "research_director":    {"label": "RD", "color": "cyan"},
-    "social_overseer":      {"label": "SO", "color": "yellow"},
-    "construction_planner": {"label": "CP", "color": "white"},
-    "medical_officer":      {"label": "MO", "color": "magenta"},
-}
-
-_ROLE_AGENTS: dict[str, type[RimWorldRoleAgent]] = {
-    "map_analyst": MapAnalyst,
-    "resource_manager": ResourceManager,
-    "defense_commander": DefenseCommander,
-    "research_director": ResearchDirector,
-    "social_overseer": SocialOverseer,
-    "construction_planner": ConstructionPlanner,
-    "medical_officer": MedicalOfficer,
-}
-
-
-def register_rle_agents() -> None:
-    """Register all RLE role agent types with the Felix AgentFactory."""
-    for name, cls in _ROLE_AGENTS.items():
-        AgentFactory.register_agent_type(name, cls)
-
+from rle.agents.json_repair import repair_json, try_parse_json
 
 __all__ = [
-    "AGENT_DISPLAY",
     "Action",
     "ActionPlan",
     "ActionPlanParseError",
+    "repair_json",
     "resolve_endpoint",
-    "ConstructionPlanner",
-    "DefenseCommander",
-    "MapAnalyst",
-    "MedicalOfficer",
-    "ResearchDirector",
-    "ResourceManager",
-    "RimWorldRoleAgent",
-    "SocialOverseer",
-    "register_rle_agents",
+    "try_parse_json",
 ]

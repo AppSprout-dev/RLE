@@ -44,6 +44,8 @@ Two new metrics folded into the composite score:
 
 Process metrics get 20% combined weight. No historical data to protect (pre-release). All 6 scenario YAMLs updated.
 
+> **Superseded (scoring 1.2, issue #51, ADR-004).** Both metrics turned out to be ≈1.0 by construction (the resolver always "resolves" every conflict it detects; empty message traffic scored 1.0) and were Felix-specific. They were replaced by a single harness-agnostic `plan_coherence` metric computed from the executed write stream, with neutral 0.5 defaults for ticks that issue no writes.
+
 ### 3. Bootstrap confidence intervals (stdlib-only)
 
 We evaluated `resample` (scikit-hep, best modern option) but it pulls in scipy (~150MB) + numpy (~50MB). For percentile bootstrap CIs and Welch's t-test at N≥4, stdlib `random.choices()` + `math` is mathematically correct and keeps the install lightweight. The existing hand-rolled Welch's t-test in `delta.py` uses a normal CDF approximation (Abramowitz & Stegun) documented as "very accurate for df > 30, approximate for smaller df." Our N≥4 minimum guarantees sufficient accuracy.

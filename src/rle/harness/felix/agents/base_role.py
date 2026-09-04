@@ -19,6 +19,7 @@ from felix_agent_sdk.tokens.budget import TokenBudget
 
 from rle.agents.actions import Action, ActionPlan, ActionPlanParseError, resolve_endpoint
 from rle.agents.json_repair import repair_json
+from rle.harness.brief import build_map_summary
 from rle.rimapi.schemas import GameState
 from rle.rimapi.sse_client import RimAPIEvent
 
@@ -408,95 +409,8 @@ class RimWorldRoleAgent(LLMAgent):
 
     @staticmethod
     def _build_map_summary(state: GameState) -> str | None:
-        """Build a compact ~500 token map summary from terrain + zone + room data.
-
-        This text is injected into every agent's context so they share a
-        common spatial understanding without needing to parse raw data.
-        """
-        terrain = state.map.terrain
-        if terrain is None:
-            return None
-
-        lines: list[str] = []
-        cx, cz = terrain.colony_center
-        lines.append(f"Colony center: ({cx}, {cz}).")
-
-        # Verified build/farm/stockpile sites
-        if terrain.recommended_shelter:
-            s = terrain.recommended_shelter
-            lines.append(
-                f"SHELTER SITE (verified solid ground): "
-                f"place walls/doors/beds at ({s.x1},{s.z1})-({s.x2},{s.z2}). "
-                f"ALL blueprint actions MUST use x,z within this rectangle."
-            )
-        if terrain.recommended_farm:
-            f = terrain.recommended_farm
-            lines.append(
-                f"FARM SITE (verified fertile soil): "
-                f"place growing_zone at x1={f.x1},z1={f.z1},x2={f.x2},z2={f.z2}. "
-                f"ALL growing_zone actions MUST use these exact coordinates."
-            )
-        if terrain.recommended_stockpile:
-            sp = terrain.recommended_stockpile
-            lines.append(
-                f"STOCKPILE SITE (verified solid ground): "
-                f"place stockpile_zone at x1={sp.x1},z1={sp.z1},"
-                f"x2={sp.x2},z2={sp.z2}."
-            )
-
-        # Water avoidance
-        if terrain.water_areas:
-            water_strs = [
-                f"({w.x1},{w.z1})-({w.x2},{w.z2})"
-                for w in terrain.water_areas
-            ]
-            lines.append(f"WATER (do NOT build here): {', '.join(water_strs)}.")
-
-        # Existing zones
-        if state.map.zones:
-            zone_strs = [
-                f"{z.label} ({z.zone_type}, {z.cell_count} cells)"
-                for z in state.map.zones[:8]
-            ]
-            lines.append(f"Zones: {'; '.join(zone_strs)}.")
-        else:
-            lines.append("Zones: NONE — create stockpile and growing zone NOW.")
-
-        # Existing rooms
-        real_rooms = [r for r in state.map.rooms if r.size > 1]
-        if real_rooms:
-            room_strs = [
-                f"{r.role} ({r.size} cells, {r.bed_count} beds)"
-                for r in real_rooms[:6]
-            ]
-            lines.append(f"Rooms: {'; '.join(room_strs)}.")
-        else:
-            lines.append(
-                "Rooms: NONE — colonists sleeping outside. "
-                "Build shelter IMMEDIATELY."
-            )
-
-        # Ore
-        if state.map.ore_deposits:
-            ore_strs = [
-                f"{o.def_name} ({o.count} cells"
-                + (f", near ({o.positions[0][0]},{o.positions[0][1]})"
-                   if o.positions else "")
-                + ")"
-                for o in state.map.ore_deposits[:5]
-            ]
-            lines.append(f"Ore: {'; '.join(ore_strs)}.")
-
-        # Farm summary
-        fs = state.map.farm_summary
-        if fs and fs.total_growing_zones > 0:
-            lines.append(
-                f"Farms: {fs.total_growing_zones} zones, "
-                f"{fs.planted_cells} planted, "
-                f"{fs.harvestable_cells} harvestable."
-            )
-
-        return "\n".join(lines)
+        """Compact map summary shared by every agent (core builder, see rle.harness.brief)."""
+        return build_map_summary(state)
 
     def build_task(
         self,
