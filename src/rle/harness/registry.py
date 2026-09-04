@@ -139,12 +139,21 @@ def create_harness(
 ) -> BaseHarness:
     """Resolve ``name`` through the registry and build a ready-to-setup harness."""
     plugin = get_plugin(name)
+    opts = validate_options(plugin, options)
+    if smoke or ctx.smoke:
+        # Smoke variants must run without the external tool, so availability
+        # is not a gate here; a plugin whose smoke still needs a missing
+        # dependency surfaces that as unavailable.
+        try:
+            return plugin.smoke(ctx, opts)
+        except ImportError as exc:
+            reason = plugin.available().reason or str(exc)
+            raise HarnessUnavailableError(
+                f"Harness {name!r} cannot run its smoke variant: {reason}",
+            ) from exc
     availability = plugin.available()
     if not availability.ok:
         raise HarnessUnavailableError(
             f"Harness {name!r} is installed but unavailable: {availability.reason}",
         )
-    opts = validate_options(plugin, options)
-    if smoke or ctx.smoke:
-        return plugin.smoke(ctx, opts)
     return plugin.create(ctx, opts)

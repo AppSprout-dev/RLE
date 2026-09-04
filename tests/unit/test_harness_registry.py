@@ -7,6 +7,7 @@ from typing import ClassVar
 import pytest
 from pydantic import BaseModel, ConfigDict
 
+import rle.harness.registry as registry
 from rle.agents.actions import ActionPlan
 from rle.config import RLEConfig
 from rle.harness import (
@@ -142,19 +143,32 @@ class _UnavailablePlugin:
         raise AssertionError("must not be called")
 
     def smoke(self, ctx: HarnessContext, options: BaseModel) -> BaseHarness:
-        raise AssertionError("must not be called")
+        return BaselineHarness()
 
     def describe(self) -> dict[str, str]:
         return {}
 
 
+class _SmokeNeedsDep(_UnavailablePlugin):
+    def smoke(self, ctx: HarnessContext, options: BaseModel) -> BaseHarness:
+        raise ImportError("No module named 'ghosttool'")
+
+
 class TestUnavailable:
     def test_unavailable_plugin_raises_with_reason(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        import rle.harness.registry as registry
-
         monkeypatch.setattr(registry, "get_plugin", lambda name: _UnavailablePlugin())
         with pytest.raises(HarnessUnavailableError, match="ghost binary"):
             registry.create_harness("ghost", _ctx())
+
+    def test_smoke_does_not_require_the_tool(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Smoke variants exist precisely so CI can run without the binary."""
+        monkeypatch.setattr(registry, "get_plugin", lambda name: _UnavailablePlugin())
+        assert isinstance(registry.create_harness("ghost", _ctx(), smoke=True), BaselineHarness)
+
+    def test_smoke_missing_dependency_is_unavailable(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(registry, "get_plugin", lambda name: _SmokeNeedsDep())
+        with pytest.raises(HarnessUnavailableError, match="ghost binary"):
+            registry.create_harness("ghost", _ctx(), smoke=True)
 
 
 class TestCompatShim:

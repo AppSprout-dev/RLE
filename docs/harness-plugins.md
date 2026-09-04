@@ -88,9 +88,20 @@ and continues. Any other exception is treated as a bug and propagates.
 - `rle.harness` — `BaseHarness`, `StepResult`, `HarnessContext`,
   `HarnessPlugin`, `Availability`, `EmptyOptions`, `HarnessStepError`,
   `TickObserver`, registry helpers.
-- `rle.harness.cli_base.HeadlessCliHarness` — scaffold for CLI coding agents
-  (spawn/attach, MCP attach, per-tick prompt, idle/timeout/abort, ledger
-  drain, token + latency capture). Tool-agnostic by design.
+- `rle.harness.cli_base.HeadlessCliHarness` — scaffold for CLI coding agents.
+  Subclass and implement three hooks: `start_agent(mcp_url)` (launch/attach
+  the tool and register the RLE MCP server), `send_turn(prompt) -> TurnResult`
+  (deliver one prompt, return when the agent has finished responding, with
+  token counts if you have them), `stop_agent()`. The base hosts the MCP
+  server in-process, builds the brief and prompt, waits for `end_turn` (or a
+  short idle grace), drains the ledger into `StepResult`, applies
+  `turn_timeout_s`, and records latency/cost/deliberation log. Options extend
+  `HeadlessCliOptions` (`model`, `turn_timeout_s`, `idle_grace_s`,
+  `extra_instructions`). Needs the `mcp` extra.
+- `rle.testing.scripted_agent.ScriptedMcpHarness` — a fake coding agent that
+  plays a fixed tool script through the MCP server. Return it from
+  `plugin.smoke()` so your package's CI exercises the full round trip
+  without the real binary.
 - `rle.harness.brief` — the harness-neutral scenario brief every harness
   receives (goals, filtered state, MAP_SUMMARY, action catalog).
 - `rle.mcp` — the RimAPI MCP server + per-tick write ledger (`rle-mcp`).
