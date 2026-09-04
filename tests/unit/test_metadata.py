@@ -17,7 +17,7 @@ def test_scoring_version_pins_a_string() -> None:
     that requires this test (and the dataset card) to be updated."""
     assert isinstance(SCORING_VERSION, str)
     assert SCORING_VERSION
-    assert SCORING_VERSION == "1.1"
+    assert SCORING_VERSION == "1.2"
 
 
 def test_file_sha256_returns_none_for_missing_path() -> None:

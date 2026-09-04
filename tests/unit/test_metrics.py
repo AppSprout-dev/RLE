@@ -6,7 +6,7 @@ import pytest
 
 # Using the ActionPlan import for TickResult construction
 from rle.agents.actions import ActionPlan
-from rle.orchestration.action_executor import ExecutionResult
+from rle.orchestration.action_executor import ActionOutcome, ExecutionResult
 from rle.orchestration.game_loop import TickResult
 from rle.rimapi.schemas import (
     ColonistData,
@@ -19,12 +19,12 @@ from rle.rimapi.schemas import (
     WeatherData,
 )
 from rle.scoring.metrics import (
+    NEUTRAL,
     MetricContext,
-    communication_efficiency,
-    coordination,
     efficiency,
     food_security,
     mood,
+    plan_coherence,
     research,
     self_sufficiency,
     survival,
@@ -95,12 +95,27 @@ def _ctx(
     )
 
 
-def _tick_result(executed: int, total: int) -> TickResult:
+def _tick_result(
+    executed: int, total: int, outcomes: tuple[ActionOutcome, ...] = (),
+) -> TickResult:
     return TickResult(
         tick=1, day=1, macro_time=0.1,
         plan=ActionPlan(role="test", tick=1, actions=[]),
-        execution=ExecutionResult(executed=executed, failed=total - executed, total=total),
+        execution=ExecutionResult(
+            executed=executed, failed=total - executed, total=total, outcomes=outcomes,
+        ),
     )
+
+
+def _ok(action_type: str, pawn: str | None = None, **params: object) -> ActionOutcome:
+    return ActionOutcome(
+        action_type=action_type, endpoint=action_type, target_colonist_id=pawn,
+        success=True, parameters=dict(params),
+    )
+
+
+def _coherence_tick(*outcomes: ActionOutcome) -> TickResult:
+    return _tick_result(len(outcomes), len(outcomes), outcomes)
 
 
 class TestSurvival:
@@ -222,57 +237,109 @@ class TestEfficiency:
         # (0.5 + 1.0) / 2 = 0.75
         assert efficiency(_state(), ctx) == pytest.approx(0.75)
 
-    def test_no_ticks(self) -> None:
-        assert efficiency(_state(), _ctx()) == pytest.approx(1.0)
+    def test_no_ticks_is_neutral(self) -> None:
+        assert efficiency(_state(), _ctx()) == pytest.approx(NEUTRAL)
 
-    def test_empty_plan(self) -> None:
+    def test_empty_plan_is_neutral(self) -> None:
+        """An unmanaged baseline issues no writes — it must not bank 1.0 (#51)."""
         ctx = _ctx(tick_results=[_tick_result(0, 0)])
-        assert efficiency(_state(), ctx) == pytest.approx(1.0)
+        assert efficiency(_state(), ctx) == pytest.approx(NEUTRAL)
 
 
-class TestCoordination:
-    def test_no_conflicts(self) -> None:
-        ctx = _ctx()
-        assert coordination(_state(), ctx) == pytest.approx(1.0)
+class TestPlanCoherence:
+    def test_no_ticks_is_neutral(self) -> None:
+        assert plan_coherence(_state(), _ctx()) == pytest.approx(NEUTRAL)
 
-    def test_all_resolved(self) -> None:
-        ctx = _ctx()
-        ctx.conflicts_total = 10
-        ctx.conflicts_resolved = 10
-        assert coordination(_state(), ctx) == pytest.approx(1.0)
+    def test_no_writes_is_neutral(self) -> None:
+        ctx = _ctx(tick_results=[_tick_result(0, 0)])
+        assert plan_coherence(_state(), ctx) == pytest.approx(NEUTRAL)
 
-    def test_half_resolved(self) -> None:
-        ctx = _ctx()
-        ctx.conflicts_total = 8
-        ctx.conflicts_resolved = 4
-        assert coordination(_state(), ctx) == pytest.approx(0.5)
+    def test_independent_writes_are_coherent(self) -> None:
+        ctx = _ctx(tick_results=[_coherence_tick(
+            _ok("draft", "1", is_drafted=True),
+            _ok("work_priority", "2", Growing=1),
+            _ok("research_target", project="Electricity"),
+            _ok("blueprint", x=10, z=10, def_name="Wall"),
+        )])
+        assert plan_coherence(_state(), ctx) == pytest.approx(1.0)
 
-    def test_none_resolved(self) -> None:
-        ctx = _ctx()
-        ctx.conflicts_total = 5
-        ctx.conflicts_resolved = 0
-        assert coordination(_state(), ctx) == pytest.approx(0.0)
+    def test_draft_undraft_same_pawn(self) -> None:
+        ctx = _ctx(tick_results=[_coherence_tick(
+            _ok("draft", "1", is_drafted=True),
+            _ok("draft", "1", is_drafted=False),
+            _ok("work_priority", "2", Mining=1),
+        )])
+        # 2 of 3 executed writes contradict each other
+        assert plan_coherence(_state(), ctx) == pytest.approx(1 / 3)
 
+    def test_move_and_job_same_pawn(self) -> None:
+        ctx = _ctx(tick_results=[_coherence_tick(
+            _ok("move", "1", x=5, z=5),
+            _ok("job_assign", "1", job_def="Mine"),
+        )])
+        assert plan_coherence(_state(), ctx) == pytest.approx(0.0)
 
-class TestCommunicationEfficiency:
-    def test_no_messages(self) -> None:
-        ctx = _ctx()
-        assert communication_efficiency(_state(), ctx) == pytest.approx(1.0)
+    def test_legacy_alias_resolves(self) -> None:
+        ctx = _ctx(tick_results=[_coherence_tick(
+            _ok("draft_colonist", "1", is_drafted=True),
+            _ok("undraft_colonist", "1", is_drafted=False),
+        )])
+        assert plan_coherence(_state(), ctx) == pytest.approx(0.0)
 
-    def test_all_acted_on(self) -> None:
-        ctx = _ctx()
-        ctx.messages_sent = 12
-        ctx.messages_acted_on = 12
-        assert communication_efficiency(_state(), ctx) == pytest.approx(1.0)
+    def test_conflicting_work_priority(self) -> None:
+        ctx = _ctx(tick_results=[_coherence_tick(
+            _ok("work_priority", "1", Growing=1),
+            _ok("work_priority", "1", Growing=4),
+        )])
+        assert plan_coherence(_state(), ctx) == pytest.approx(0.0)
 
-    def test_half_acted_on(self) -> None:
-        ctx = _ctx()
-        ctx.messages_sent = 10
-        ctx.messages_acted_on = 5
-        assert communication_efficiency(_state(), ctx) == pytest.approx(0.5)
+    def test_same_work_priority_twice_is_redundant_not_contradictory(self) -> None:
+        ctx = _ctx(tick_results=[_coherence_tick(
+            _ok("work_priority", "1", Growing=1),
+            _ok("work_priority", "1", Growing=1),
+        )])
+        assert plan_coherence(_state(), ctx) == pytest.approx(1.0)
 
-    def test_none_acted_on(self) -> None:
-        ctx = _ctx()
-        ctx.messages_sent = 7
-        ctx.messages_acted_on = 0
-        assert communication_efficiency(_state(), ctx) == pytest.approx(0.0)
+    def test_overlapping_zones(self) -> None:
+        ctx = _ctx(tick_results=[_coherence_tick(
+            _ok("growing_zone", x1=0, z1=0, x2=8, z2=8),
+            _ok("stockpile_zone", x1=4, z1=4, x2=9, z2=9),
+            _ok("growing_zone", x1=20, z1=20, x2=28, z2=28),
+        )])
+        assert plan_coherence(_state(), ctx) == pytest.approx(1 / 3)
+
+    def test_duplicate_blueprint_cell(self) -> None:
+        ctx = _ctx(tick_results=[_coherence_tick(
+            _ok("blueprint", x=1, z=1, def_name="Wall"),
+            _ok("blueprint", x=1, z=1, def_name="Door"),
+            _ok("blueprint", x=2, z=1, def_name="Wall"),
+        )])
+        assert plan_coherence(_state(), ctx) == pytest.approx(1 / 3)
+
+    def test_competing_research_targets(self) -> None:
+        ctx = _ctx(tick_results=[_coherence_tick(
+            _ok("research_target", project="Electricity"),
+            _ok("research_target", project="Batteries"),
+        )])
+        assert plan_coherence(_state(), ctx) == pytest.approx(0.0)
+
+    def test_failed_writes_do_not_count(self) -> None:
+        failed = ActionOutcome(
+            action_type="draft", endpoint="draft", target_colonist_id="1",
+            success=False, error="boom", parameters={"is_drafted": False},
+        )
+        ctx = _ctx(tick_results=[_tick_result(1, 2, (
+            _ok("draft", "1", is_drafted=True), failed,
+        ))])
+        assert plan_coherence(_state(), ctx) == pytest.approx(1.0)
+
+    def test_averages_across_ticks(self) -> None:
+        ctx = _ctx(tick_results=[
+            _coherence_tick(_ok("draft", "1", is_drafted=True)),
+            _coherence_tick(
+                _ok("draft", "1", is_drafted=True),
+                _ok("draft", "1", is_drafted=False),
+            ),
+            _tick_result(0, 0),
+        ])
+        assert plan_coherence(_state(), ctx) == pytest.approx((1.0 + 0.0 + NEUTRAL) / 3)

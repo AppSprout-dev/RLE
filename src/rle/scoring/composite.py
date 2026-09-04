@@ -7,17 +7,20 @@ from pydantic import BaseModel, ConfigDict
 from rle.rimapi.schemas import GameState
 from rle.scoring.metrics import ALL_METRICS, MetricContext
 
+# Scoring 1.2 (#51): one harness-agnostic process metric (plan_coherence)
+# replaces coordination + communication_efficiency; the freed weight returns
+# to colony outcomes. Bump SCORING_VERSION in tracking/metadata.py whenever
+# this table changes.
 DEFAULT_WEIGHTS: dict[str, float] = {
-    "survival": 0.20,
-    "threat_response": 0.12,
+    "survival": 0.24,
+    "threat_response": 0.14,
     "mood": 0.12,
-    "food_security": 0.08,
+    "food_security": 0.10,
     "wealth": 0.08,
     "research": 0.08,
-    "self_sufficiency": 0.08,
-    "efficiency": 0.04,
-    "coordination": 0.12,
-    "communication_efficiency": 0.08,
+    "self_sufficiency": 0.10,
+    "efficiency": 0.06,
+    "plan_coherence": 0.08,
 }
 
 

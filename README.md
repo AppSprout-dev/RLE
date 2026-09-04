@@ -194,22 +194,21 @@ Measured against a pinned no-agent baseline (4 seeds, mean time-to-end 8.0 days)
 
 ## Scoring
 
-10 metrics, weighted composite (scenarios can override weights):
+9 metrics, weighted composite (`SCORING_VERSION = "1.2"`; scenarios can override weights):
 
 | Metric | Default Weight | What it measures |
 |--------|---------------|------------------|
-| survival | 0.25 | alive / started colonists |
-| threat_response | 0.15 | draft response speed |
-| mood | 0.15 | avg colonist mood |
+| survival | 0.24 | alive / started colonists |
+| threat_response | 0.14 | draft response speed |
+| mood | 0.12 | avg colonist mood |
 | food_security | 0.10 | days of food (10+ = 1.0) |
-| wealth | 0.10 | wealth growth ratio |
-| research | 0.10 | % research tree completed |
+| wealth | 0.08 | wealth growth ratio |
+| research | 0.08 | % research tree completed |
 | self_sufficiency | 0.10 | power + food + population stability |
-| efficiency | 0.05 | action execution rate |
-| coordination | 0.00* | conflicts resolved / total conflicts |
-| communication_efficiency | 0.00* | messages acted on / total messages |
+| efficiency | 0.06 | executed / proposed writes per tick |
+| plan_coherence | 0.08 | 1 − contradictory executed writes / executed writes per tick |
 
-*Process metrics weighted 0.0 until game loop wires MetricContext counters.
+Both process metrics (`efficiency`, `plan_coherence`) are computed from the writes that actually reached RIMAPI, so any harness is scored the same way, and both return a neutral 0.5 for ticks with no writes so the unmanaged baseline earns no free points. The pre-1.2 `coordination` / `communication_efficiency` metrics were removed because they were ≈1.0 by construction (issue #51).
 
 ## Development
 

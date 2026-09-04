@@ -268,22 +268,21 @@ Macro helix: `t = min(1.0, game_day / expected_duration_days)` drives agent beha
 - **Analysis** (0.4 <= t < 0.7): Medium temp, evaluate trade-offs
 - **Synthesis** (t >= 0.7): Low temperature, decisive actions
 
-## Scoring (10 metrics, weighted composite)
+## Scoring (9 metrics, weighted composite, SCORING_VERSION 1.2)
 
 | Metric | Default Weight | Source |
 |--------|---------------|--------|
-| survival | 0.25 | alive/started colonists |
-| threat_response | 0.15 | draft response speed |
-| mood | 0.15 | avg colonist mood (from real RIMAPI data) |
+| survival | 0.24 | alive/started colonists |
+| threat_response | 0.14 | draft response speed |
+| mood | 0.12 | avg colonist mood (from real RIMAPI data) |
 | food_security | 0.10 | food count / 10 (from /api/v1/resources/summary) |
-| wealth | 0.10 | wealth growth ratio |
-| research | 0.10 | % research tree completed |
+| wealth | 0.08 | wealth growth ratio |
+| research | 0.08 | % research tree completed |
 | self_sufficiency | 0.10 | power + food + population stability |
-| efficiency | 0.05 | action execution rate |
-| coordination | 0.00* | conflicts resolved / total conflicts |
-| communication_efficiency | 0.00* | messages acted on / total messages |
+| efficiency | 0.06 | executed / proposed writes per tick (neutral 0.5 when no writes) |
+| plan_coherence | 0.08 | 1 − contradictory executed writes / executed writes per tick (neutral 0.5 when no writes); see `scoring/coherence.py` |
 
-*Process metrics have 0.0 weight until game loop wires MetricContext counters. Target: coordination=0.12, communication_efficiency=0.08.
+Process metrics are harness-agnostic: they read the executed write stream (`ExecutionResult.outcomes`), never CentralPost or resolver counters. Those Felix-specific counts are still emitted on the `CONFLICT` event as diagnostics. `coordination` / `communication_efficiency` were removed in 1.2 (issue #51) because they were ≈1.0 by construction. Bump `SCORING_VERSION` in `tracking/metadata.py` whenever weights or metric implementations change; pinned `.baseline.json` sidecars are rejected on mismatch until recalibrated with `scripts/calibrate_baseline.py`.
 
 Scenarios can override weights. TimeSeriesRecorder exports per-tick CSV.
 

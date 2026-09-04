@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from rle.agents.actions import ActionPlan
+from rle.orchestration.action_executor import ExecutionResult
+from rle.orchestration.game_loop import TickResult
 from rle.rimapi.schemas import (
     ColonyData,
     GameState,
@@ -13,7 +16,7 @@ from rle.rimapi.schemas import (
     WeatherData,
 )
 from rle.scoring.composite import DEFAULT_WEIGHTS, CompositeScorer, ScoreSnapshot
-from rle.scoring.metrics import MetricContext
+from rle.scoring.metrics import ALL_METRICS, NEUTRAL, MetricContext
 
 
 def _state() -> GameState:
@@ -48,8 +51,35 @@ class TestDefaultWeights:
     def test_sum_to_one(self) -> None:
         assert sum(DEFAULT_WEIGHTS.values()) == pytest.approx(1.0)
 
-    def test_ten_metrics(self) -> None:
-        assert len(DEFAULT_WEIGHTS) == 10
+    def test_nine_metrics(self) -> None:
+        assert len(DEFAULT_WEIGHTS) == 9
+
+    def test_weights_cover_exactly_the_registered_metrics(self) -> None:
+        assert set(DEFAULT_WEIGHTS) == set(ALL_METRICS)
+
+    def test_legacy_process_metrics_gone(self) -> None:
+        """Scoring 1.2 (#51): always-1.0 Felix-specific metrics removed."""
+        assert "coordination" not in DEFAULT_WEIGHTS
+        assert "communication_efficiency" not in DEFAULT_WEIGHTS
+        assert "plan_coherence" in DEFAULT_WEIGHTS
+
+    def test_outcome_metrics_dominate(self) -> None:
+        process = DEFAULT_WEIGHTS["efficiency"] + DEFAULT_WEIGHTS["plan_coherence"]
+        assert process <= 0.15
+
+
+class TestBaselineNeutrality:
+    def test_unmanaged_baseline_gets_no_free_process_points(self) -> None:
+        """A run with zero writes scores NEUTRAL, not 1.0, on process metrics."""
+        ctx = _ctx()
+        ctx.tick_results.append(TickResult(
+            tick=1, day=1, macro_time=0.0,
+            plan=ActionPlan(role="baseline", tick=1, actions=[]),
+            execution=ExecutionResult(executed=0, failed=0, total=0),
+        ))
+        snap = CompositeScorer().score(_state(), ctx)
+        assert snap.metrics["efficiency"] == pytest.approx(NEUTRAL)
+        assert snap.metrics["plan_coherence"] == pytest.approx(NEUTRAL)
 
 
 class TestCompositeScorer:
@@ -59,7 +89,7 @@ class TestCompositeScorer:
         assert isinstance(snap, ScoreSnapshot)
         assert snap.tick == 600000
         assert snap.day == 10
-        assert len(snap.metrics) == 10
+        assert len(snap.metrics) == 9
         assert 0.0 <= snap.composite <= 1.0
 
     def test_custom_weights(self) -> None:
@@ -89,7 +119,7 @@ class TestFinalScore:
                 metrics={"survival": 1.0, "mood": 0.8, "food_security": 0.6,
                          "wealth": 0.5, "research": 0.0, "threat_response": 1.0,
                          "self_sufficiency": 0.5, "efficiency": 1.0,
-                         "coordination": 0.9, "communication_efficiency": 0.8},
+                         "plan_coherence": 0.9},
                 composite=0.7,
             ),
             ScoreSnapshot(
@@ -97,7 +127,7 @@ class TestFinalScore:
                 metrics={"survival": 0.5, "mood": 0.6, "food_security": 0.4,
                          "wealth": 0.3, "research": 0.5, "threat_response": 0.5,
                          "self_sufficiency": 0.5, "efficiency": 0.5,
-                         "coordination": 0.7, "communication_efficiency": 0.6},
+                         "plan_coherence": 0.7},
                 composite=0.5,
             ),
         ]

@@ -600,12 +600,13 @@ class RLEGameLoop:
                 results = await self._deliberate_sequential(state, current_time, tick_num)
 
             # Collect plans, update visualizer, send via CentralPost
+            agents_acted_with_messages = 0
             for agent, plan in results:
                 if plan is None:
                     continue
                 plans.append(plan)
                 if agent.agent_id in agents_with_messages:
-                    self._metric_context.messages_acted_on += 1
+                    agents_acted_with_messages += 1
                 self._update_visualizer_agent(agent, plan, current_time)
                 spoke = self._spoke_manager.get_spoke(agent.agent_id)
                 if spoke and spoke.is_connected:
@@ -631,22 +632,20 @@ class RLEGameLoop:
                     for gen_id in any_agent.drain_generation_ids():
                         self._cost_tracker.record_generation_id(gen_id)
 
-            # Resolve conflicts
+            # Resolve conflicts. Resolver + CentralPost counts are diagnostics
+            # in the event log only — they are Felix-specific and no longer
+            # feed the composite (#51).
             resolved, resolver_stats = self._resolver.resolve(plans, state)
-            self._metric_context.conflicts_total += resolver_stats.conflicts_total
-            self._metric_context.conflicts_resolved += resolver_stats.conflicts_resolved
             self._emit(
                 EventType.CONFLICT, tick_num,
                 input_plans=len(plans),
                 output_actions=len(resolved.actions),
                 conflicts_detected=resolver_stats.conflicts_total,
                 conflicts_resolved=resolver_stats.conflicts_resolved,
+                messages_routed=self._hub.total_messages_processed - messages_before,
+                agents_with_messages=len(agents_with_messages),
+                agents_acted_with_messages=agents_acted_with_messages,
             )
-
-            # Track message effectiveness
-            messages_after = self._hub.total_messages_processed
-            new_messages = messages_after - messages_before
-            self._metric_context.messages_sent += new_messages
 
         # 7. Execute merged plan
         exec_result = await self._executor.execute(resolved)

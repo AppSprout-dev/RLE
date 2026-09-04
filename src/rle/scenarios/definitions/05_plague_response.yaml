@@ -23,14 +23,13 @@ triggered_incidents:
 - tick_offset: 1
   name: Plague
 scoring_weights:
-  survival: 0.28
-  mood: 0.12
+  survival: 0.34
+  mood: 0.18
   food_security: 0.08
   threat_response: 0.08
   wealth: 0.04
   research: 0.04
   self_sufficiency: 0.08
   efficiency: 0.08
-  coordination: 0.12
-  communication_efficiency: 0.08
+  plan_coherence: 0.08
 save_sha256: a31a1eb31913fee79cb39b91009e4058029eac133a30ad3e0fc0e53a31a79e6d
