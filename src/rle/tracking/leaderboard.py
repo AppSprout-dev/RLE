@@ -1,7 +1,9 @@
 """Leaderboard generation from RLE benchmark history.
 
-Builds model x scenario results matrix with significance markers,
-cost-normalized rankings, and Pareto frontier computation.
+Rows are keyed by **harness x model**: the same model under two harnesses is
+two rows, because the harness is a benchmark variable. Scenario scores are
+averaged across runs (quarantined harness-failure runs excluded), with
+bootstrap CIs when N >= 2, plus cost and mean step latency as Pareto axes.
 """
 
 from __future__ import annotations
@@ -12,33 +14,54 @@ from pydantic import BaseModel, ConfigDict
 
 from rle.scoring.bootstrap import bootstrap_ci
 
+# History entries written before the harness layer existed were all Felix runs.
+LEGACY_HARNESS = "felix"
+
 
 class LeaderboardEntry(BaseModel):
-    """One model's benchmark results."""
+    """One harness x model's benchmark results."""
 
     model_config = ConfigDict(frozen=True)
 
     model: str
+    harness: str = LEGACY_HARNESS
     composite_score: float
     composite_ci: tuple[float, float] | None = None
     total_cost_usd: float = 0.0
     cost_per_scenario: float = 0.0
     total_tokens: int = 0
     total_wall_time_s: float = 0.0
+    mean_step_latency_s: float = 0.0
     n_runs: int = 1
+    n_quarantined: int = 0
     scenarios: dict[str, float] = {}
     significance_vs_baseline: dict[str, str] = {}
     timestamp: str = ""
     git_commit: str = ""
 
+    @property
+    def label(self) -> str:
+        return f"{self.harness}/{self.model}"
 
-def _collect_scenario_scores(
-    runs: list[dict[str, Any]],
-) -> dict[str, list[float]]:
-    """Group scenario scores across multiple runs for one model."""
+
+def _run_harness(entry: dict[str, Any]) -> str:
+    harness = entry.get("harness")
+    return str(harness) if harness else LEGACY_HARNESS
+
+
+def _clean_scenarios(run: dict[str, Any]) -> list[dict[str, Any]]:
+    """Scenario results minus those flagged as harness/plumbing failures."""
+    return [
+        sc for sc in run.get("scenarios", [])
+        if isinstance(sc, dict) and not sc.get("harness_failed")
+    ]
+
+
+def _collect_scenario_scores(runs: list[dict[str, Any]]) -> dict[str, list[float]]:
+    """Group scenario scores across multiple runs for one harness x model."""
     scores: dict[str, list[float]] = {}
     for run in runs:
-        for sc in run.get("scenarios", []):
+        for sc in _clean_scenarios(run):
             name = sc.get("name", "")
             score = sc.get("score")
             if name and isinstance(score, (int, float)):
@@ -51,8 +74,7 @@ def _per_run_composites(runs: list[dict[str, Any]]) -> list[float]:
     composites: list[float] = []
     for run in runs:
         scenario_scores = [
-            sc["score"]
-            for sc in run.get("scenarios", [])
+            sc["score"] for sc in _clean_scenarios(run)
             if isinstance(sc.get("score"), (int, float))
         ]
         if scenario_scores:
@@ -60,18 +82,32 @@ def _per_run_composites(runs: list[dict[str, Any]]) -> list[float]:
     return composites
 
 
+def _mean_latency(runs: list[dict[str, Any]]) -> float:
+    latencies = [
+        float(sc["mean_step_latency_s"])
+        for run in runs for sc in _clean_scenarios(run)
+        if isinstance(sc.get("mean_step_latency_s"), (int, float))
+    ]
+    return round(sum(latencies) / len(latencies), 3) if latencies else 0.0
+
+
+def _cost_block(run: dict[str, Any]) -> dict[str, Any]:
+    block = run.get("cost_snapshot") or run.get("cost") or {}
+    return block if isinstance(block, dict) else {}
+
+
 class Leaderboard:
     """Manages the RLE benchmark leaderboard."""
 
     def from_history(self, history: list[dict[str, Any]]) -> list[LeaderboardEntry]:
         """Build sorted leaderboard from benchmark_history.jsonl entries."""
-        by_model: dict[str, list[dict[str, Any]]] = {}
+        by_key: dict[tuple[str, str], list[dict[str, Any]]] = {}
         for entry in history:
-            model = entry.get("model", "unknown")
-            by_model.setdefault(model, []).append(entry)
+            key = (_run_harness(entry), str(entry.get("model", "unknown")))
+            by_key.setdefault(key, []).append(entry)
 
         entries: list[LeaderboardEntry] = []
-        for model, runs in by_model.items():
+        for (harness, model), runs in by_key.items():
             latest = runs[-1]
             scenario_scores = _collect_scenario_scores(runs)
             scenario_means = {k: sum(v) / len(v) for k, v in scenario_scores.items()}
@@ -79,26 +115,34 @@ class Leaderboard:
             composites = _per_run_composites(runs)
             composite = sum(composites) / len(composites) if composites else 0.0
             n_runs = len(runs)
+            n_quarantined = sum(
+                1 for run in runs for sc in run.get("scenarios", [])
+                if isinstance(sc, dict) and sc.get("harness_failed")
+            )
 
             ci: tuple[float, float] | None = None
             if len(composites) >= 2:
                 bci = bootstrap_ci(composites)
                 ci = (bci.ci_lower, bci.ci_upper)
 
-            cost = float(latest.get("cost", {}).get("estimated_cost_usd", 0.0))
-            tokens = int(latest.get("cost", {}).get("total_tokens", 0))
-            wall = float(latest.get("cost", {}).get("wall_time_s", 0.0))
+            cost_block = _cost_block(latest)
+            cost = float(cost_block.get("estimated_cost_usd", 0.0))
+            tokens = int(cost_block.get("total_tokens", 0))
+            wall = float(cost_block.get("wall_time_s", 0.0))
             n_scenarios = max(len(scenario_means), 1)
 
             entries.append(LeaderboardEntry(
                 model=model,
+                harness=harness,
                 composite_score=round(composite, 4),
                 composite_ci=ci,
                 total_cost_usd=cost,
                 cost_per_scenario=round(cost / n_scenarios, 4),
                 total_tokens=tokens,
                 total_wall_time_s=wall,
+                mean_step_latency_s=_mean_latency(runs),
                 n_runs=n_runs,
+                n_quarantined=n_quarantined,
                 scenarios=scenario_means,
                 timestamp=str(latest.get("timestamp", "")),
                 git_commit=str(latest.get("git_commit", "")),
@@ -108,27 +152,33 @@ class Leaderboard:
         return entries
 
     def to_markdown(self, entries: list[LeaderboardEntry]) -> str:
-        """Render model x scenario matrix as Markdown table."""
+        """Render harness x model x scenario matrix as Markdown table."""
         if not entries:
             return ""
 
-        all_scenarios = sorted(
-            {s for e in entries for s in e.scenarios}
-        )
+        all_scenarios = sorted({s for e in entries for s in e.scenarios})
         short_names = [s.split()[0] if " " in s else s[:12] for s in all_scenarios]
 
-        header = "| Model | " + " | ".join(short_names) + " | Avg | Cost |"
-        sep = "|" + "|".join("---" for _ in range(len(short_names) + 3)) + "|"
+        header = (
+            "| Harness | Model | " + " | ".join(short_names)
+            + " | Avg | Cost | s/step | N |"
+        )
+        sep = "|" + "|".join("---" for _ in range(len(short_names) + 6)) + "|"
 
         rows = [header, sep]
         for entry in entries:
-            cells = [entry.model]
+            cells = [entry.harness, entry.model]
             for scenario in all_scenarios:
                 score = entry.scenarios.get(scenario)
                 sig = entry.significance_vs_baseline.get(scenario, "")
                 cells.append(f"{score:.2f}{sig}" if score is not None else "—")
             cells.append(f"{entry.composite_score:.2f}")
             cells.append(f"${entry.total_cost_usd:.2f}")
+            cells.append(f"{entry.mean_step_latency_s:.1f}")
+            n = str(entry.n_runs)
+            if entry.n_quarantined:
+                n += f" ({entry.n_quarantined} quarantined)"
+            cells.append(n)
             rows.append("| " + " | ".join(cells) + " |")
 
         return "\n".join(rows)
@@ -139,17 +189,22 @@ class Leaderboard:
             return
 
         all_scenarios = sorted({s for e in entries for s in e.scenarios})
-        header = ["model"] + all_scenarios + ["avg", "cost_usd", "n_runs"]
+        header = (
+            ["harness", "model"] + all_scenarios
+            + ["avg", "cost_usd", "mean_step_latency_s", "n_runs", "n_quarantined"]
+        )
 
         lines = [",".join(header)]
         for entry in entries:
-            row = [entry.model]
+            row = [entry.harness, entry.model]
             for s in all_scenarios:
                 score = entry.scenarios.get(s)
                 row.append(f"{score:.4f}" if score is not None else "")
             row.append(f"{entry.composite_score:.4f}")
             row.append(f"{entry.total_cost_usd:.4f}")
+            row.append(f"{entry.mean_step_latency_s:.3f}")
             row.append(str(entry.n_runs))
+            row.append(str(entry.n_quarantined))
             lines.append(",".join(row))
 
         with open(path, "w", encoding="utf-8") as f:

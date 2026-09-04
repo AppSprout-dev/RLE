@@ -88,6 +88,8 @@ jobs:
       - name: Install the template harness from GitHub
         run: uv pip install "git+https://github.com/AppSprout-dev/rle-harness-template" --system
       - name: Template appears in the registry
-        run: python scripts/run_benchmark.py --harness list | tee /dev/stderr | grep -q "^template "
+        run: |
+          python scripts/run_benchmark.py --harness list
+          python scripts/run_benchmark.py --harness list | grep -q "^template "
       - name: Template passes smoke
         run: python scripts/run_benchmark.py --smoke-test --ticks 3 --harness template
