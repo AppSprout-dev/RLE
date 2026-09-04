@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "rimworld-learning-environment"
-version = "0.4.1"
+version = "0.4.2"
 description = "Harness x model benchmark: swappable agent harnesses manage a RimWorld colony"
 readme = "README.md"
 license = "MIT"

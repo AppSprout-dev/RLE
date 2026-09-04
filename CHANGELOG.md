@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.2](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.4.1...rimworld-learning-environment-v0.4.2) (2026-09-04)
+
+
+### Documentation
+
+* **CLAUDE:** CentralPost/SSE/helix sections scoped to the Felix harness ([80592f9](https://github.com/AppSprout-dev/RLE/commit/80592f987565220f5628fb03bace59ea9da86a15))
+* README, CONTRIBUTING and CLAUDE.md reflect the harness x model benchmark ([fd82549](https://github.com/AppSprout-dev/RLE/commit/fd825498b4d2b6a61477058b526e8a781ad84ed2))
+* README/CONTRIBUTING/CLAUDE reflect the harness x model benchmark ([c1d9ea6](https://github.com/AppSprout-dev/RLE/commit/c1d9ea6b878e388ba1eb8b74a02bb06e5a790dfa))
+
 ## [0.4.1](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.4.0...rimworld-learning-environment-v0.4.1) (2026-08-31)
 
 
