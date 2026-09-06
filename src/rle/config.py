@@ -49,8 +49,8 @@ class RLEConfig(BaseSettings):
     Unrelated to the MCP HTTP server; do not reuse 8765 for MCP."""
     mcp_container_reachable: bool = False
     """Bind MCP on ``0.0.0.0`` and advertise ``http://host.docker.internal:<port>/mcp``
-    so a Docker agent (e.g. stock grok-build on Docker Desktop) can reach a
-    host-side RLE process. Does **not** change ``--docker`` / RIMAPI (8765).
+    so a Docker coding-agent container can reach a host-side RLE process.
+    Does **not** change ``--docker`` / RIMAPI (8765).
     Env: ``MCP_CONTAINER_REACHABLE``. CLI harnesses also accept
     ``--harness-opt mcp_container_reachable=true``."""
     mcp_bind_host: str | None = None

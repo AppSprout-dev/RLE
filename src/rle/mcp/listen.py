@@ -2,8 +2,7 @@
 
 A Linux Docker container cannot reach ``127.0.0.1`` on the host. Container-
 reachable mode binds ``0.0.0.0`` and advertises ``host.docker.internal`` so
-an agent inside the container (stock grok-build on Docker Desktop, other
-CLI harnesses) can call the host-side MCP server.
+an agent inside the container can call the host-side MCP server.
 
 This is the opposite topology of ``--docker`` (headless RimWorld in a
 container, RIMAPI published on localhost:8765). Enabling container-reachable
