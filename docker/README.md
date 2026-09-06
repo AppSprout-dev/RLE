@@ -86,6 +86,25 @@ docker run -d --name rle-rimworld \
 curl http://localhost:8765/api/v1/game/state
 ```
 
+## Container-reachable MCP (agent in Docker, RimWorld on the host)
+
+`--docker` above is **RimWorld in a container**. The other common Desktop layout is the reverse: RimWorld + RIMAPI on the Windows/macOS host (`localhost:8765`), and a stock coding-agent image (e.g. grok-build) talking to RLE's in-process MCP server.
+
+RLE defaults to binding MCP on `127.0.0.1` with an ephemeral port, which a Linux container cannot reach. For that layout:
+
+```bash
+MCP_CONTAINER_REACHABLE=true \
+  python scripts/run_scenario.py crashlanded --harness grok-build
+# or: --harness-opt mcp_container_reachable=true
+```
+
+| Process | Where | URL |
+|---------|--------|-----|
+| RIMAPI (game) | host | `http://localhost:8765` — unchanged |
+| MCP HTTP host | host, bind `0.0.0.0:8766` | advertised to the agent as `http://host.docker.internal:8766/mcp` |
+
+Windows Docker Desktop (and the OS firewall) may prompt to allow Python to listen on 8766; allow it. Override with `MCP_BIND_HOST` / `MCP_ADVERTISE_HOST` / `MCP_PORT`. This is host-side RLE config, not a Grok Dockerfile in this repo (third-party harnesses stay in their own packages).
+
 ## Known Issues
 
 - **IPv6 loopback binding**: RIMAPI's Mono HttpListener binds to `[::1]:8765` inside the container despite `serverIP=0.0.0.0` config. Docker port forwarding can't reach `::1`. Workaround: access RIMAPI from inside the container or fix the HttpListener binding in RIMAPI fork.

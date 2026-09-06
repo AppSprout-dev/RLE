@@ -81,6 +81,8 @@ The `.env` file controls which LLM provider is used. Key fields:
 | `MODEL` | Model name as the provider expects it | `unsloth/nvidia-nemotron-3-nano-4b` |
 | `PROVIDER_BASE_URL` | API base URL (required for LM Studio and OpenRouter) | `http://localhost:1234/v1` |
 | `RIMAPI_URL` | RIMAPI mod URL | `http://localhost:8765` |
+| `MCP_CONTAINER_REACHABLE` | Bind MCP on `0.0.0.0:8766`, advertise `http://host.docker.internal:8766/mcp` for Docker agents (host RimWorld). Not `--docker`. | `true` |
+| `MCP_BIND_HOST` / `MCP_ADVERTISE_HOST` / `MCP_PORT` | Optional MCP listen overrides (also `--harness-opt mcp_*`) | `0.0.0.0` / `host.docker.internal` / `8766` |
 
 **Important:** For OpenRouter, `OPENAI_API_KEY` must be set to your OpenRouter API key. The OpenAI SDK reads this env var directly. The `OPENROUTER_API_KEY` field is NOT read by the SDK.
 

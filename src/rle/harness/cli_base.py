@@ -21,10 +21,12 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from rle.config import RLEConfig
 from rle.harness.brief import ScenarioBrief, build_brief
 from rle.harness.protocol import BaseHarness, HarnessContext, HarnessStepError, StepResult
 from rle.mcp.host import McpHost
 from rle.mcp.ledger import TickLedger
+from rle.mcp.listen import McpListenSettings, first_host, first_not_none, resolve_mcp_listen
 from rle.mcp.server import build_server
 from rle.mcp.session import McpSession
 from rle.orchestration.action_executor import ActionExecutor
@@ -71,6 +73,42 @@ class HeadlessCliOptions(BaseModel):
         default="",
         description="Appended to every turn prompt (harness-side prompt engineering).",
     )
+    mcp_container_reachable: bool | None = Field(
+        default=None,
+        description=(
+            "Bind MCP on 0.0.0.0 and advertise http://host.docker.internal:<port>/mcp "
+            "so a Docker agent can reach host RimWorld/RLE. None inherits RLEConfig / "
+            "MCP_CONTAINER_REACHABLE. Does not affect --docker (RIMAPI in a container)."
+        ),
+    )
+    mcp_bind_host: str | None = Field(
+        default=None,
+        description="MCP listen address. None inherits RLEConfig / MCP_BIND_HOST.",
+    )
+    mcp_advertise_host: str | None = Field(
+        default=None,
+        description=(
+            "Hostname in the MCP URL given to the agent. None inherits "
+            "RLEConfig / MCP_ADVERTISE_HOST."
+        ),
+    )
+    mcp_port: int | None = Field(
+        default=None,
+        description=(
+            "MCP listen port (8766 in container-reachable mode; 0 = ephemeral). "
+            "None inherits RLEConfig / MCP_PORT."
+        ),
+    )
+
+    def mcp_listen(self, config: RLEConfig) -> McpListenSettings:
+        """Merge harness-opt overrides onto RLEConfig, then apply mode defaults."""
+        container = first_not_none(self.mcp_container_reachable, config.mcp_container_reachable)
+        return resolve_mcp_listen(
+            container_reachable=bool(container),
+            bind_host=first_host(self.mcp_bind_host, config.mcp_bind_host),
+            advertise_host=first_host(self.mcp_advertise_host, config.mcp_advertise_host),
+            port=first_not_none(self.mcp_port, config.mcp_port),
+        )
 
 
 @dataclass
@@ -140,8 +178,13 @@ class HeadlessCliHarness(BaseHarness, ABC):
         self._session = McpSession(
             client=ctx.client, executor=ActionExecutor(ctx.client), ledger=ledger, emit=ctx.emit,
         )
-        self._host = McpHost(build_server(self._session))
+        listen = self.options.mcp_listen(ctx.config)
+        self._host = McpHost(build_server(self._session), listen)
         url = await self._host.start()
+        logger.info(
+            "MCP host listening on %s:%s, advertising %s",
+            self._host.bind_host, self._host.port, url,
+        )
         await self.start_agent(url)
         self._agent_started = True
 

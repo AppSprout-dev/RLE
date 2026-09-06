@@ -73,6 +73,26 @@ class TestScriptedMcpHarness:
                 await harness.teardown()
         assert info == {"harness": "my-tool", "model": "some/model", "scripted_agent": "1"}
 
+    async def test_setup_hands_agent_advertised_url(self) -> None:
+        harness = scripted.ScriptedMcpHarness(
+            cli_base.HeadlessCliOptions(
+                mcp_bind_host="127.0.0.1",
+                mcp_advertise_host="host.docker.internal",
+                mcp_port=0,
+            ),
+        )
+        async with _env() as (client, _mock):
+            ctx = HarnessContext(config=RLEConfig(tick_interval=0.0), client=client)
+            await harness.setup(ctx)
+            try:
+                assert harness.mcp_url == (
+                    f"http://host.docker.internal:{harness._host.port}/mcp"  # type: ignore[union-attr]
+                )
+                assert harness._url == harness.mcp_url
+                assert harness._host.bind_host == "127.0.0.1"  # type: ignore[union-attr]
+            finally:
+                await harness.teardown()
+
 
 class _NeverEndsTurn(scripted.ScriptedMcpHarness):  # type: ignore[misc]
     name: ClassVar[str] = "never-ends"
