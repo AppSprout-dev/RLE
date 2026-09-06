@@ -7,6 +7,13 @@ HTTP) so the ledger and the loop share memory.
 """
 
 from rle.mcp.ledger import NoActiveTickError, TickLedger
+from rle.mcp.listen import McpListenSettings, resolve_mcp_listen
 from rle.mcp.session import McpSession
 
-__all__ = ["McpSession", "NoActiveTickError", "TickLedger"]
+__all__ = [
+    "McpListenSettings",
+    "McpSession",
+    "NoActiveTickError",
+    "TickLedger",
+    "resolve_mcp_listen",
+]

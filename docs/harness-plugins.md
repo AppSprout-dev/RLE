@@ -97,7 +97,12 @@ and continues. Any other exception is treated as a bug and propagates.
   short idle grace), drains the ledger into `StepResult`, applies
   `turn_timeout_s`, and records latency/cost/deliberation log. Options extend
   `HeadlessCliOptions` (`model`, `turn_timeout_s`, `idle_grace_s`,
-  `extra_instructions`). Needs the `mcp` extra.
+  `extra_instructions`, plus MCP listen overrides `mcp_container_reachable`,
+  `mcp_bind_host`, `mcp_advertise_host`, `mcp_port`). `setup()` starts the
+  MCP host on the **bind** address and passes the **advertised** URL to
+  `start_agent`. Default is `127.0.0.1` + ephemeral port; container-reachable
+  mode binds `0.0.0.0:8766` and advertises `http://host.docker.internal:8766/mcp`.
+  Needs the `mcp` extra.
 - `rle.testing.scripted_agent.ScriptedMcpHarness` — a fake coding agent that
   plays a fixed tool script through the MCP server. Return it from
   `plugin.smoke()` so your package's CI exercises the full round trip

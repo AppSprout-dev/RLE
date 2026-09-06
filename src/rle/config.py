@@ -45,6 +45,24 @@ class RLEConfig(BaseSettings):
     log_level: str = "INFO"
     docker_image: str = "rle-headless:latest"
     docker_port: int = 8765
+    """Published RIMAPI port for ``--docker`` (headless RimWorld in a container).
+    Unrelated to the MCP HTTP server; do not reuse 8765 for MCP."""
+    mcp_container_reachable: bool = False
+    """Bind MCP on ``0.0.0.0`` and advertise ``http://host.docker.internal:<port>/mcp``
+    so a Docker coding-agent container can reach a host-side RLE process.
+    Does **not** change ``--docker`` / RIMAPI (8765).
+    Env: ``MCP_CONTAINER_REACHABLE``. CLI harnesses also accept
+    ``--harness-opt mcp_container_reachable=true``."""
+    mcp_bind_host: str | None = None
+    """Interface the MCP HTTP server listens on. Unset: ``127.0.0.1`` locally,
+    ``0.0.0.0`` when ``mcp_container_reachable``. Env: ``MCP_BIND_HOST``."""
+    mcp_advertise_host: str | None = None
+    """Hostname put in the MCP URL handed to the agent. Unset: ``127.0.0.1``
+    locally, ``host.docker.internal`` when container-reachable.
+    Env: ``MCP_ADVERTISE_HOST``."""
+    mcp_port: int | None = None
+    """MCP HTTP port. Unset: ephemeral locally, ``8766`` when container-reachable
+    (never 8765). ``0`` forces ephemeral. Env: ``MCP_PORT``."""
     hf_token: str | None = None
     """Fine-grained HuggingFace write token (HF_TOKEN in .env) for dataset pushes."""
     hf_dataset_repo: str = "AppSprout/rle-benchmarks"

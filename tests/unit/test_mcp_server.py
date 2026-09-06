@@ -144,6 +144,9 @@ class TestHttpHost:
             url = await host.start()
             try:
                 assert url.endswith("/mcp")
+                assert url.startswith("http://127.0.0.1:")
+                assert host.bind_host == "127.0.0.1"
+                assert host.advertise_host == "127.0.0.1"
                 async with mcp_client.Client(url) as client:
                     tools = await client.list_tools()
                     assert any(t.name == "end_turn" for t in tools.tools)
@@ -155,3 +158,31 @@ class TestHttpHost:
             finally:
                 await host.stop()
             assert not host.running
+
+    async def test_advertises_host_while_binding_loopback(self) -> None:
+        async with _session() as (session, _mock):
+            host = mcp_host.McpHost(
+                mcp_server.build_server(session),
+                bind_host="127.0.0.1",
+                advertise_host="host.docker.internal",
+                port=0,
+            )
+            advertised = await host.start()
+            try:
+                assert advertised == (
+                    f"http://host.docker.internal:{host.port}/mcp"
+                )
+                assert host.bind_host == "127.0.0.1"
+                bind_url = f"http://127.0.0.1:{host.port}/mcp"
+                async with mcp_client.Client(bind_url) as client:
+                    tools = await client.list_tools()
+                    assert any(t.name == "end_turn" for t in tools.tools)
+            finally:
+                await host.stop()
+
+    def test_settings_and_kwargs_are_exclusive(self) -> None:
+        from rle.mcp.listen import resolve_mcp_listen
+
+        settings = resolve_mcp_listen()
+        with pytest.raises(TypeError, match="not both"):
+            mcp_host.McpHost(mcp_server.build_server, settings, bind_host="0.0.0.0")

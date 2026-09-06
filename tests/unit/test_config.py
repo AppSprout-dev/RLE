@@ -39,6 +39,22 @@ class TestConfigIsFrameworkFree:
         assert config.harness == "felix"
         assert config.harness_options == {}
         assert config.tick_timeout_s is None
+        assert config.mcp_container_reachable is False
+        assert config.mcp_bind_host is None
+        assert config.mcp_advertise_host is None
+        assert config.mcp_port is None
+        assert config.docker_port == 8765
+
+    def test_mcp_listen_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("MCP_CONTAINER_REACHABLE", "true")
+        monkeypatch.setenv("MCP_BIND_HOST", "0.0.0.0")
+        monkeypatch.setenv("MCP_ADVERTISE_HOST", "host.docker.internal")
+        monkeypatch.setenv("MCP_PORT", "8766")
+        config = RLEConfig()
+        assert config.mcp_container_reachable is True
+        assert config.mcp_bind_host == "0.0.0.0"
+        assert config.mcp_advertise_host == "host.docker.internal"
+        assert config.mcp_port == 8766
 
     def test_no_felix_symbols_on_config(self) -> None:
         assert not hasattr(RLEConfig(), "get_provider")

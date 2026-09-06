@@ -42,9 +42,10 @@ release-please keeps an open "release PR" accumulating changes; merging it tags 
 |---------|---------|-------------|
 | LM Studio | LLM inference | 1234 |
 | RimWorld + RIMAPI mod | Game state + actions | 8765 |
+| MCP HTTP host (CLI harnesses) | In-process tool server for coding agents | ephemeral on 127.0.0.1; 8766 when container-reachable |
 | Dashboard (optional) | Live visualization | 3000 |
 | Tick data server (optional) | Dashboard data feed | 9000 |
-| Docker (optional) | Headless benchmarks | 8765 |
+| Docker (optional) | Headless RimWorld (`--docker`) | 8765 (RIMAPI only) |
 
 ### Recommended local model
 
@@ -110,6 +111,23 @@ docker compose -f docker/docker-compose.yml up -d
 # Run a harness x model matrix against the container, 4 paired runs each
 python scripts/run_benchmark.py --docker --runs 4 --harness felix --harness baseline --output results/docker/
 ```
+
+`--docker` publishes **RIMAPI** from a headless RimWorld container on localhost:8765. It does not change the MCP host.
+
+### Container-reachable MCP (agent in Docker, game on the host)
+
+When the coding agent runs in a Linux container (stock grok-build on Docker Desktop) and RimWorld/RLE stay on the Windows/macOS host, the default MCP bind `127.0.0.1` is unreachable from the container. Enable host-advertised MCP:
+
+```bash
+# .env or process env
+MCP_CONTAINER_REACHABLE=true
+
+# or per harness
+python scripts/run_scenario.py crashlanded --harness grok-build \
+  --harness-opt mcp_container_reachable=true
+```
+
+That binds `0.0.0.0:8766` and hands the agent `http://host.docker.internal:8766/mcp`. RimAPI remains `localhost:8765`. Windows Docker Desktop / the firewall may prompt to allow Python on 8766 — allow it. Override bind/advertise/port with `MCP_BIND_HOST`, `MCP_ADVERTISE_HOST`, `MCP_PORT` or the matching `--harness-opt` keys. Do not point this at `--docker` (that path is RimWorld-in-container, not agent-in-container).
 
 ### OpenRouter (cloud, no local GPU needed)
 
