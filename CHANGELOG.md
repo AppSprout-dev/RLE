@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.5.0...rimworld-learning-environment-v0.5.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* pass raw-grok argv via RLE_GROK_ARGV_JSON on Windows .cmd/.bat ([#60](https://github.com/AppSprout-dev/RLE/issues/60)) ([9a1dc75](https://github.com/AppSprout-dev/RLE/commit/9a1dc757b1fc1d8b4f7b53269f289d031982418f))
+
 ## [0.5.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.4.2...rimworld-learning-environment-v0.5.0) (2026-09-06)
 
 
