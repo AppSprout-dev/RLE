@@ -69,8 +69,8 @@ jobs:
           python-version: "3.14"
       - uses: astral-sh/setup-uv@v4
       - run: uv pip install -e ".[dev,felix,mcp]" --system
-      - name: Smoke test felix + baseline matrix
-        run: python scripts/run_benchmark.py --smoke-test --ticks 5 --harness felix --harness baseline
+      - name: Smoke test felix + baseline + raw-grok matrix
+        run: python scripts/run_benchmark.py --smoke-test --ticks 5 --harness felix --harness baseline --harness raw-grok
 
   # Contract test for the plugin API: an external harness package installed
   # straight from GitHub must appear in --harness list and pass smoke with

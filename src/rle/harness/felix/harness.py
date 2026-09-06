@@ -327,8 +327,10 @@ class FelixHarness(BaseHarness):
     ) -> tuple[RimWorldRoleAgent, ActionPlan | None]:
         """Run one agent's deliberation with a hard timeout.
 
-        On timeout: emits a deliberation_timeout ERROR event, records it in the
-        deliberation log, and returns ``(agent, None)`` so the tick continues.
+        On timeout: emits a structured deliberation_timeout ERROR event,
+        records it in the deliberation log, and returns ``(agent, None)``.
+        The caller never appends that ``None`` to the plan list, so the
+        resolver cannot apply a partial or cancelled completion.
         """
         try:
             return await asyncio.wait_for(

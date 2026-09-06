@@ -20,7 +20,7 @@ from rle.harness.felix.agents.research_director import ResearchDirector
 from rle.harness.felix.agents.resource_manager import ResourceManager
 from rle.harness.felix.agents.social_overseer import SocialOverseer
 from rle.harness.felix.harness import FelixHarness
-from rle.harness.felix.options import FelixOptions
+from rle.harness.felix.options import FelixOptions, select_role_ids
 from rle.harness.felix.provider_factory import build_helix, build_provider
 from rle.harness.felix.smoke import SmokeProvider
 from rle.harness.protocol import HarnessContext
@@ -28,28 +28,37 @@ from rle.harness.protocol import HarnessContext
 # Context extras understood by this builder.
 WEAVE_MODULE_EXTRA = "weave_module"
 
+_ROLE_CTORS: dict[str, type[RimWorldRoleAgent]] = {
+    "map_analyst": MapAnalyst,
+    "resource_manager": ResourceManager,
+    "defense_commander": DefenseCommander,
+    "research_director": ResearchDirector,
+    "social_overseer": SocialOverseer,
+    "construction_planner": ConstructionPlanner,
+    "medical_officer": MedicalOfficer,
+}
+
 
 def create_agents(
     provider: BaseProvider,
     helix: HelixGeometry,
     *,
-    exclude_agent: str | None = None,
+    roles: list[str] | None = None,
+    exclude_agent: str | list[str] | None = None,
     provider_kwargs: dict[str, Any] | None = None,
     no_think: bool = False,
 ) -> list[RimWorldRoleAgent]:
-    """The canonical 7-agent roster (MapAnalyst + 6 domain roles)."""
-    roster: list[RimWorldRoleAgent] = [
-        MapAnalyst("map_analyst", provider, helix, spawn_time=0.0, velocity=1.0),
-        ResourceManager("resource_manager", provider, helix, spawn_time=0.0, velocity=1.0),
-        DefenseCommander("defense_commander", provider, helix, spawn_time=0.0, velocity=1.0),
-        ResearchDirector("research_director", provider, helix, spawn_time=0.0, velocity=1.0),
-        SocialOverseer("social_overseer", provider, helix, spawn_time=0.0, velocity=1.0),
-        ConstructionPlanner(
-            "construction_planner", provider, helix, spawn_time=0.0, velocity=1.0,
-        ),
-        MedicalOfficer("medical_officer", provider, helix, spawn_time=0.0, velocity=1.0),
+    """Instantiate the requested Felix roster (default: all 7 agents)."""
+    excluded: list[str] | None
+    if isinstance(exclude_agent, str):
+        excluded = [exclude_agent]
+    else:
+        excluded = exclude_agent
+    selected = select_role_ids(roles=roles, exclude_agent=excluded)
+    agents: list[RimWorldRoleAgent] = [
+        _ROLE_CTORS[role](role, provider, helix, spawn_time=0.0, velocity=1.0)
+        for role in selected
     ]
-    agents = [a for a in roster if a.agent_id != exclude_agent]
     for agent in agents:
         if provider_kwargs:
             agent.set_provider_kwargs(**provider_kwargs)
@@ -88,6 +97,7 @@ def build_felix_harness(
     helix = build_helix(opts.helix_preset)
     agents = create_agents(
         provider, helix,
+        roles=opts.roles,
         exclude_agent=opts.exclude_agent,
         provider_kwargs=opts.provider_kwargs or None,
         no_think=opts.no_think,

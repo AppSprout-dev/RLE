@@ -73,6 +73,23 @@ class TestScriptedMcpHarness:
                 await harness.teardown()
         assert info == {"harness": "my-tool", "model": "some/model", "scripted_agent": "1"}
 
+    async def test_setup_hands_agent_advertise_url_override(self) -> None:
+        harness = scripted.ScriptedMcpHarness(
+            cli_base.HeadlessCliOptions(
+                mcp_bind_host="127.0.0.1",
+                mcp_port=0,
+                mcp_advertise_url="http://host.docker.internal:8766/mcp",
+            ),
+        )
+        async with _env() as (client, _mock):
+            ctx = HarnessContext(config=RLEConfig(tick_interval=0.0), client=client)
+            await harness.setup(ctx)
+            try:
+                assert harness.mcp_url == "http://host.docker.internal:8766/mcp"
+                assert harness._url == "http://host.docker.internal:8766/mcp"
+            finally:
+                await harness.teardown()
+
     async def test_setup_hands_agent_advertised_url(self) -> None:
         harness = scripted.ScriptedMcpHarness(
             cli_base.HeadlessCliOptions(

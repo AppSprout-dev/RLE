@@ -13,11 +13,16 @@ python scripts/run_benchmark.py --harness list
 
 ## Repo boundary rule
 
-RLE core ships only harnesses that are RLE-authored code: `baseline`
-(unmanaged colony) and `felix` (the original 7-agent stack). **A harness that
-wraps a third-party tool lives in its own repository and package**
-(`rle-harness-opencode`, `rle-harness-grok-build`, ...). Nothing tool-specific
-is committed to RLE core; adding a harness is `pip install`, never a core PR.
+RLE core ships RLE-authored harnesses: `baseline` (unmanaged colony), `felix`
+(the original 7-agent stack), and `raw-grok` (a **model baseline** that drives
+the stock `grok` binary through `HeadlessCliHarness` with `TURN_RULES` only).
+`raw-grok` is not a product harness — do not compare it to `felix` or to
+external coding-agent packages as an architecture. Felix knobs:
+[docs/harness-felix.md](harness-felix.md).
+
+**A harness that wraps a third-party coding-agent product** lives in its own
+repository and package (`rle-harness-opencode`, …). Adding one of those is
+`pip install`, never a core PR.
 
 Start from the template: <https://github.com/AppSprout-dev/rle-harness-template>.
 
@@ -98,11 +103,14 @@ and continues. Any other exception is treated as a bug and propagates.
   `turn_timeout_s`, and records latency/cost/deliberation log. Options extend
   `HeadlessCliOptions` (`model`, `turn_timeout_s`, `idle_grace_s`,
   `extra_instructions`, plus MCP listen overrides `mcp_container_reachable`,
-  `mcp_bind_host`, `mcp_advertise_host`, `mcp_port`). `setup()` starts the
-  MCP host on the **bind** address and passes the **advertised** URL to
-  `start_agent`. Default is `127.0.0.1` + ephemeral port; container-reachable
-  mode binds `0.0.0.0:8766` and advertises `http://host.docker.internal:8766/mcp`.
-  Needs the `mcp` extra.
+  `mcp_bind_host`, `mcp_advertise_host`, `mcp_port`, `mcp_advertise_url`).
+  `setup()` starts the MCP host on the **bind** address and passes the
+  **advertised** URL to `start_agent` (`mcp_advertise_url` overrides when
+  set). Default is `127.0.0.1` + ephemeral port; container-reachable mode
+  binds `0.0.0.0:8766` and advertises `http://host.docker.internal:8766/mcp`.
+  Needs the `mcp` extra. `raw-grok` uses this scaffold as a model baseline
+  (`turn_timeout_s` default 180; pass `300` when comparing against slower
+  coding-agent harnesses).
 - `rle.testing.scripted_agent.ScriptedMcpHarness` — a fake coding agent that
   plays a fixed tool script through the MCP server. Return it from
   `plugin.smoke()` so your package's CI exercises the full round trip
