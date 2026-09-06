@@ -110,7 +110,11 @@ and continues. Any other exception is treated as a bug and propagates.
   binds `0.0.0.0:8766` and advertises `http://host.docker.internal:8766/mcp`.
   Needs the `mcp` extra. `raw-grok` uses this scaffold as a model baseline
   (`turn_timeout_s` default 180; pass `300` when comparing against slower
-  coding-agent harnesses).
+  coding-agent harnesses). On Windows, a `.cmd`/`.bat` binary (e.g.
+  `grok-docker.cmd`) cannot carry a large `-p` prompt: `cmd.exe` re-parses
+  argv and drops it. `raw-grok` writes those argv strings (after the wrapper
+  path) to a temp UTF-8 JSON file and sets `RLE_GROK_ARGV_JSON` so the
+  wrapper can read them. Host `grok.exe` is unchanged.
 - `rle.testing.scripted_agent.ScriptedMcpHarness` — a fake coding agent that
   plays a fixed tool script through the MCP server. Return it from
   `plugin.smoke()` so your package's CI exercises the full round trip

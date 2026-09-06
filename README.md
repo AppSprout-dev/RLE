@@ -63,6 +63,11 @@ python scripts/run_scenario.py crashlanded --harness raw-grok --model grok-4.6 -
   --harness-opt mcp_advertise_url=http://host.docker.internal:8766/mcp
 ```
 
+Windows `.cmd` / `.bat` wrappers (such as `grok-docker.cmd`) need grok argv
+via `RLE_GROK_ARGV_JSON` because `cmd.exe` drops large `-p` prompts. `raw-grok`
+writes that sidecar automatically when `--harness-opt binary=` ends in `.cmd`
+or `.bat`.
+
 Coding-agent harnesses attach to RLE over MCP: RLE hosts a RimAPI tool server in-process (`rle.mcp`, extra `mcp`), the agent calls `get_brief`, then write tools (`work_priority`, `blueprint`, ...), then `end_turn`; the writes that reached the game are what gets scored. `--smoke-test` needs none of the binaries — each plugin ships a scripted stand-in that plays the same round trip.
 
 ## The Felix harness: 7 agents

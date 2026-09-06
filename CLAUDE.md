@@ -207,6 +207,8 @@ python scripts/run_scenario.py crashlanded --harness raw-grok --model grok-4.6 -
   --harness-opt mcp_advertise_url=http://host.docker.internal:8766/mcp
 ```
 
+Windows `.cmd`/`.bat` binaries (e.g. `grok-docker.cmd`) need argv via `RLE_GROK_ARGV_JSON` — `cmd.exe` drops large `-p` prompts. `raw-grok` writes that sidecar automatically.
+
 ## Harnesses
 
 | Harness | Where | What |
