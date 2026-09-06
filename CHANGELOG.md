@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.4.2...rimworld-learning-environment-v0.5.0) (2026-09-06)
+
+
+### Features
+
+* container-reachable MCP host for Docker harnesses ([#58](https://github.com/AppSprout-dev/RLE/issues/58)) ([771911b](https://github.com/AppSprout-dev/RLE/commit/771911b8afa5cac59c3aa4d396d2afdbfecc460f))
+* Felix roster/merge opts and raw-grok model baseline ([#59](https://github.com/AppSprout-dev/RLE/issues/59)) ([99e4784](https://github.com/AppSprout-dev/RLE/commit/99e478447d7df277c42ce6c1c218bbd192a100d3))
+
+
+### Documentation
+
+* add ELI5 blurb at top of README ([#56](https://github.com/AppSprout-dev/RLE/issues/56)) ([3220bf8](https://github.com/AppSprout-dev/RLE/commit/3220bf84d8befc7a252caf383daec88df8d90645))
+
 ## [0.4.2](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.4.1...rimworld-learning-environment-v0.4.2) (2026-09-04)
 
 

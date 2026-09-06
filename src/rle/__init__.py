@@ -7,7 +7,7 @@ framework-free; the Felix harness lives under ``rle.harness.felix`` behind
 the optional ``felix`` extra.
 """
 
-__version__ = "0.4.2"  # x-release-please-version
+__version__ = "0.5.0"  # x-release-please-version
 
 from rle.agents import (
     Action,
