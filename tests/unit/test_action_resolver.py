@@ -96,41 +96,46 @@ class TestNoConflicts:
 
 
 class TestSamePawnConflicts:
-    def test_higher_priority_wins(self) -> None:
+    def test_same_type_higher_priority_wins(self) -> None:
         resolver = ActionResolver()
         plans = [
             _plan("resource_manager", [
-                Action(action_type="set_work_priority",
-                       target_colonist_id="col_01", priority=5),
+                Action(action_type="draft_colonist",
+                       target_colonist_id="col_01", priority=5,
+                       parameters={"is_drafted": False}),
             ]),
             _plan("defense_commander", [
                 Action(action_type="draft_colonist",
-                       target_colonist_id="col_01", priority=1),
+                       target_colonist_id="col_01", priority=1,
+                       parameters={"is_drafted": True}),
             ]),
         ]
         state = _make_state()
         result, _stats = resolver.resolve(plans, state)
-        assert len(result.actions) == 1
-        assert result.actions[0].action_type == "draft_colonist"
+        drafts = [a for a in result.actions if a.action_type == "draft_colonist"]
+        assert len(drafts) == 1
+        assert drafts[0].parameters["is_drafted"] is True
 
-    def test_confidence_tiebreak(self) -> None:
+    def test_confidence_tiebreak_same_type(self) -> None:
         resolver = ActionResolver()
         plans = [
-            _plan("resource_manager", [
+            _plan("research_director", [
                 Action(action_type="set_work_priority",
-                       target_colonist_id="col_01", priority=3),
+                       target_colonist_id="col_01", priority=3,
+                       parameters={"Research": 1}),
             ], confidence=0.9),
             _plan("social_overseer", [
-                Action(action_type="assign_social_activity",
-                       target_colonist_id="col_01", priority=3),
+                Action(action_type="set_work_priority",
+                       target_colonist_id="col_01", priority=3,
+                       parameters={"Research": 4}),
             ], confidence=0.4),
         ]
         state = _make_state()
         result, _stats = resolver.resolve(plans, state)
-        assert len(result.actions) == 1
-        # Same action.priority (3), same role_priority (3 vs 5), RM wins on role
-        # Actually RM has role_priority=3, SO has 5, so RM wins
-        assert result.actions[0].action_type == "set_work_priority"
+        work = [a for a in result.actions if a.action_type == "set_work_priority"]
+        assert len(work) == 1
+        # Same action.priority (3), RD and SO both role_priority=5, RD wins on confidence
+        assert work[0].parameters["Research"] == 1
 
 
 # ------------------------------------------------------------------
@@ -157,9 +162,9 @@ class TestEmergencyPriority:
         ]
         state = _make_state(threats=[raid])
         result, _stats = resolver.resolve(plans, state)
-        assert len(result.actions) == 1
-        # DC gets role_priority=1 during raid, RM stays at 3
-        assert result.actions[0].action_type == "draft_colonist"
+        # Complementary types coexist; raid still promotes DC for draft.
+        types = {a.action_type for a in result.actions}
+        assert types == {"set_work_priority", "draft_colonist"}
 
     def test_disease_promotes_medical_officer(self) -> None:
         resolver = ActionResolver()
@@ -179,8 +184,8 @@ class TestEmergencyPriority:
         ]
         state = _make_state(threats=[disease])
         result, _stats = resolver.resolve(plans, state)
-        assert len(result.actions) == 1
-        assert result.actions[0].action_type == "assign_bed_rest"
+        types = {a.action_type for a in result.actions}
+        assert types == {"assign_social_activity", "assign_bed_rest"}
 
     def test_low_health_triggers_medical_emergency(self) -> None:
         resolver = ActionResolver()
@@ -196,8 +201,8 @@ class TestEmergencyPriority:
         ]
         state = _make_state(colonist_health=0.3)
         result, _stats = resolver.resolve(plans, state)
-        assert len(result.actions) == 1
-        assert result.actions[0].action_type == "assign_bed_rest"
+        types = {a.action_type for a in result.actions}
+        assert types == {"set_work_priority", "assign_bed_rest"}
 
 
 # ------------------------------------------------------------------
@@ -270,13 +275,14 @@ class TestCrisisDetection:
 
 
 class TestPeacetimeNoAction:
-    def test_no_action_wins_during_peacetime(self) -> None:
-        """When no crisis is active, NO_ACTION beats a regular action for same pawn."""
+    def test_no_action_does_not_veto_real_writes(self) -> None:
+        """An idle role's no_action must not drop another role's write."""
         resolver = ActionResolver()
         plans = [
             _plan("resource_manager", [
                 Action(action_type="set_work_priority",
-                       target_colonist_id="col_01", priority=3),
+                       target_colonist_id="col_01", priority=3,
+                       parameters={"Growing": 1}),
             ], confidence=0.9),
             _plan("social_overseer", [
                 Action(action_type="no_action",
@@ -287,7 +293,18 @@ class TestPeacetimeNoAction:
         result, _stats = resolver.resolve(plans, state)
         pawn_actions = [a for a in result.actions if a.target_colonist_id == "col_01"]
         assert len(pawn_actions) == 1
-        assert pawn_actions[0].action_type == "no_action"
+        assert pawn_actions[0].action_type == "set_work_priority"
+
+    def test_lone_no_action_is_kept(self) -> None:
+        resolver = ActionResolver()
+        plans = [
+            _plan("social_overseer", [
+                Action(action_type="no_action", target_colonist_id="col_01"),
+            ]),
+        ]
+        state = _make_state()
+        result, _stats = resolver.resolve(plans, state)
+        assert [a.action_type for a in result.actions] == ["no_action"]
 
     def test_real_action_wins_during_raid(self) -> None:
         """During a raid, regular actions beat NO_ACTION."""
@@ -392,11 +409,13 @@ class TestResolverStats:
         plans = [
             _plan("resource_manager", [
                 Action(action_type="set_work_priority",
-                       target_colonist_id="col_01", priority=5),
+                       target_colonist_id="col_01", priority=5,
+                       parameters={"Growing": 1}),
             ]),
-            _plan("defense_commander", [
-                Action(action_type="draft_colonist",
-                       target_colonist_id="col_01", priority=1),
+            _plan("construction_planner", [
+                Action(action_type="set_work_priority",
+                       target_colonist_id="col_01", priority=5,
+                       parameters={"Growing": 4}),
             ]),
         ]
         state = _make_state()
@@ -426,18 +445,112 @@ class TestResolverStats:
         plans = [
             _plan("resource_manager", [
                 Action(action_type="set_work_priority",
-                       target_colonist_id="col_01", priority=5),
+                       target_colonist_id="col_01", priority=5,
+                       parameters={"Growing": 1}),
                 Action(action_type="set_work_priority",
-                       target_colonist_id="col_02", priority=3),
+                       target_colonist_id="col_02", priority=3,
+                       parameters={"Growing": 1}),
             ]),
-            _plan("defense_commander", [
-                Action(action_type="draft_colonist",
-                       target_colonist_id="col_01", priority=1),
-                Action(action_type="draft_colonist",
-                       target_colonist_id="col_02", priority=1),
+            _plan("construction_planner", [
+                Action(action_type="set_work_priority",
+                       target_colonist_id="col_01", priority=5,
+                       parameters={"Growing": 4}),
+                Action(action_type="set_work_priority",
+                       target_colonist_id="col_02", priority=5,
+                       parameters={"Growing": 4}),
             ]),
         ]
         state = _make_state()
         _result, stats = resolver.resolve(plans, state)
         assert stats.conflicts_total == 2
         assert stats.conflicts_resolved == 2
+
+
+# ------------------------------------------------------------------
+# Complementary types + work_priority merge + last-writer
+# ------------------------------------------------------------------
+
+
+class TestComplementaryPawnWrites:
+    def test_work_priority_and_schedule_both_kept(self) -> None:
+        resolver = ActionResolver()
+        plans = [
+            _plan("resource_manager", [
+                Action(action_type="work_priority",
+                       target_colonist_id="col_01",
+                       parameters={"Growing": 1}),
+            ]),
+            _plan("social_overseer", [
+                Action(action_type="time_assignment",
+                       target_colonist_id="col_01",
+                       parameters={"hours": [18, 19], "assignment": "Joy"}),
+            ]),
+        ]
+        state = _make_state()
+        result, stats = resolver.resolve(plans, state)
+        types = {a.action_type for a in result.actions}
+        assert types == {"work_priority", "time_assignment"}
+        assert stats.conflicts_total == 0
+
+    def test_work_priority_merges_complementary_work_types(self) -> None:
+        resolver = ActionResolver()
+        plans = [
+            _plan("resource_manager", [
+                Action(action_type="work_priority",
+                       target_colonist_id="col_01",
+                       parameters={"Growing": 1, "Hauling": 2}),
+            ]),
+            _plan("construction_planner", [
+                Action(action_type="work_priority",
+                       target_colonist_id="col_01",
+                       parameters={"Construction": 1, "Growing": 4}),
+            ]),
+        ]
+        state = _make_state()
+        result, _stats = resolver.resolve(plans, state)
+        work = [a for a in result.actions if a.action_type == "work_priority"]
+        assert len(work) == 1
+        # Growing: RM wins (role_priority 3 vs 5). Construction/Hauling kept.
+        assert work[0].parameters == {"Growing": 1, "Hauling": 2, "Construction": 1}
+
+    def test_same_type_last_writer_on_equal_priority(self) -> None:
+        resolver = ActionResolver()
+        plans = [
+            _plan("research_director", [
+                Action(action_type="time_assignment",
+                       target_colonist_id="col_01", priority=5,
+                       parameters={"hours": [8], "assignment": "Work"}),
+            ], confidence=0.5),
+            _plan("social_overseer", [
+                Action(action_type="time_assignment",
+                       target_colonist_id="col_01", priority=5,
+                       parameters={"hours": [18], "assignment": "Joy"}),
+            ], confidence=0.5),
+        ]
+        state = _make_state()
+        result, _stats = resolver.resolve(plans, state)
+        assigns = [a for a in result.actions if a.action_type == "time_assignment"]
+        assert len(assigns) == 1
+        # Same action.priority, both role_priority=5, same confidence → last writer
+        assert assigns[0].parameters["assignment"] == "Joy"
+
+    def test_medical_same_type_wins_during_emergency(self) -> None:
+        resolver = ActionResolver()
+        plans = [
+            _plan("social_overseer", [
+                Action(action_type="bed_rest",
+                       target_colonist_id="col_01", priority=2,
+                       parameters={"rest": False}),
+            ]),
+            _plan("medical_officer", [
+                Action(action_type="bed_rest",
+                       target_colonist_id="col_01", priority=2,
+                       parameters={"rest": True}),
+            ]),
+        ]
+        state = _make_state(colonist_health=0.3)
+        result, _stats = resolver.resolve(plans, state)
+        rests = [a for a in result.actions if a.action_type == "bed_rest"]
+        assert len(rests) == 1
+        assert rests[0].parameters["rest"] is True
+

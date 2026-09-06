@@ -47,6 +47,7 @@ class TestBuiltinRegistration:
         names = harness_names()
         assert "baseline" in names
         assert "felix" in names
+        assert "raw-grok" in names
 
     def test_list_reports_package_and_availability(self) -> None:
         infos = {i.name: i for i in list_harnesses()}
@@ -71,6 +72,17 @@ class TestBuiltinRegistration:
         harness = create_harness("felix", _ctx(), {"no_think": True}, smoke=True)
         assert harness.name == "felix"
         assert len(harness.agents) == 7  # type: ignore[attr-defined]
+
+    @requires_felix
+    def test_create_felix_smoke_respects_roles_and_exclude(self) -> None:
+        harness = create_harness(
+            "felix", _ctx(),
+            {"roles": "map_analyst,resource_manager,medical_officer",
+             "exclude_agent": "medical_officer"},
+            smoke=True,
+        )
+        ids = [a.ROLE_NAME for a in harness.agents]  # type: ignore[attr-defined]
+        assert ids == ["map_analyst", "resource_manager"]
 
     @requires_felix
     def test_felix_options_validated(self) -> None:

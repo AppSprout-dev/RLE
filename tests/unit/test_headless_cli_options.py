@@ -36,3 +36,13 @@ class TestOptionsMergeOntoConfig:
         listen = opts.mcp_listen(config)
         assert listen.bind_host == "127.0.0.1"
         assert listen.port == 0
+
+    def test_advertise_url_is_an_option(self) -> None:
+        opts = cli_base.HeadlessCliOptions(
+            mcp_advertise_url="http://host.docker.internal:8766/mcp",
+            mcp_container_reachable=True,
+        )
+        assert opts.mcp_advertise_url == "http://host.docker.internal:8766/mcp"
+        listen = opts.mcp_listen(RLEConfig())
+        assert listen.bind_host == "0.0.0.0"
+        assert listen.advertise_host == "host.docker.internal"

@@ -1,19 +1,43 @@
-"""Conflict resolution for multi-agent action plans."""
+"""Conflict resolution for multi-agent action plans.
+
+Arbitration is general (role × action type), not scenario-specific.
+
+Pawn-targeted writes are grouped by ``(colonist_id, canonical action_type)``
+after ``resolve_endpoint`` so complementary types on the same pawn coexist
+(``work_priority`` and ``time_assignment`` are not the same write). Within a
+group the winner is deterministic:
+
+1. lower ``Action.priority`` number
+2. role-priority table (crisis promotion for defense / medical)
+3. higher plan confidence
+4. last-writer (later plan, then later action in that plan)
+
+``work_priority`` is merged across roles: each work type keeps the winning
+role's value so Growing=1 from ResourceManager and Construction=1 from
+ConstructionPlanner both survive, while Growing=1 vs Growing=4 is a
+same-type conflict.
+
+``no_action`` never vetoes another role's real write. Timed-out or failed
+deliberations must not be passed in — callers hand only successful plans.
+"""
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from rle.agents.actions import Action, ActionPlan
+from rle.agents.actions import Action, ActionPlan, resolve_endpoint
 from rle.rimapi.schemas import GameState
 
 logger = logging.getLogger(__name__)
 
 # Default role priorities (lower number = higher priority).
-_DEFAULT_ROLE_PRIORITY: dict[str, int] = {
+# Crisis promotion (raid → defense_commander, medical → medical_officer)
+# overrides these to 1. Documented so ablation / custom rosters stay stable.
+ROLE_PRIORITY: dict[str, int] = {
     "map_analyst": 10,
     "resource_manager": 3,
     "defense_commander": 3,
@@ -22,6 +46,7 @@ _DEFAULT_ROLE_PRIORITY: dict[str, int] = {
     "construction_planner": 5,
     "medical_officer": 4,
 }
+_DEFAULT_ROLE_PRIORITY = ROLE_PRIORITY
 
 RAID_THREAT_THRESHOLD = 0.5
 MEDICAL_HEALTH_THRESHOLD = 0.5
@@ -47,6 +72,7 @@ class _TaggedAction:
     role: str
     role_priority: int
     plan_confidence: float
+    seq: int
 
 
 @dataclass(frozen=True)
@@ -57,6 +83,49 @@ class ResolverStats:
     conflicts_resolved: int
 
 
+def _winner_key(ta: _TaggedAction) -> tuple[int, int, float, int]:
+    """Sort key for ``min``: lower wins. Last-writer is ``-seq``."""
+    return (ta.action.priority, ta.role_priority, -ta.plan_confidence, -ta.seq)
+
+
+def _work_priorities(params: dict[str, Any]) -> dict[str, int]:
+    """Accepted work_priority shapes, tolerant of garbage."""
+    nested = params.get("work_priorities")
+    if isinstance(nested, dict):
+        return {str(work): int(pri) for work, pri in nested.items() if isinstance(pri, int)}
+    if "work_type" in params:
+        pri = params.get("priority", 1)
+        return {str(params["work_type"]): int(pri)} if isinstance(pri, int) else {}
+    return {
+        str(work): pri for work, pri in params.items()
+        if isinstance(pri, int) and not isinstance(pri, bool)
+    }
+
+
+def _merge_work_priority(candidates: list[_TaggedAction]) -> Action:
+    """Keep the winning priority per work type; emit one action."""
+    by_type: dict[str, _TaggedAction] = {}
+    for ta in candidates:
+        for work in _work_priorities(ta.action.parameters):
+            prev = by_type.get(work)
+            if prev is None or _winner_key(ta) < _winner_key(prev):
+                by_type[work] = ta
+    base = min(candidates, key=_winner_key).action
+    if not by_type:
+        return base
+    parameters = {
+        work: _work_priorities(ta.action.parameters)[work]
+        for work, ta in by_type.items()
+    }
+    return Action(
+        action_type=base.action_type,
+        target_colonist_id=base.target_colonist_id,
+        parameters=parameters,
+        priority=base.priority,
+        reason=base.reason,
+    )
+
+
 class ActionResolver:
     """Merges multiple ActionPlans into a single conflict-free plan."""
 
@@ -64,6 +133,8 @@ class ActionResolver:
         self, plans: list[ActionPlan], state: GameState,
     ) -> tuple[ActionPlan, ResolverStats]:
         """Apply priority rules and return a merged ActionPlan with conflict stats."""
+        # Callers must omit timed-out / parse-failed deliberations. Empty
+        # plans contribute no writes.
         if not plans:
             return (
                 ActionPlan(role="orchestrator", tick=state.colony.tick, actions=[]),
@@ -86,16 +157,14 @@ class ActionResolver:
             colony_actions,
         )
         resolved_pawn, pawn_detected, pawn_resolved = self._resolve_pawn_conflicts(
-            pawn_actions, crisis,
+            pawn_actions,
         )
 
         resolved: list[Action] = []
         resolved.extend(resolved_colony)
         resolved.extend(resolved_pawn)
 
-        avg_confidence = (
-            sum(p.confidence for p in plans) / len(plans) if plans else 0.5
-        )
+        avg_confidence = sum(p.confidence for p in plans) / len(plans)
 
         plan = ActionPlan(
             role="orchestrator",
@@ -137,7 +206,7 @@ class ActionResolver:
     # ------------------------------------------------------------------
 
     def _get_role_priority(self, role: str, crisis: CrisisState) -> int:
-        base = _DEFAULT_ROLE_PRIORITY.get(role, 5)
+        base = ROLE_PRIORITY.get(role, 5)
         if crisis.raid_active and role == "defense_commander":
             return 1
         if crisis.medical_emergency and role == "medical_officer":
@@ -148,6 +217,7 @@ class ActionResolver:
         self, plans: list[ActionPlan], crisis: CrisisState,
     ) -> list[_TaggedAction]:
         tagged: list[_TaggedAction] = []
+        seq = 0
         for plan in plans:
             rp = self._get_role_priority(plan.role, crisis)
             for action in plan.actions:
@@ -157,8 +227,10 @@ class ActionResolver:
                         role=plan.role,
                         role_priority=rp,
                         plan_confidence=plan.confidence,
+                        seq=seq,
                     )
                 )
+                seq += 1
         return tagged
 
     # ------------------------------------------------------------------
@@ -166,71 +238,70 @@ class ActionResolver:
     # ------------------------------------------------------------------
 
     def _resolve_pawn_conflicts(
-        self, actions: list[_TaggedAction], crisis: CrisisState,
+        self, actions: list[_TaggedAction],
     ) -> tuple[list[Action], int, int]:
-        """Group by colonist, keep best action per pawn.
+        """One winner (or merged work_priority) per pawn × action type.
 
-        During peacetime (no raid, no medical emergency), NO_ACTION is
-        preferred over regular actions — this implements "do no harm".
+        Complementary types on the same pawn are kept. ``no_action`` is
+        dropped when any other write targets that pawn.
 
         Returns (resolved_actions, conflicts_detected, conflicts_resolved).
         """
-        peacetime = not crisis.raid_active and not crisis.medical_emergency
-        by_pawn: dict[str, list[_TaggedAction]] = {}
+        by_key: dict[tuple[str, str], list[_TaggedAction]] = {}
         for ta in actions:
             cid = ta.action.target_colonist_id or ""
-            by_pawn.setdefault(cid, []).append(ta)
+            kind = resolve_endpoint(ta.action.action_type)
+            by_key.setdefault((cid, kind), []).append(ta)
 
-        resolved: list[Action] = []
+        kept: list[tuple[str, Action]] = []
         detected = 0
         resolved_count = 0
-        for cid, candidates in by_pawn.items():
-            winner = min(
-                candidates,
-                key=lambda ta: (
-                    # Peacetime: prefer NO_ACTION (do no harm)
-                    0 if peacetime and ta.action.action_type == "no_action" else 1,
-                    ta.action.priority,   # Rule 2: lower priority number wins
-                    ta.role_priority,     # Rule 1/3: role priority
-                    -ta.plan_confidence,  # Rule 4: higher confidence wins (negate)
-                ),
-            )
+        for (cid, kind), candidates in by_key.items():
             if len(candidates) > 1:
                 detected += 1
                 resolved_count += 1
                 losers = [
                     f"{ta.role}:{ta.action.action_type}" for ta in candidates
-                    if ta is not winner
                 ]
                 logger.info(
-                    "Pawn %s conflict: %s wins over %s",
-                    cid, f"{winner.role}:{winner.action.action_type}",
-                    ", ".join(losers),
+                    "Pawn %s %s conflict among %s",
+                    cid, kind, ", ".join(losers),
                 )
-            resolved.append(winner.action)
+            if kind == "work_priority":
+                kept.append((cid, _merge_work_priority(candidates)))
+            else:
+                winner = min(candidates, key=_winner_key)
+                kept.append((cid, winner.action))
+
+        real_pawns = {
+            cid for cid, action in kept
+            if resolve_endpoint(action.action_type) != "no_action"
+        }
+        resolved = [
+            action for cid, action in kept
+            if resolve_endpoint(action.action_type) != "no_action" or cid not in real_pawns
+        ]
         return resolved, detected, resolved_count
 
     def _resolve_colony_actions(
         self, actions: list[_TaggedAction],
     ) -> tuple[list[Action], int, int]:
-        """Deduplicate colony-level actions by type, highest role priority wins.
+        """Deduplicate colony-level actions by canonical type.
 
         Returns (resolved_actions, conflicts_detected, conflicts_resolved).
         """
         by_type: dict[str, list[_TaggedAction]] = {}
         for ta in actions:
-            by_type.setdefault(ta.action.action_type, []).append(ta)
+            kind = resolve_endpoint(ta.action.action_type)
+            by_type.setdefault(kind, []).append(ta)
 
         resolved: list[Action] = []
         detected = 0
         resolved_count = 0
-        for action_type, candidates in by_type.items():
+        for _action_type, candidates in by_type.items():
             if len(candidates) > 1:
                 detected += 1
                 resolved_count += 1
-            winner = min(
-                candidates,
-                key=lambda ta: (ta.role_priority, -ta.plan_confidence),
-            )
+            winner = min(candidates, key=_winner_key)
             resolved.append(winner.action)
         return resolved, detected, resolved_count

@@ -99,6 +99,14 @@ class HeadlessCliOptions(BaseModel):
             "None inherits RLEConfig / MCP_PORT."
         ),
     )
+    mcp_advertise_url: str | None = Field(
+        default=None,
+        description=(
+            "Full MCP URL handed to the agent instead of the in-process bind URL. "
+            "For a Docker agent against host RimWorld use "
+            "http://host.docker.internal:8766/mcp with mcp_container_reachable=true."
+        ),
+    )
 
     def mcp_listen(self, config: RLEConfig) -> McpListenSettings:
         """Merge harness-opt overrides onto RLEConfig, then apply mode defaults."""
@@ -130,6 +138,7 @@ class HeadlessCliHarness(BaseHarness, ABC):
         self.options = options
         self._session: McpSession | None = None
         self._host: McpHost | None = None
+        self._agent_mcp_url: str | None = None
         self._agent_started = False
 
     # ------------------------------------------------------------------
@@ -168,6 +177,8 @@ class HeadlessCliHarness(BaseHarness, ABC):
 
     @property
     def mcp_url(self) -> str:
+        if self._agent_mcp_url is not None:
+            return self._agent_mcp_url
         if self._host is None:
             raise RuntimeError("setup() has not been called")
         return self._host.url
@@ -180,11 +191,13 @@ class HeadlessCliHarness(BaseHarness, ABC):
         )
         listen = self.options.mcp_listen(ctx.config)
         self._host = McpHost(build_server(self._session), listen)
-        url = await self._host.start()
+        bind_url = await self._host.start()
+        url = (self.options.mcp_advertise_url or "").strip() or bind_url
         logger.info(
             "MCP host listening on %s:%s, advertising %s",
             self._host.bind_host, self._host.port, url,
         )
+        self._agent_mcp_url = url
         await self.start_agent(url)
         self._agent_started = True
 
@@ -197,6 +210,7 @@ class HeadlessCliHarness(BaseHarness, ABC):
             self._agent_started = False
         if self._host is not None:
             await self._host.stop()
+        self._agent_mcp_url = None
 
     def describe(self) -> dict[str, str]:
         info = {"harness": self.name, "model": self.options.model or self.ctx.config.model}

@@ -26,6 +26,7 @@ RLEGameLoop (environment: pause → state → harness.step → execute → score
     ↕ Harness protocol (rle.harness) — discovered via the `rle.harnesses` entry-point group
     ├─ felix     MapAnalyst → 6 role agents over CentralPost, merged by ActionResolver   [in tree, extra `felix`]
     ├─ baseline  unmanaged colony                                                        [in tree]
+    ├─ raw-grok  MODEL BASELINE: stock grok binary, TURN_RULES only                      [in tree, extra `mcp`]
     └─ <tool>    external coding agents attached over the RimAPI MCP server (rle-mcp)    [own repos]
     ↕ OpenAI-compatible / Anthropic / local API (provider + model are strings; the harness interprets them)
 LLM
@@ -44,8 +45,9 @@ The benchmark has two axes. `--model` picks the LLM; `--harness` picks the decis
 
 | Harness | Where | What it is | Install |
 |---------|-------|------------|---------|
-| `felix` | this repo (extra `felix`) | MapAnalyst + 6 role agents over Felix SDK CentralPost, merged by ActionResolver — the original RLE stack | `uv sync --extra felix` |
+| `felix` | this repo (extra `felix`) | MapAnalyst + 6 role agents over Felix SDK CentralPost, merged by ActionResolver — the original RLE stack. Roster ablation: `--harness-opt roles=` / `exclude_agent=`. See [docs/harness-felix.md](docs/harness-felix.md). | `uv sync --extra felix` |
 | `baseline` | this repo | Unmanaged colony (RimWorld's own pawn AI) — the paired control | built in |
+| `raw-grok` | this repo (extra `mcp`) | **Model baseline** — stock `grok` binary, one `HeadlessCliHarness` turn per tick, `TURN_RULES` only. Not a product harness; do not compare to `felix` or external coding-agent packages as an architecture. | `uv sync --extra mcp`; `grok` on PATH |
 | `opencode` | [rle-harness-opencode](https://github.com/AppSprout-dev/rle-harness-opencode) | [OpenCode](https://opencode.ai) coding agent, one prompt per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-opencode` |
 | `grok-build` | [rle-harness-grok-build](https://github.com/AppSprout-dev/rle-harness-grok-build) | [Grok Build](https://github.com/xai-org/grok-build) coding agent, headless `grok -p` per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-grok-build` |
 | `template` | [rle-harness-template](https://github.com/AppSprout-dev/rle-harness-template) | Copy-me starting point for your own harness | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-template` |
@@ -55,6 +57,10 @@ python scripts/run_benchmark.py --harness list                                  
 python scripts/run_benchmark.py --harness felix --harness opencode --model openai/gpt-4o --runs 4
 python scripts/run_scenario.py crashlanded --harness grok-build --model grok-4.6 --tick-interval 30
 python scripts/run_scenario.py crashlanded --harness felix --harness-opt no_think=true --harness-opt parallel=false
+python scripts/run_scenario.py crashlanded --harness raw-grok --model grok-4.6 --seed 42 --ticks 10 \
+  --harness-opt binary=grok --harness-opt turn_timeout_s=300 \
+  --harness-opt mcp_container_reachable=true \
+  --harness-opt mcp_advertise_url=http://host.docker.internal:8766/mcp
 ```
 
 Coding-agent harnesses attach to RLE over MCP: RLE hosts a RimAPI tool server in-process (`rle.mcp`, extra `mcp`), the agent calls `get_brief`, then write tools (`work_priority`, `blueprint`, ...), then `end_turn`; the writes that reached the game are what gets scored. `--smoke-test` needs none of the binaries — each plugin ships a scripted stand-in that plays the same round trip.
