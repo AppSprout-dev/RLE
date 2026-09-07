@@ -203,7 +203,7 @@ docker/                    # HeadlessRim Dockerfile, compose, entrypoint
 - [felix-agent-sdk](https://github.com/AppSprout-dev/felix-agent-sdk) >= 0.3.0
 - [RIMAPI](https://github.com/IlyaChichkov/RIMAPI) C# mod
 - httpx, pydantic >= 2.0, pyyaml
-- Optional: wandb, huggingface-hub (`uv sync --extra tracking`)
+- Optional: wandb, huggingface-hub (`uv sync --extra tracking`). W&B stays opt-in (`--wandb` on `run_benchmark.py` only). Weave is a separate optional import (not in the extra or lockfile); see [README — Weights and Biases (opt-in)](README.md#weights-and-biases-opt-in).
 
 ## Questions?
 

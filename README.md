@@ -228,6 +228,36 @@ python scripts/visualize_results.py results/ --all
 python scripts/analyze_spread.py --spread-dir results/spread
 ```
 
+### Weights and Biases (opt-in)
+
+W&B is **strictly opt-in**. Open-source RLE does not require `wandb`, does not enable it by default, and degrades gracefully if the package is missing or unauthenticated. Third parties who omit `--wandb` need no W&B setup.
+
+AppSprout Crashlanded **benchmark** runs should use W&B / Weave. That is an AppSprout ops policy, not a core default and not a required dependency.
+
+The optional `tracking` extra installs `wandb` and `huggingface-hub` only. `uv sync --extra tracking` enables W&B. Weave tracing is a separate optional import in `wandb_logger.py` and is not in `uv.lock`; install it yourself (`uv pip install weave`) if you want traces, or expand the extra later. Missing `weave` is a no-op.
+
+`scripts/run_scenario.py` has **no `--wandb` hook** today. Do not assume a single-scenario run will log to W&B unless that hook is added later. This recipe is for `run_benchmark.py` only.
+
+```bash
+# Optional extra — not part of the default install (wandb + huggingface-hub)
+uv sync --extra tracking
+
+# Weave traces only if weave is installed separately (not in the tracking extra)
+# uv pip install weave
+
+# Authenticate only if this machine is not already logged in.
+# Never commit a W&B key. WANDB_API_KEY may be set in the environment
+# (do not print it).
+wandb login
+
+python scripts/run_benchmark.py \
+  --wandb \
+  --no-think --no-pause \
+  --ticks 10 --tick-interval 30 --seed 42 \
+  --output results/crashlanded \
+  --harness felix --harness baseline
+```
+
 ## Benchmark Results
 
 **Live board — `spread-2026-09-06`, scoring 1.2, harness × model** — Crashlanded, 10 ticks, seed 42, N=1. **Content-first — not statistically valid (no confidence intervals). Winners advance to N=4; N=4 is not published.** Ranked by mean composite across the run. Featured numbers live on [rle.appsprout.dev](https://rle.appsprout.dev) and the [HF card](https://huggingface.co/datasets/AppSprout/rle-benchmarks) (`runs/spread-2026-09-06`).
