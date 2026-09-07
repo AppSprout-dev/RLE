@@ -2,7 +2,7 @@
 
 ## ELI5
 
-RLE is a public research benchmark — not a product — where AI agent setups try to keep a RimWorld colony alive. The published leaderboard is one 11-model Crashlanded run (2026-06-11, N=1, seed 42, 10 ticks) on the `felix` harness at scoring 1.1 — Grok 4.3 leads at mean composite 0.836; it is content-first and not statistically valid. Winners advance to N=4; N=4 is not published. Those rows are not comparable to scoring 1.2. Harness × model and scoring 1.2 are how the code works now; that matrix is not a published result yet. Full table: [Benchmark Results](#benchmark-results).
+RLE is a public research benchmark — not a product — where AI agent setups try to keep a RimWorld colony alive. The live published board is [spread-2026-09-06](https://huggingface.co/datasets/AppSprout/rle-benchmarks) on [rle.appsprout.dev](https://rle.appsprout.dev): scoring 1.2, harness × model, Crashlanded, N=1, seed 42, 10 ticks. Grok Build (ACP) leads at mean composite 0.811 (final 0.833). N=1 is content-first and not statistically valid. Winners advance to N=4; N=4 is not published. The June 2026 scoring 1.1 `felix` 11-model table is historical and **not comparable** (different scoring era). Full table: [Benchmark Results](#benchmark-results).
 
 A **harness × model** benchmark: swappable agent harnesses manage a RimWorld colony under uncertainty and are scored on the same footing against an unmanaged baseline. Think [FLE](https://github.com/chenhao-wang/FLE) (Factorio Learning Environment) but stochastic, multi-agent-capable, and with the *harness* — not just the model — as a first-class variable.
 
@@ -218,9 +218,24 @@ python scripts/analyze_spread.py --spread-dir results/spread
 
 ## Benchmark Results
 
-**11-model spread, `felix` harness, scoring 1.1** — Crashlanded, 10 ticks, seed 42, 2026-06-11. **N=1, content-first — not statistically valid (no confidence intervals). Winners advance to N=4; N=4 is not published.** Ranked by mean composite across the run. Featured numbers live on the [HF card](https://huggingface.co/datasets/AppSprout/rle-benchmarks) and [rle.appsprout.dev](https://rle.appsprout.dev) (same `site_data.json` payload).
+**Live board — `spread-2026-09-06`, scoring 1.2, harness × model** — Crashlanded, 10 ticks, seed 42, N=1. **Content-first — not statistically valid (no confidence intervals). Winners advance to N=4; N=4 is not published.** Ranked by mean composite across the run. Featured numbers live on [rle.appsprout.dev](https://rle.appsprout.dev) and the [HF card](https://huggingface.co/datasets/AppSprout/rle-benchmarks) (`runs/spread-2026-09-06`).
 
-These rows predate the harness axis and scoring 1.2: they were all produced by the Felix harness and include the since-removed `coordination` / `communication_efficiency` metrics, so they are not comparable to 1.2 runs. The next published spread will be a harness × model matrix at scoring 1.2.
+`felix` here is a technical harness name (the original 7-agent stack), not a product.
+
+| # | Harness / model | Mean | Final | vs baseline | Cost |
+|---|-----------------|------|-------|-------------|------|
+| 1 | Grok Build (ACP) / grok-4.6 | **0.811** | 0.833 | −0.021 | $7.00* |
+| 2 | OpenCode / grok-4.6 | 0.801 | 0.821 | −0.005 | $1.59* |
+| 3 | Felix / grok-4.6 | 0.707 | 0.372 | −0.083 | $0.86 |
+| 4 | raw-grok / grok-4.6 | 0.665 | 0.380 | −0.095 | — |
+
+Measured against a pinned no-agent baseline (4 seeds, mean time-to-end 8.0 days). **0 of 4 harness/model rows beat the unmanaged baseline.** Highest mean composite is not the same as beating baseline.
+
+Costs match the live site: Felix $0.86 is OpenRouter billed; OpenCode $1.59* is estimated from OpenRouter grok-4.6 tokens×rates (796917 tokens; OSS harness still billed via OpenRouter); Grok Build ACP $7.00* is console. raw-grok cost is unknown and omitted from the cost frontier. `*` = estimated / console. Total spend $9.45.
+
+### Historical — scoring 1.1 (non-comparable)
+
+**11-model spread, `felix` harness, scoring 1.1** — Crashlanded, 10 ticks, seed 42, 2026-06-11 (`spread-2026-06-11`). **N=1, content-first — not statistically valid.** These rows predate the harness axis and scoring 1.2: they were all produced by the Felix harness and include the since-removed `coordination` / `communication_efficiency` metrics, so they are **not comparable** to the 1.2 board above.
 
 | # | Model | Mean | Final | vs baseline | Cost |
 |---|-------|------|-------|-------------|------|
@@ -236,7 +251,7 @@ These rows predate the harness axis and scoring 1.2: they were all produced by t
 | 10 | DeepSeek-V4 Pro | 0.716 | 0.610 | −0.021 | $0.52 |
 | 11 | Kimi K2.6 | 0.686 | 0.638 | −0.034 | $1.22 |
 
-Measured against a pinned no-agent baseline (4 seeds, mean time-to-end 8.0 days). **1 of 11 models beat the no-agent baseline** (GLM-5.1). Highest mean composite is not the same as beating baseline. Costs marked `~` are token-count estimates (subscription-billed); unmarked costs are OpenRouter billed.
+**1 of 11 models beat the no-agent baseline** (GLM-5.1). Costs marked `~` are token-count estimates (subscription-billed); unmarked costs are OpenRouter billed.
 
 ## Scenarios
 
