@@ -228,7 +228,7 @@ python scripts/visualize_results.py results/ --all
 python scripts/analyze_spread.py --spread-dir results/spread
 ```
 
-### Weights & Biases (opt-in)
+### Weights and Biases (opt-in)
 
 W&B / Weave is **strictly opt-in**. Open-source RLE does not require `wandb`, does not enable it by default, and degrades gracefully if the package is missing or unauthenticated. Third parties who omit `--wandb` need no W&B setup.
 
