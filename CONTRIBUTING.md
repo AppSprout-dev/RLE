@@ -72,6 +72,25 @@ python scripts/check_harness_boundary.py
 
 `--smoke-test` always uses mock LLMs. To exercise a real model against the fake game state, run a real harness with `--ticks` small against a live RIMAPI instead (below).
 
+### RIMAPI DLL pin (run metadata)
+
+Live-run summaries record `rimapi_dll_path`, `rimapi_dll_sha256`, and
+`rimapi_fork_commit`. **Steam Workshop is not the source of truth.** AppSprout
+runs should pin the compiled [AppSprout-dev/RIMAPI](https://github.com/AppSprout-dev/RIMAPI)
+checkout (`rle-testing`):
+
+```bash
+# .env — compiled Assemblies, not the Workshop copy
+RIMAPI_DLL_PATH=/path/to/RIMAPI/1.6/Assemblies/RIMAPI.dll
+RIMAPI_FORK_PATH=/path/to/RIMAPI
+```
+
+When those are unset, metadata probes `{RIMAPI_FORK_PATH}/1.6/Assemblies/RIMAPI.dll`
+(then `1.5`), then `../RIMAPI` next to `git rev-parse --show-toplevel` of the RLE
+checkout, and only then the conventional Workshop path as a last-resort OSS
+fallback. Copying a build into the Workshop folder is still how RimWorld loads
+the fork; it is not what summaries should treat as SoT.
+
 ### Live game test
 
 ```bash

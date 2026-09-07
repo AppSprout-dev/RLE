@@ -25,12 +25,24 @@ git checkout rle-testing
 cd Source/RIMAPI
 dotnet build RimApi.csproj -c Release-1.6
 
-# Deploy DLL over Workshop install (close RimWorld first!)
+# Deploy DLL over Workshop install (close RimWorld first!) so the *game* loads the fork.
 cp ../../1.6/Assemblies/RIMAPI.dll \
   "C:/Steam/steamapps/workshop/content/294100/3593423732/1.6/Assemblies/RIMAPI.dll"
 ```
 
 The upstream Workshop DLL is backed up as `RIMAPI.dll.upstream-backup` in the same folder.
+
+**Pin (source of truth):** AppSprout runs hash the compiled checkout, not Workshop.
+Set both in `.env` after the build (Workshop remains a last-resort metadata fallback only):
+
+```bash
+RIMAPI_DLL_PATH=/path/to/RIMAPI/1.6/Assemblies/RIMAPI.dll
+RIMAPI_FORK_PATH=/path/to/RIMAPI
+```
+
+`collect_metadata()` records `rimapi_dll_path`, `rimapi_dll_sha256`, and
+`rimapi_fork_commit`. Probe order when env is unset: fork Assemblies (`1.6` then
+`1.5`) → sibling `../RIMAPI` next to the RLE git toplevel → Workshop path.
 
 ### RIMAPI gotchas
 
@@ -81,6 +93,8 @@ The `.env` file controls which LLM provider is used. Key fields:
 | `MODEL` | Model name as the provider expects it | `unsloth/nvidia-nemotron-3-nano-4b` |
 | `PROVIDER_BASE_URL` | API base URL (required for LM Studio and OpenRouter) | `http://localhost:1234/v1` |
 | `RIMAPI_URL` | RIMAPI mod URL | `http://localhost:8765` |
+| `RIMAPI_DLL_PATH` | Compiled `RIMAPI.dll` to pin in run summaries (AppSprout SoT; not Workshop) | `/path/to/RIMAPI/1.6/Assemblies/RIMAPI.dll` |
+| `RIMAPI_FORK_PATH` | AppSprout-dev/RIMAPI checkout root (`rle-testing`) for `rimapi_fork_commit` | `/path/to/RIMAPI` |
 | `MCP_CONTAINER_REACHABLE` | Bind MCP on `0.0.0.0:8766`, advertise `http://host.docker.internal:8766/mcp` for Docker agents (host RimWorld). Not `--docker`. | `true` |
 | `MCP_BIND_HOST` / `MCP_ADVERTISE_HOST` / `MCP_PORT` | Optional MCP listen overrides (also `--harness-opt mcp_*`) | `0.0.0.0` / `host.docker.internal` / `8766` |
 
@@ -466,7 +480,7 @@ docker/
 
 We contribute upstream to IlyaChichkov/RIMAPI. PRs #52-54, #60, #63, #65 all merged.
 
-The `rle-testing` branch tracks upstream develop. We always build from `rle-testing` and deploy the DLL to the Workshop folder — this is our active development workflow.
+The `rle-testing` branch tracks upstream develop. We always **build** from `rle-testing`. Copying that DLL into the Workshop folder is how RimWorld loads the fork; **Workshop is not source of truth** for run metadata. Pin `RIMAPI_DLL_PATH` + `RIMAPI_FORK_PATH` at the compiled checkout so summaries record that path, sha256, and fork commit.
 
 To restore the original Workshop DLL: rename `RIMAPI.dll.upstream-backup` back to `RIMAPI.dll` in `C:\Steam\steamapps\workshop\content\294100\3593423732\1.6\Assemblies\`.
 ```
