@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.6.0...rimworld-learning-environment-v0.7.0) (2026-09-07)
+
+
+### Features
+
+* add raw-openrouter OpenRouter model-only baseline harness ([#67](https://github.com/AppSprout-dev/RLE/issues/67)) ([6749db3](https://github.com/AppSprout-dev/RLE/commit/6749db3dc90c569c11ee53e5c96a5c200cffd9b5))
+
+
+### Bug Fixes
+
+* install felix and mcp extras in scheduled Benchmark smoke ([#63](https://github.com/AppSprout-dev/RLE/issues/63)) ([2d52956](https://github.com/AppSprout-dev/RLE/commit/2d529562ca23ff86353f05f3550de545c998b0dd))
+
+
+### Documentation
+
+* acknowledge published scoring 1.2 Sep 6 board ([#65](https://github.com/AppSprout-dev/RLE/issues/65)) ([2b37bf3](https://github.com/AppSprout-dev/RLE/commit/2b37bf303e93e093b72a3855ce99b487ef4df74a))
+* list public claude-code and cursor-agent harnesses ([#66](https://github.com/AppSprout-dev/RLE/issues/66)) ([1594787](https://github.com/AppSprout-dev/RLE/commit/1594787695900cc9cf2633cf7496dcf994d618b5))
+
 ## [0.6.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.5.0...rimworld-learning-environment-v0.6.0) (2026-09-07)
 
 
