@@ -103,7 +103,7 @@ You need four things set up:
 3. **Python 3.14+** with [uv](https://docs.astral.sh/uv/)
 4. **Save file** — `rle_crashlanded_v1` in RimWorld's save folder (the scenario auto-loads it)
 
-> **RIMAPI note:** The Workshop version may not have our contributed endpoints yet. See [CLAUDE.md](CLAUDE.md) for instructions on building and deploying our fork DLL.
+> **RIMAPI note:** The Workshop version may not have our contributed endpoints yet. See [CLAUDE.md](CLAUDE.md) for instructions on building and deploying our fork DLL. AppSprout runs set `RIMAPI_DLL_PATH` and `RIMAPI_FORK_PATH` to the compiled checkout; summaries record that path, the DLL SHA, and the fork commit. Workshop is not source of truth.
 
 ### Verify
 

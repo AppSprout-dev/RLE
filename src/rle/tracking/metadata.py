@@ -27,9 +27,12 @@ from pathlib import Path
 # baseline no longer banks free process points; weights redistributed.
 SCORING_VERSION = "1.2"
 
-# Conventional install path for the RIMAPI Workshop mod we deploy our fork DLL
-# over. Best-effort — if Steam lives elsewhere set the RIMAPI_DLL_PATH env var.
-_RIMAPI_DLL_DEFAULT_PATH = Path(
+# Compiled fork layout relative to a RIMAPI checkout root.
+_RIMAPI_DLL_RELATIVE = Path("1.6") / "Assemblies" / "RIMAPI.dll"
+
+# Steam Workshop install we sometimes overlay. Last-resort fallback only —
+# Workshop is not source of truth (Flash can drift the Workshop DLL).
+_RIMAPI_DLL_WORKSHOP_FALLBACK = Path(
     "C:/Steam/steamapps/workshop/content/294100/3593423732/1.6/Assemblies/RIMAPI.dll",
 )
 
@@ -83,36 +86,122 @@ def file_sha256(path: Path | None) -> str | None:
         return None
 
 
+def _is_packaged_install(path: Path) -> bool:
+    """True when *path* lives in a venv/site-packages install, not a checkout."""
+    return "site-packages" in path.parts or ".venv" in path.parts
+
+
+def _checkout_root_from_source_file(file_path: Path) -> Path | None:
+    """RLE checkout root inferred from ``src/rle/tracking/metadata.py``.
+
+    Returns None for packaged installs (site-packages / .venv): ``parents[3]``
+    is not the RLE repo in those layouts.
+    """
+    if _is_packaged_install(file_path):
+        return None
+    try:
+        candidate = file_path.resolve().parents[3]
+    except IndexError:
+        return None
+    if (candidate / ".git").exists() or (candidate / "src" / "rle").is_dir():
+        return candidate
+    return None
+
+
+def _rle_checkout_root() -> Path | None:
+    """Git toplevel of the RLE checkout, if findable.
+
+    Prefers ``git rev-parse --show-toplevel`` from the process cwd (works when
+    RLE is imported from site-packages/.venv but launched from the checkout).
+    Falls back to ``__file__`` only when that path still looks like a source
+    tree — not a packaged install.
+    """
+    raw = _git("rev-parse", "--show-toplevel")
+    if raw:
+        return Path(raw)
+    return _checkout_root_from_source_file(Path(__file__))
+
+
+def _sibling_rimapi_root() -> Path | None:
+    """``../RIMAPI`` next to the RLE checkout, or None if the checkout is unknown."""
+    checkout = _rle_checkout_root()
+    if checkout is None:
+        return None
+    return checkout.parent / "RIMAPI"
+
+
+def _first_existing_file(candidates: list[Path]) -> Path | None:
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = os.fspath(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _rimapi_dll_candidates() -> list[Path]:
+    """Deterministic DLL probe order. First existing file wins.
+
+    1. ``$RIMAPI_DLL_PATH``
+    2. ``$RIMAPI_FORK_PATH/1.6/Assemblies/RIMAPI.dll``
+    3. sibling checkout ``../RIMAPI/1.6/Assemblies/RIMAPI.dll``
+    4. Workshop path (optional last fallback; not source of truth)
+    """
+    candidates: list[Path] = []
+    dll_override = os.environ.get("RIMAPI_DLL_PATH")
+    if dll_override:
+        candidates.append(Path(dll_override))
+    fork_override = os.environ.get("RIMAPI_FORK_PATH")
+    if fork_override:
+        candidates.append(Path(fork_override) / _RIMAPI_DLL_RELATIVE)
+    sibling = _sibling_rimapi_root()
+    if sibling is not None:
+        candidates.append(sibling / _RIMAPI_DLL_RELATIVE)
+    candidates.append(_RIMAPI_DLL_WORKSHOP_FALLBACK)
+    return candidates
+
+
 def _rimapi_dll_path() -> Path | None:
-    """Resolve the deployed RIMAPI DLL path (env override → Workshop default)."""
-    override = os.environ.get("RIMAPI_DLL_PATH")
+    """Resolve the RIMAPI DLL, preferring a compiled fork over Workshop."""
+    return _first_existing_file(_rimapi_dll_candidates())
+
+
+def _rimapi_fork_candidates() -> list[Path]:
+    """Fork checkout probe order. First path with a ``.git`` dir wins.
+
+    1. ``$RIMAPI_FORK_PATH``
+    2. sibling of the RLE git toplevel (``../RIMAPI``), not only ``__file__``
+    """
+    candidates: list[Path] = []
+    override = os.environ.get("RIMAPI_FORK_PATH")
     if override:
-        candidate = Path(override)
-        return candidate if candidate.is_file() else None
-    return (
-        _RIMAPI_DLL_DEFAULT_PATH if _RIMAPI_DLL_DEFAULT_PATH.is_file() else None
-    )
+        candidates.append(Path(override))
+    sibling = _sibling_rimapi_root()
+    if sibling is not None:
+        candidates.append(sibling)
+    return candidates
 
 
 def _rimapi_fork_commit() -> str:
     """HEAD short SHA of the local RIMAPI fork checkout, if findable.
 
-    Honors $RIMAPI_FORK_PATH; otherwise checks the conventional sibling repo
-    location (../RIMAPI relative to this RLE checkout). Empty string when the
-    fork isn't reachable from the runtime environment.
+    Honors ``$RIMAPI_FORK_PATH`` and the sibling of the RLE git toplevel.
+    Empty string when the fork isn't reachable from the runtime environment.
     """
-    override = os.environ.get("RIMAPI_FORK_PATH")
-    candidates = [Path(override)] if override else []
-    candidates.append(Path(__file__).resolve().parents[3] / "RIMAPI")
-    for fork_path in candidates:
-        if (fork_path / ".git").exists():
-            try:
-                return subprocess.check_output(
-                    ["git", "-C", str(fork_path), "rev-parse", "--short", "HEAD"],
-                    stderr=subprocess.DEVNULL, text=True,
-                ).strip()
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                return ""
+    for fork_path in _rimapi_fork_candidates():
+        if not (fork_path / ".git").exists():
+            continue
+        try:
+            return subprocess.check_output(
+                ["git", "-C", str(fork_path), "rev-parse", "--short", "HEAD"],
+                stderr=subprocess.DEVNULL,
+                text=True,
+            ).strip()
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return ""
     return ""
 
 
