@@ -1,9 +1,10 @@
 """Harness discovery via the ``rle.harnesses`` entry-point group.
 
-Built-in harnesses (``baseline``, ``felix``, ``raw-grok``) and third-party
-packages (``rle-harness-<tool>``) register the same way. Product wrappers
-for coding-agent tools are ``pip install <package>``; the in-tree
-``raw-grok`` entry is the model baseline, not a product harness.
+Built-in harnesses (``baseline``, ``felix``, ``raw-grok``, ``raw-openrouter``)
+and third-party packages (``rle-harness-<tool>``) register the same way.
+Product wrappers for coding-agent tools are ``pip install <package>``; the
+in-tree ``raw-grok`` / ``raw-openrouter`` entries are model baselines, not
+product harnesses.
 """
 
 from __future__ import annotations

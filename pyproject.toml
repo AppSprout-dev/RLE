@@ -45,12 +45,14 @@ tracking = [
 ]
 
 # Harness registry. RLE-authored harnesses live in this tree (baseline, felix,
-# and the raw-grok model baseline). Product wrappers for third-party coding
-# agents ship as their own packages and register under the same group.
+# and the raw-grok / raw-openrouter model baselines). Product wrappers for
+# third-party coding agents ship as their own packages and register under the
+# same group.
 [project.entry-points."rle.harnesses"]
 baseline = "rle.harness.baseline:PLUGIN"
 felix = "rle.harness.felix:PLUGIN"
 raw-grok = "rle.harness.raw_grok:PLUGIN"
+raw-openrouter = "rle.harness.raw_openrouter:PLUGIN"
 
 [project.scripts]
 rle-mcp = "rle.mcp.__main__:main"

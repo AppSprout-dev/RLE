@@ -182,8 +182,9 @@ RLEGameLoop (environment — no agent framework imports)
     ├── felix     (in tree, extra `felix`)  CentralPost hub-spoke → MapAnalyst FIRST →
     │             6 role agents (parallel) → ActionResolver → merged ActionPlan → helix viz
     ├── baseline  (in tree)                 unmanaged colony — the paired control
-    ├── raw-grok  (in tree, extra `mcp`)    MODEL BASELINE: stock grok, TURN_RULES only
-    └── <tool>    (own repos: rle-harness-template / -opencode / …)
+    ├── raw-grok        (in tree, extra `mcp`)  MODEL BASELINE: stock grok, TURN_RULES only
+    ├── raw-openrouter  (in tree, extra `mcp`)  MODEL BASELINE: OpenRouter OpenAI-compat, TURN_RULES only
+    └── <tool>          (own repos: rle-harness-template / -opencode / …)
                   HeadlessCliHarness → RLE MCP server (rle.mcp, in-process HTTP) →
                   coding agent acts through tools during its turn → TickLedger → StepResult.execution
     ↕
@@ -196,7 +197,7 @@ ScenarioEvaluator → victory/defeat/timeout
 Dashboard (React :3000 via latest_tick.json :9000; `harness` + `extras` fields are harness-neutral)
 ```
 
-**Repo boundary rule:** RLE-authored harnesses (`baseline`, `felix`, `raw-grok` model baseline) live here. Product wrappers for third-party coding agents ship as their own `AppSprout-dev/rle-harness-*` packages. `scripts/check_harness_boundary.py` (run in CI) fails on any `felix_agent_sdk` import outside `src/rle/harness/felix/` and on any third-party product-harness name in `src/`, `tests/`, or `scripts/`. Writing a harness: `docs/harness-plugins.md`; Felix knobs: `docs/harness-felix.md`; design rationale: ADR-004.
+**Repo boundary rule:** RLE-authored harnesses (`baseline`, `felix`, `raw-grok` / `raw-openrouter` model baselines) live here. Product wrappers for third-party coding agents ship as their own `AppSprout-dev/rle-harness-*` packages. `scripts/check_harness_boundary.py` (run in CI) fails on any `felix_agent_sdk` import outside `src/rle/harness/felix/` and on any third-party product-harness name in `src/`, `tests/`, or `scripts/`. Writing a harness: `docs/harness-plugins.md`; Felix knobs: `docs/harness-felix.md`; design rationale: ADR-004.
 
 ```bash
 python scripts/run_benchmark.py --harness list                     # installed plugins + availability
@@ -205,6 +206,9 @@ python scripts/run_scenario.py crashlanded --harness felix --harness-opt no_thin
 python scripts/run_scenario.py crashlanded --harness raw-grok --model grok-4.6 --seed 42 --ticks 10 \
   --harness-opt binary=grok --harness-opt turn_timeout_s=300 \
   --harness-opt mcp_advertise_url=http://host.docker.internal:8766/mcp
+OPENROUTER_API_KEY=<key> python scripts/run_scenario.py crashlanded --harness raw-openrouter \
+  --model google/gemini-3.8-flash --provider openai \
+  --base-url https://openrouter.ai/api/v1 --ticks 10
 ```
 
 Windows `.cmd`/`.bat` binaries (e.g. `grok-docker.cmd`) need argv via `RLE_GROK_ARGV_JSON` — `cmd.exe` drops large `-p` prompts. `raw-grok` writes that sidecar automatically.
@@ -216,6 +220,7 @@ Windows `.cmd`/`.bat` binaries (e.g. `grok-docker.cmd`) need argv via `RLE_GROK_
 | `felix` | in tree, extra `felix` (`src/rle/harness/felix/`) | MapAnalyst + 6 role agents over CentralPost, merged by ActionResolver; helix phases; the original stack. Everything in the next four sections describes this harness only. Roster: `--harness-opt roles=` / `exclude_agent=`. |
 | `baseline` | in tree | Unmanaged colony — paired control for every run. |
 | `raw-grok` | in tree, extra `mcp` | **Model baseline** — stock `grok` binary, `TURN_RULES` only. Not comparable to felix or product coding-agent harnesses as an architecture. |
+| `raw-openrouter` | in tree, extra `mcp` | **Model-only OpenRouter baseline** — OpenAI-compat chat completions (not XAI, not an agent harness), `TURN_RULES` only. |
 | `opencode` / `grok-build` | own repos (`AppSprout-dev/rle-harness-*`) | Coding agents driven via `HeadlessCliHarness`: one prompt per tick, act through the RLE MCP tools, `end_turn`; the ledger of writes is scored. |
 | `template` | own repo | Starting point for new harnesses; RLE CI installs it as the plugin-API contract test. |
 
@@ -388,6 +393,8 @@ src/rle/
 │   ├── baseline.py        # BaselineHarness (unmanaged colony) + PLUGIN
 │   ├── compat.py          # RLEGameLoop(agents=..., no_agent=...) legacy shim
 │   ├── cli_base.py        # HeadlessCliHarness: scaffold for CLI coding agents over MCP (extra `mcp`)
+│   ├── raw_grok/          # Model baseline: stock grok binary (extra `mcp`)
+│   ├── raw_openrouter/    # Model-only OpenRouter OpenAI-compat baseline (extra `mcp`; not XAI)
 │   └── felix/             # The Felix multi-agent harness (extra `felix`; only place felix_agent_sdk is imported)
 │       ├── plugin.py      # PLUGIN (lazy SDK imports), harness.py (FelixHarness), build.py, options.py
 │       ├── provider_factory.py  # Felix providers + helix presets (moved off RLEConfig)

@@ -14,10 +14,12 @@ python scripts/run_benchmark.py --harness list
 ## Repo boundary rule
 
 RLE core ships RLE-authored harnesses: `baseline` (unmanaged colony), `felix`
-(the original 7-agent stack), and `raw-grok` (a **model baseline** that drives
-the stock `grok` binary through `HeadlessCliHarness` with `TURN_RULES` only).
-`raw-grok` is not a product harness — do not compare it to `felix` or to
-external coding-agent packages as an architecture. Felix knobs:
+(the original 7-agent stack), `raw-grok` (a **model baseline** that drives
+the stock `grok` binary through `HeadlessCliHarness` with `TURN_RULES` only),
+and `raw-openrouter` (a **model-only OpenRouter baseline** — OpenAI-compat
+`chat/completions`, not XAI, not an agent harness — same MCP turn protocol).
+Those raw entries are not product harnesses — do not compare them to `felix`
+or to external coding-agent packages as an architecture. Felix knobs:
 [docs/harness-felix.md](harness-felix.md).
 
 **A harness that wraps a third-party coding-agent product** lives in its own
@@ -110,7 +112,10 @@ and continues. Any other exception is treated as a bug and propagates.
   binds `0.0.0.0:8766` and advertises `http://host.docker.internal:8766/mcp`.
   Needs the `mcp` extra. `raw-grok` uses this scaffold as a model baseline
   (`turn_timeout_s` default 180; pass `300` when comparing against slower
-  coding-agent harnesses). On Windows, a `.cmd`/`.bat` binary (e.g.
+  coding-agent harnesses). `raw-openrouter` is the OpenRouter equivalent:
+  same turn protocol, but the model is called via OpenAI-compat HTTP
+  (`OPENROUTER_API_KEY`, default `https://openrouter.ai/api/v1`) — no XAI
+  binary, no coding-agent product. On Windows, a `.cmd`/`.bat` binary (e.g.
   `grok-docker.cmd`) cannot carry a large `-p` prompt: `cmd.exe` re-parses
   argv and drops it. `raw-grok` writes those argv strings (after the wrapper
   path) to a temp UTF-8 JSON file and sets `RLE_GROK_ARGV_JSON` so the

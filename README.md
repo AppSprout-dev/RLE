@@ -26,8 +26,9 @@ RLEGameLoop (environment: pause → state → harness.step → execute → score
     ↕ Harness protocol (rle.harness) — discovered via the `rle.harnesses` entry-point group
     ├─ felix     MapAnalyst → 6 role agents over CentralPost, merged by ActionResolver   [in tree, extra `felix`]
     ├─ baseline  unmanaged colony                                                        [in tree]
-    ├─ raw-grok  MODEL BASELINE: stock grok binary, TURN_RULES only                      [in tree, extra `mcp`]
-    └─ <tool>    external coding agents attached over the RimAPI MCP server (rle-mcp)    [own repos]
+    ├─ raw-grok         MODEL BASELINE: stock grok binary, TURN_RULES only               [in tree, extra `mcp`]
+    ├─ raw-openrouter   MODEL BASELINE: OpenRouter OpenAI-compat, TURN_RULES only        [in tree, extra `mcp`]
+    └─ <tool>           external coding agents attached over the RimAPI MCP server       [own repos]
     ↕ OpenAI-compatible / Anthropic / local API (provider + model are strings; the harness interprets them)
 LLM
 ```
@@ -48,6 +49,7 @@ The benchmark has two axes. `--model` picks the LLM; `--harness` picks the decis
 | `felix` | this repo (extra `felix`) | MapAnalyst + 6 role agents over Felix SDK CentralPost, merged by ActionResolver — the original RLE stack. Roster ablation: `--harness-opt roles=` / `exclude_agent=`. See [docs/harness-felix.md](docs/harness-felix.md). | `uv sync --extra felix` |
 | `baseline` | this repo | Unmanaged colony (RimWorld's own pawn AI) — the paired control | built in |
 | `raw-grok` | this repo (extra `mcp`) | **Model baseline** — stock `grok` binary, one `HeadlessCliHarness` turn per tick, `TURN_RULES` only. Not a product harness; do not compare to `felix` or external coding-agent packages as an architecture. | `uv sync --extra mcp`; `grok` on PATH |
+| `raw-openrouter` | this repo (extra `mcp`) | **Model-only OpenRouter baseline** — OpenAI-compat `chat/completions` (not XAI, not an agent harness), one `HeadlessCliHarness` turn per tick, `TURN_RULES` only. Same MCP write contract as other headless model baselines. | `uv sync --extra mcp`; `OPENROUTER_API_KEY` |
 | `opencode` | [rle-harness-opencode](https://github.com/AppSprout-dev/rle-harness-opencode) | [OpenCode](https://opencode.ai) coding agent, one prompt per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-opencode` |
 | `grok-build` | [rle-harness-grok-build](https://github.com/AppSprout-dev/rle-harness-grok-build) | [Grok Build](https://github.com/xai-org/grok-build) coding agent, headless `grok -p` per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-grok-build` |
 | `claude-code` | [rle-harness-claude-code](https://github.com/AppSprout-dev/rle-harness-claude-code) | [Claude Code](https://code.claude.com) coding agent, headless `claude -p` per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-claude-code` |
@@ -65,6 +67,12 @@ python scripts/run_scenario.py crashlanded --harness raw-grok --model grok-4.6 -
   --harness-opt binary=grok --harness-opt turn_timeout_s=300 \
   --harness-opt mcp_container_reachable=true \
   --harness-opt mcp_advertise_url=http://host.docker.internal:8766/mcp
+# OpenRouter model-only baseline (not XAI / raw-grok; not an agent harness)
+OPENROUTER_API_KEY=<your-openrouter-key> \
+python scripts/run_scenario.py crashlanded --harness raw-openrouter \
+  --model google/gemini-3.8-flash --provider openai \
+  --base-url https://openrouter.ai/api/v1 \
+  --no-pause --ticks 10 --tick-interval 30
 ```
 
 Windows `.cmd` / `.bat` wrappers (such as `grok-docker.cmd`) need grok argv

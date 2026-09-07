@@ -157,7 +157,7 @@ OPENAI_API_KEY=<your-openrouter-key> python scripts/run_benchmark.py \
 ## Adding a new harness
 
 Harnesses are plugins discovered through the `rle.harnesses` entry-point group. RLE-authored
-harnesses (`baseline`, `felix`, and the `raw-grok` **model baseline**) live in this repo;
+harnesses (`baseline`, `felix`, and the `raw-grok` / `raw-openrouter` **model baselines**) live in this repo;
 a harness that wraps a third-party coding-agent *product* gets its own repo — start from
 [rle-harness-template](https://github.com/AppSprout-dev/rle-harness-template) and read
 `docs/harness-plugins.md`. Felix knobs: `docs/harness-felix.md`.
