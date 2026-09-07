@@ -30,6 +30,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from rle.agents.actions import Action, ActionPlan, resolve_endpoint
+from rle.orchestration.preflight import extract_work_priorities
 from rle.rimapi.schemas import GameState
 
 logger = logging.getLogger(__name__)
@@ -89,17 +90,8 @@ def _winner_key(ta: _TaggedAction) -> tuple[int, int, float, int]:
 
 
 def _work_priorities(params: dict[str, Any]) -> dict[str, int]:
-    """Accepted work_priority shapes, tolerant of garbage."""
-    nested = params.get("work_priorities")
-    if isinstance(nested, dict):
-        return {str(work): int(pri) for work, pri in nested.items() if isinstance(pri, int)}
-    if "work_type" in params:
-        pri = params.get("priority", 1)
-        return {str(params["work_type"]): int(pri)} if isinstance(pri, int) else {}
-    return {
-        str(work): pri for work, pri in params.items()
-        if isinstance(pri, int) and not isinstance(pri, bool)
-    }
+    """Accepted work_priority shapes; reserved DTO keys are not work types."""
+    return extract_work_priorities(params)
 
 
 def _merge_work_priority(candidates: list[_TaggedAction]) -> Action:

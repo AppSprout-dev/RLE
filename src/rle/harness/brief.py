@@ -14,7 +14,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict
 
-from rle.rimapi.api_catalog import WRITE_CATALOG
+from rle.rimapi.api_catalog import visible_write_catalog
 from rle.rimapi.schemas import GameState
 from rle.rimapi.sse_client import RimAPIEvent
 from rle.scenarios.schema import ScenarioConfig
@@ -110,7 +110,7 @@ def action_catalog() -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = [
         {"action_type": "no_action", "description": "Do nothing this tick.", "params": {}},
     ]
-    for name, raw in sorted(WRITE_CATALOG.items()):
+    for name, raw in sorted(visible_write_catalog().items()):
         entry = cast(dict[str, Any], raw)
         out.append({
             "action_type": name,

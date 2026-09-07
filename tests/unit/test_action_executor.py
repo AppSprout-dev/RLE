@@ -140,9 +140,8 @@ class TestOutcomes:
 
 
 class TestGrowingZoneIdempotency:
-    """Issue #33: agents re-issue the same growing zone every tick; repeats
-    overlap the first zone's cells and fail. The executor short-circuits
-    overlapping repeats with a clear error instead of doomed RIMAPI calls."""
+    """Overlapping growing-zone repeats are success-by-state: the farm
+    already exists, so we must not recreate or score the repeat as failure."""
 
     def _zone(self, x1: int, z1: int, x2: int, z2: int) -> Action:
         return Action(
@@ -160,18 +159,13 @@ class TestGrowingZoneIdempotency:
         assert result.executed == 1
         client.create_growing_zone.assert_awaited_once()
 
-    async def test_overlapping_repeat_is_rejected(self) -> None:
+    async def test_overlapping_repeat_is_already_satisfied(self) -> None:
         client = AsyncMock()
         executor = ActionExecutor(client)
-        # First creation succeeds.
         await executor.execute(_make_plan(self._zone(132, 137, 139, 144)))
-        # Identical re-issue next tick: overlaps, must be blocked.
         result = await executor.execute(_make_plan(self._zone(132, 137, 139, 144)))
-        assert result.failed == 1
-        assert result.executed == 0
-        assert result.outcomes[0].error is not None
-        assert "already" in result.outcomes[0].error.lower()
-        # Only the first call reached RIMAPI.
+        assert result.executed == 1
+        assert result.failed == 0
         client.create_growing_zone.assert_awaited_once()
 
     async def test_non_overlapping_zone_allowed(self) -> None:

@@ -429,7 +429,7 @@ class RLEGameLoop:
 
         # 4. Execute — unless the harness already applied its writes
         if step.execution is None:
-            exec_result = await self._executor.execute(step.plan)
+            exec_result = await self._executor.execute(step.plan, state=state)
             for outcome in exec_result.outcomes:
                 self._emit(
                     EventType.ACTION_EXEC, tick_num,

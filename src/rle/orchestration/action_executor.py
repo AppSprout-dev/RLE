@@ -13,8 +13,18 @@ from rle.agents.actions import (
     ExecutionResult,
     resolve_endpoint,
 )
+from rle.orchestration.preflight import (
+    VANILLA_WORK_TYPES,
+    growing_zone_already_covers,
+    is_already_covered_error,
+    is_quarantined_write,
+    normalize_work_priorities,
+    research_target_status,
+    resolve_tend_pair,
+)
 from rle.rimapi.api_catalog import WRITE_CATALOG
-from rle.rimapi.client import RimAPIClient, RimAPIResponseError
+from rle.rimapi.client import RimAPIClient, RimAPIConnectionError, RimAPIResponseError
+from rle.rimapi.schemas import GameState
 
 __all__ = ["NEEDS_PAWN", "ActionExecutor", "ActionOutcome", "ExecutionResult"]
 
@@ -47,31 +57,6 @@ def _extract_rimapi_error(detail: str) -> str:
     return detail
 
 
-def _normalize_work_priorities(params: dict[str, Any]) -> dict[str, int]:
-    """Accept the parameter shapes models actually emit for work_priority.
-
-    Documented shape is flat ``{"<WorkType>": <1-4>}``, but frontier models
-    also emit ``{"work_type": "Research", "priority": 2}`` and
-    ``{"work_priorities": {"Growing": 1, ...}}`` (issue #27). Passing those
-    through verbatim posted garbage like work="work_type" to RIMAPI.
-    """
-    nested = params.get("work_priorities")
-    if isinstance(nested, dict):
-        return {str(work): int(pri) for work, pri in nested.items()}
-    if "work_type" in params:
-        return {str(params["work_type"]): int(params.get("priority", 1))}
-    flat = {
-        str(work): int(pri) for work, pri in params.items()
-        if isinstance(pri, int) and not isinstance(pri, bool)
-    }
-    if not flat:
-        raise ValueError(
-            'work_priority requires {"<WorkType>": <1-4>} parameters '
-            "(e.g. {\"Growing\": 1})"
-        )
-    return flat
-
-
 class ActionExecutor:
     """Dispatches agent actions to RIMAPI write endpoints.
 
@@ -85,15 +70,15 @@ class ActionExecutor:
         # Agents perseverate — they re-issue the same growing zone every tick.
         # Each repeat targets cells already owned by the first zone, which RIMAPI
         # rejects (and historically mislabelled as "Invalid plant definition").
-        # We short-circuit overlapping repeats with an explicit error so the
-        # agent learns the zone exists instead of burning ticks on doomed calls
-        # (issue #33).
+        # Overlapping repeats are success-by-state (the farm already exists).
         self._created_growing_zones: list[tuple[int, int, int, int]] = []
         # Same guard for stockpiles: RimWorld logs one "overwriting slot group
         # square" error PER CELL when a stockpile overlaps an existing one,
         # which spams the dev log (and pops it over the game when auto-open
         # is enabled).
         self._created_stockpile_zones: list[tuple[int, int, int, int]] = []
+        self._tick_state: GameState | None = None
+        self._work_types: frozenset[str] | None = None
 
     @staticmethod
     def _rects_overlap(
@@ -103,8 +88,16 @@ class ActionExecutor:
         bx1, bz1, bx2, bz2 = b
         return not (ax2 < bx1 or ax1 > bx2 or az2 < bz1 or az1 > bz2)
 
-    async def execute(self, plan: ActionPlan) -> ExecutionResult:
-        """Execute all actions in a plan, return summary + per-action outcomes."""
+    async def execute(
+        self, plan: ActionPlan, state: GameState | None = None,
+    ) -> ExecutionResult:
+        """Execute all actions in a plan, return summary + per-action outcomes.
+
+        ``state`` is the current colony snapshot used by preflight gates
+        (research availability, living doctor/patient). Harnesses that omit
+        it keep the write path; gates that need state are skipped.
+        """
+        self._tick_state = state
         executed = 0
         failed = 0
         no_action_count = 0
@@ -158,6 +151,15 @@ class ActionExecutor:
         cid = action.target_colonist_id or ""
         params = action.parameters
 
+        if is_quarantined_write(endpoint):
+            raise ValueError(
+                f"{endpoint} is quarantined — the endpoint is missing on "
+                "this RIMAPI build. Do not advertise or call it."
+            )
+
+        if endpoint == "tend" and (not cid or cid == "0"):
+            cid = str(params.get("patient_pawn_id") or params.get("patient_id") or "")
+
         # Skip pawn-targeting actions with no valid colonist ID
         if endpoint in _NEEDS_PAWN and (not cid or cid == "0"):
             logger.info("Skipping %s: no valid colonist ID", endpoint)
@@ -180,9 +182,22 @@ class ActionExecutor:
 
     # -- Specialized handlers (parameter mapping for complex DTOs) -----------
 
+    async def _allowed_work_types(self) -> frozenset[str]:
+        if self._work_types is not None:
+            return self._work_types
+        try:
+            names = await self._client.get_work_list()
+        except (RimAPIResponseError, RimAPIConnectionError, TypeError, AttributeError):
+            names = None
+        if isinstance(names, list) and names:
+            self._work_types = frozenset(str(item) for item in names)
+        else:
+            self._work_types = VANILLA_WORK_TYPES
+        return self._work_types
+
     async def _h_work_priority(self, cid: str, params: dict[str, Any]) -> None:
         await self._client.set_work_priorities(
-            cid, _normalize_work_priorities(params),
+            cid, normalize_work_priorities(params, await self._allowed_work_types()),
         )
 
     async def _h_draft(self, cid: str, params: dict[str, Any]) -> None:
@@ -219,7 +234,8 @@ class ActionExecutor:
         await self._client.assign_bed_rest(cid, bed_building_id=params.get("bed_building_id"))
 
     async def _h_tend(self, cid: str, params: dict[str, Any]) -> None:
-        await self._client.administer_medicine(cid, doctor_id=params.get("doctor_id"))
+        doctor_id, patient_id = resolve_tend_pair(cid, params, self._tick_state)
+        await self._client.administer_medicine(patient_id, doctor_id=doctor_id)
 
     async def _h_blueprint(self, cid: str, params: dict[str, Any]) -> None:
         if "x" not in params or "z" not in params:
@@ -240,21 +256,38 @@ class ActionExecutor:
         x2 = int(params.get("x2", x1 + 5))
         z2 = int(params.get("z2", z1 + 5))
         rect = (min(x1, x2), min(z1, z2), max(x1, x2), max(z1, z2))
+        map_id = int(params.get("map_id", 0))
         if any(self._rects_overlap(rect, prev) for prev in self._created_growing_zones):
-            raise ValueError(
-                "A growing zone already covers these cells — it was created "
-                "earlier this run. Do NOT recreate it; pick a different, "
-                "non-overlapping rectangle or move on to another task."
+            # Already satisfied this run — do not recreate or score as failure.
+            return
+        if await self._growing_zone_covered_on_map(map_id, x1, z1, x2, z2):
+            self._created_growing_zones.append(rect)
+            return
+        try:
+            await self._client.create_growing_zone(
+                map_id=map_id,
+                plant_def=params.get("plant_def", "Plant_Potato"),
+                x1=x1,
+                z1=z1,
+                x2=x2,
+                z2=z2,
             )
-        await self._client.create_growing_zone(
-            map_id=int(params.get("map_id", 0)),
-            plant_def=params.get("plant_def", "Plant_Potato"),
-            x1=x1,
-            z1=z1,
-            x2=x2,
-            z2=z2,
-        )
+        except RimAPIResponseError as exc:
+            if is_already_covered_error(_extract_rimapi_error(exc.detail)):
+                self._created_growing_zones.append(rect)
+                return
+            raise
         self._created_growing_zones.append(rect)
+
+    async def _growing_zone_covered_on_map(
+        self, map_id: int, x1: int, z1: int, x2: int, z2: int,
+    ) -> bool:
+        """Ask ``POST /builder/check-zone`` whether a zone already owns these cells."""
+        try:
+            payload = await self._client.check_zone(map_id, x1, z1, x2, z2)
+        except (RimAPIResponseError, RimAPIConnectionError, AttributeError, TypeError):
+            return False
+        return growing_zone_already_covers(payload)
 
     # RimWorld's StoragePriority is semantic; models reasonably emit the
     # words. Map them instead of crashing in int() (found in the 2026-06-11
@@ -324,8 +357,24 @@ class ActionExecutor:
         )
 
     async def _h_research_target(self, cid: str, params: dict[str, Any]) -> None:
-        project = params.get("project", params.get("name", ""))
-        await self._client.set_research_target(project, force=params.get("force", False))
+        project = str(params.get("project", params.get("name", "")))
+        force = bool(params.get("force", False))
+        research = None if self._tick_state is None else self._tick_state.research
+        if research is not None and not force:
+            status = research_target_status(project, research)
+            if status == "current":
+                return
+            if status == "finished":
+                raise ValueError(
+                    f"Research project '{project}' is already finished."
+                )
+            if status == "locked":
+                raise ValueError(
+                    f"Research project '{project}' is not currently available "
+                    "(prerequisites or research bench missing). Only queue "
+                    "projects listed in research.available."
+                )
+        await self._client.set_research_target(project, force=force)
 
     async def _h_research_stop(self, cid: str, params: dict[str, Any]) -> None:
         await self._client.stop_research()

@@ -51,13 +51,19 @@ class McpSession:
     ) -> dict[str, Any]:
         """Execute one write immediately, record it, and return the outcome."""
         self.ledger.require_active()
+        endpoint = resolve_endpoint(action_type)
+        if endpoint == "tend" and not target_colonist_id:
+            target_colonist_id = str(
+                (parameters or {}).get("patient_pawn_id")
+                or (parameters or {}).get("patient_id")
+                or ""
+            ) or None
         action = Action(
             action_type=action_type,
             target_colonist_id=target_colonist_id,
             parameters=dict(parameters or {}),
             reason=reason,
         )
-        endpoint = resolve_endpoint(action_type)
         if endpoint == "no_action":
             self.ledger.record(action, None)
             return {"ok": True, "action_type": action_type, "note": "no-op recorded"}
@@ -74,6 +80,7 @@ class McpSession:
                     "error": outcome.error}
         result = await self.executor.execute(
             ActionPlan(role=self.ledger.harness_name, tick=self.ledger.game_tick, actions=[action]),
+            state=self.state,
         )
         if result.outcomes:
             outcome = result.outcomes[0]

@@ -56,6 +56,12 @@ MOCK_ROUTES: dict[str, dict[str, Any] | list[Any]] = {
         "current_project": "electricity", "progress": 0.45,
         "completed": ["stonecutting"], "available": ["electricity", "battery", "smithing"],
     },
+    "/api/v1/work-list": {
+        "work": [
+            "Firefighter", "Patient", "Doctor", "Growing", "Mining",
+            "Research", "Hauling", "Construction", "Cooking",
+        ],
+    },
     "/api/v1/incidents?map_id=0": {"incidents": []},
     "/api/v1/game/state": {
         "name": "New Hope", "wealth": 8000.0, "day": 5, "tick": 300000,

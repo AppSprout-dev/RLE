@@ -77,6 +77,7 @@ class TestToolsInMemory:
             names = {t.name for t in await server.list_tools()}
             assert {"get_brief", "get_state", "list_actions", "rimapi_read", "end_turn"} <= names
             assert {"work_priority", "draft", "blueprint", "growing_zone"} <= names
+            assert "stockpile_delete" not in names
 
             brief = _text(await server.call_tool("get_brief", {}))
             assert "## Scenario" in brief and "## Actions available" in brief
