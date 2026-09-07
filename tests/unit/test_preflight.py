@@ -157,12 +157,19 @@ class TestWorkPrioritySchema:
         pairs = extract_work_priorities({"Growing": 1, "id": 184, "priority": 2})
         assert pairs == {"Growing": 1}
 
-    def test_invalid_work_type_rejected(self) -> None:
-        with pytest.raises(ValueError, match="Unknown WorkTypeDef"):
+    def test_id_priority_only_has_no_work_type(self) -> None:
+        with pytest.raises(ValueError, match="Do not send id/priority"):
             normalize_work_priorities({"id": 184, "priority": 1})
+
+    def test_unknown_work_type_rejected(self) -> None:
+        with pytest.raises(ValueError, match="Unknown WorkTypeDef"):
+            normalize_work_priorities({"NotAJob": 1})
 
     def test_valid_work_type_normalized(self) -> None:
         assert normalize_work_priorities({"growing": 1}) == {"Growing": 1}
+
+    def test_skill_alias_maps_to_work_type(self) -> None:
+        assert normalize_work_priorities({"skill": "growing", "priority": 1}) == {"Growing": 1}
 
     def test_priority_out_of_range_rejected(self) -> None:
         with pytest.raises(ValueError, match="out of range"):
@@ -229,7 +236,8 @@ class TestResearchAvailability:
         assert result.executed == 1
         client.set_research_target.assert_awaited_once_with("Smithing", force=False)
 
-    async def test_current_project_is_already_satisfied(self) -> None:
+    async def test_current_project_is_still_queued(self) -> None:
+        """Re-targeting the current project is allowed; it is available."""
         client = AsyncMock()
         executor = ActionExecutor(client)
         result = await executor.execute(
@@ -237,7 +245,7 @@ class TestResearchAvailability:
             state=_state(),
         )
         assert result.executed == 1
-        client.set_research_target.assert_not_awaited()
+        client.set_research_target.assert_awaited_once_with("Electricity", force=False)
 
 
 # -- 4. Doctor + patient preflight -------------------------------------------

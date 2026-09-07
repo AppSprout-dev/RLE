@@ -68,6 +68,7 @@ WORK_PRIORITY_RESERVED_KEYS: frozenset[str] = frozenset({
     "target_colonist_id",
     "work",
     "work_type",
+    "skill",
     "work_priorities",
     "reason",
     "map_id",
@@ -108,8 +109,9 @@ def extract_work_priorities(params: dict[str, Any]) -> dict[str, int]:
                 continue
         return out
 
-    work_name = params.get("work_type", params.get("work"))
-    if work_name is not None and str(work_name) and str(work_name) not in WORK_PRIORITY_RESERVED_KEYS:
+    work_name = params.get("work_type", params.get("work", params.get("skill")))
+    named = work_name is not None and str(work_name)
+    if named and str(work_name) not in WORK_PRIORITY_RESERVED_KEYS:
         raw_pri = params.get("priority", 1)
         try:
             return {str(work_name): int(raw_pri)}
