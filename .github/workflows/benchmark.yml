@@ -41,10 +41,11 @@ jobs:
         with:
           python-version: "3.14"
       - uses: astral-sh/setup-uv@v4
-      - run: uv pip install -e ".[dev]" --system
+      # felix extra: default smoke harness. mcp extra: raw-grok / MCP smoke variants.
+      - run: uv pip install -e ".[dev,felix,mcp]" --system
 
       - name: Smoke test
-        run: python scripts/run_benchmark.py --dry-run --ticks 5
+        run: python scripts/run_benchmark.py --smoke-test --ticks 5
 
       # --- Docker benchmark (uncomment when self-hosted runner is configured) ---
       #
