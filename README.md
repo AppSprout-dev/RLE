@@ -37,7 +37,7 @@ python scripts/run_benchmark.py --harness list          # what is installed
 python scripts/run_benchmark.py --harness felix --harness baseline --smoke-test
 ```
 
-Writing a harness: see [docs/harness-plugins.md](docs/harness-plugins.md). Third-party harnesses (OpenCode, Grok Build, ...) live in their own `AppSprout-dev/rle-harness-*` repos and are installed with `pip`, never committed here.
+Writing a harness: see [docs/harness-plugins.md](docs/harness-plugins.md). Third-party harnesses (OpenCode, Grok Build, Claude Code, Cursor Agent, ...) live in their own `AppSprout-dev/rle-harness-*` repos and are installed with `pip`, never committed here.
 
 ## Harnesses
 
@@ -50,12 +50,16 @@ The benchmark has two axes. `--model` picks the LLM; `--harness` picks the decis
 | `raw-grok` | this repo (extra `mcp`) | **Model baseline** — stock `grok` binary, one `HeadlessCliHarness` turn per tick, `TURN_RULES` only. Not a product harness; do not compare to `felix` or external coding-agent packages as an architecture. | `uv sync --extra mcp`; `grok` on PATH |
 | `opencode` | [rle-harness-opencode](https://github.com/AppSprout-dev/rle-harness-opencode) | [OpenCode](https://opencode.ai) coding agent, one prompt per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-opencode` |
 | `grok-build` | [rle-harness-grok-build](https://github.com/AppSprout-dev/rle-harness-grok-build) | [Grok Build](https://github.com/xai-org/grok-build) coding agent, headless `grok -p` per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-grok-build` |
+| `claude-code` | [rle-harness-claude-code](https://github.com/AppSprout-dev/rle-harness-claude-code) | [Claude Code](https://code.claude.com) coding agent, headless `claude -p` per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-claude-code` |
+| `cursor-agent` | [rle-harness-cursor-agent](https://github.com/AppSprout-dev/rle-harness-cursor-agent) | [Cursor Agent](https://cursor.com/docs/cli/overview) coding agent, headless `agent -p` per tick, acting through the RLE MCP tools | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-cursor-agent` |
 | `template` | [rle-harness-template](https://github.com/AppSprout-dev/rle-harness-template) | Copy-me starting point for your own harness | `uv pip install git+https://github.com/AppSprout-dev/rle-harness-template` |
 
 ```bash
 python scripts/run_benchmark.py --harness list                                  # installed plugins + availability
 python scripts/run_benchmark.py --harness felix --harness opencode --model openai/gpt-4o --runs 4
 python scripts/run_scenario.py crashlanded --harness grok-build --model grok-4.6 --tick-interval 30
+python scripts/run_scenario.py crashlanded --harness claude-code --model sonnet --tick-interval 30
+python scripts/run_scenario.py crashlanded --harness cursor-agent --model composer-2 --tick-interval 30
 python scripts/run_scenario.py crashlanded --harness felix --harness-opt no_think=true --harness-opt parallel=false
 python scripts/run_scenario.py crashlanded --harness raw-grok --model grok-4.6 --seed 42 --ticks 10 \
   --harness-opt binary=grok --harness-opt turn_timeout_s=300 \
@@ -305,6 +309,8 @@ CI runs the suite twice — with and without the `felix` extra — plus a contra
 | [rle-harness-template](https://github.com/AppSprout-dev/rle-harness-template) | Template for a harness plugin | Start here to add a harness; RLE CI installs it as the plugin-API contract test |
 | [rle-harness-opencode](https://github.com/AppSprout-dev/rle-harness-opencode) | OpenCode as a harness | `opencode serve` + HTTP API over the RLE MCP server |
 | [rle-harness-grok-build](https://github.com/AppSprout-dev/rle-harness-grok-build) | Grok Build as a harness | headless `grok -p`, session resumed per tick, over the RLE MCP server |
+| [rle-harness-claude-code](https://github.com/AppSprout-dev/rle-harness-claude-code) | Claude Code as a harness | headless `claude -p`, session resumed per tick, over the RLE MCP server |
+| [rle-harness-cursor-agent](https://github.com/AppSprout-dev/rle-harness-cursor-agent) | Cursor Agent as a harness | headless `agent -p`, session resumed per tick, over the RLE MCP server |
 | [felix-agent-sdk](https://github.com/AppSprout-dev/felix-agent-sdk) | Agent framework behind the `felix` harness (LLMAgent, CentralPost, HelixGeometry, providers) | optional extra `felix` |
 | [RIMAPI](https://github.com/IlyaChichkov/RIMAPI) | C# RimWorld mod (REST API + SSE) | We contribute upstream. [Our fork](https://github.com/AppSprout-dev/RIMAPI) has `rle-testing` branch. |
 | [rimapi-dashboard](https://github.com/AppSprout-dev/rimapi-dashboard) | React dashboard with RLE widgets | Runs on :3000, reads tick data from :9000 (`latest_tick.json` now carries `harness` + `extras`) |
