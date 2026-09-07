@@ -888,6 +888,18 @@ class RimAPIClient:
         data = await self._get("/api/v1/research/summary")
         return ResearchData.model_validate(self._adapt_research(data))
 
+    async def get_work_list(self) -> list[str]:
+        """WorkTypeDef defNames from ``GET /api/v1/work-list``."""
+        data = await self._get("/api/v1/work-list")
+        if isinstance(data, dict):
+            raw = data.get("work", data.get("Work", []))
+            if isinstance(raw, list):
+                return [str(item) for item in raw]
+            return []
+        if isinstance(data, list):
+            return [str(item) for item in data]
+        return []
+
     async def get_threats(self) -> list[ThreatData]:
         try:
             data = await self._get("/api/v1/incidents?map_id=0")
@@ -1207,6 +1219,24 @@ class RimAPIClient:
             json={
                 "map_id": map_id,
                 "plant_def": self._normalize_plant_def(plant_def),
+                "point_a": {"x": x1, "y": 0, "z": z1},
+                "point_b": {"x": x2, "y": 0, "z": z2},
+            },
+        )
+
+    async def check_zone(
+        self,
+        map_id: int,
+        x1: int,
+        z1: int,
+        x2: int,
+        z2: int,
+    ) -> Any:
+        """``POST /api/v1/builder/check-zone`` — cells free vs already zoned."""
+        return await self._post(
+            "/api/v1/builder/check-zone",
+            json={
+                "map_id": map_id,
                 "point_a": {"x": x1, "y": 0, "z": z1},
                 "point_b": {"x": x2, "y": 0, "z": z2},
             },

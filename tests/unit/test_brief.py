@@ -65,6 +65,10 @@ class TestActionCatalog:
         assert "no_action" in names
         assert {"work_priority", "draft", "blueprint", "growing_zone"} <= names
 
+    def test_quarantined_stockpile_delete_hidden(self) -> None:
+        names = {a["action_type"] for a in action_catalog()}
+        assert "stockpile_delete" not in names
+
 
 class TestBrief:
     def test_brief_carries_goals_state_events_and_actions(self) -> None:

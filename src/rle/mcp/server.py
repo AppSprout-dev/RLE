@@ -1,6 +1,6 @@
 """RimAPI as an MCP tool server (requires the ``mcp`` extra).
 
-One tool per ``WRITE_CATALOG`` entry (executed immediately through
+One tool per visible ``WRITE_CATALOG`` entry (executed immediately through
 ``ActionExecutor`` and recorded in the tick ledger), a generic read tool over
 ``READ_CATALOG``, the harness-neutral brief, and ``end_turn``. Any MCP-capable
 coding agent can attach and play; the harness packages that do so live in
@@ -15,7 +15,7 @@ from typing import Any, cast
 from mcp.server.mcpserver import MCPServer
 
 from rle.mcp.session import McpSession
-from rle.rimapi.api_catalog import READ_CATALOG, WRITE_CATALOG
+from rle.rimapi.api_catalog import READ_CATALOG, visible_write_catalog
 
 SERVER_NAME = "rle"
 INSTRUCTIONS = (
@@ -80,7 +80,7 @@ def build_server(session: McpSession) -> MCPServer:
         n = len(session.ledger.actions)
         return f"Turn ended after {n} action(s)."
 
-    for name, raw in sorted(WRITE_CATALOG.items()):
+    for name, raw in sorted(visible_write_catalog().items()):
         entry = cast(dict[str, Any], raw)
         server.add_tool(
             _make_action_tool(session, name),

@@ -10,6 +10,8 @@ pause/unpause/save/load.
 
 from __future__ import annotations
 
+from typing import Any
+
 # -- GAME CONTROL (used by game loop, not agents) --------------------------
 
 GAME_CONTROL = {
@@ -291,6 +293,24 @@ READ_CATALOG = {
     },
 }
 
+# Writes that exist on some RIMAPI builds (upstream develop) but are
+# missing from the deployed Workshop / rle-testing DLL. Advertising them
+# makes models call a 404; those failures get scored as model noise.
+# Hide from briefs/MCP and refuse at dispatch until the endpoint is live.
+QUARANTINED_WRITES: frozenset[str] = frozenset({
+    "stockpile_delete",
+})
+
+
+def visible_write_catalog() -> dict[str, Any]:
+    """WRITE_CATALOG minus quarantined endpoints — what agents may see."""
+    return {
+        name: entry
+        for name, entry in WRITE_CATALOG.items()
+        if name not in QUARANTINED_WRITES
+    }
+
+
 # -- WRITE ENDPOINTS (agents propose these as actions) ----------------------
 
 WRITE_CATALOG = {
@@ -298,11 +318,14 @@ WRITE_CATALOG = {
     "work_priority": {
         "method": "POST",
         "path": "/api/v1/colonist/work-priority",
-        "description": "Set a colonist's priority for a work type (1=highest, 4=lowest)",
+        "description": (
+            "Set a colonist's WorkTypeDef priorities. "
+            "target_colonist_id is the pawn — do NOT send id/priority as fields. "
+            "Work type names come from GET /api/v1/work-list "
+            "(Growing, Mining, Research, …). 1=highest, 4=lowest, 0=disabled."
+        ),
         "params": {
-            "id": "int (colonist ID)",
-            "work": "string (e.g. Growing, Mining)",
-            "priority": "int (1-4)",
+            "<WorkType>": "int 0-4 (WorkTypeDef defName, e.g. Growing: 1, Mining: 2)",
         },
     },
     "draft": {
@@ -354,8 +377,14 @@ WRITE_CATALOG = {
     "tend": {
         "method": "POST",
         "path": "/api/v1/pawn/medical/tend",
-        "description": "Have a doctor tend to a patient",
-        "params": {"patient_pawn_id": "int", "doctor_pawn_id": "int? (optional)"},
+        "description": (
+            "Have a living doctor tend a living patient. Both IDs are "
+            "required and must be distinct living colonists."
+        ),
+        "params": {
+            "patient_pawn_id": "int (or target_colonist_id)",
+            "doctor_pawn_id": "int (required living doctor)",
+        },
     },
     # Construction / Zones
     "blueprint": {
@@ -384,7 +413,11 @@ WRITE_CATALOG = {
     "growing_zone": {
         "method": "POST",
         "path": "/api/v1/map/zone/growing",
-        "description": "Create a growing zone for food production",
+        "description": (
+            "Create a growing zone for food production. If a growing zone "
+            "already covers the cells (check-zone / engine), the write is "
+            "treated as already satisfied — do not recreate."
+        ),
         "params": {
             "map_id": "int",
             "plant_def": "string (e.g. Plant_Potato)",
@@ -414,7 +447,10 @@ WRITE_CATALOG = {
     "stockpile_delete": {
         "method": "DELETE",
         "path": "/api/v1/map/zone/stockpile/delete",
-        "description": "Delete a stockpile zone",
+        "description": (
+            "Delete a stockpile zone. Quarantined: missing on the deployed "
+            "RIMAPI DLL — do not advertise or call."
+        ),
         "params": {"zone_id": "int"},
     },
     "designate_area": {
@@ -450,8 +486,12 @@ WRITE_CATALOG = {
     "research_target": {
         "method": "POST",
         "path": "/api/v1/research/target",
-        "description": "Set the current research target",
-        "params": {"name": "string (defName)", "force": "bool? (bypass prerequisites)"},
+        "description": (
+            "Set the current research target. Only queue a project that is "
+            "available (prerequisites and research bench). Locked or "
+            "unfinished-prereq projects will be rejected."
+        ),
+        "params": {"project": "string (defName from research.available)"},
     },
     "research_stop": {
         "method": "POST",

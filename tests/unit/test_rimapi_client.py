@@ -47,6 +47,10 @@ _WRITE_ROUTES: dict[str, dict] = {
     "/api/v1/pawn/job": {"success": True},
     "/api/v1/map/building/power?buildingId=999&powerOn=false": {"success": True},
     "/api/v1/map/zone/growing": {"success": True},
+    "/api/v1/builder/check-zone": {
+        "can_build": True,
+        "issues": {"terrain": [], "ores": [], "buildings": [], "zones": []},
+    },
     "/api/v1/pawn/medical/bed-rest": {"success": True},
     "/api/v1/pawn/medical/tend": {"success": True},
     "/api/v1/jobs/make/equip": {"success": True},
@@ -189,6 +193,9 @@ def all_routes(
         ],
         "/api/v1/map/buildings?map_id=0": [],
         "/api/v1/research/summary": sample_research_dict,
+        "/api/v1/work-list": {
+            "work": ["Growing", "Mining", "Research", "Hauling", "Construction"],
+        },
         "/api/v1/incidents?map_id=0": {"incidents": [sample_threat_dict]},
         "/api/v1/game/state": sample_colony_dict,
         "/api/v1/map/weather?map_id=0": sample_weather_dict,
@@ -439,6 +446,16 @@ class TestForkEndpoints:
             0, "PlantPotato", x1=115, z1=130, x2=120, z2=135,
         )
         assert result["success"] is True
+
+    async def test_check_zone(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.check_zone(0, 50, 50, 55, 55)
+        assert result["can_build"] is True
+        assert result["issues"]["zones"] == []
+
+    async def test_get_work_list(self, mock_client: RimAPIClient) -> None:
+        names = await mock_client.get_work_list()
+        assert "Growing" in names
+        assert "Research" in names
 
     async def test_assign_bed_rest(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.assign_bed_rest("12345")

@@ -513,6 +513,19 @@ class TestComplementaryPawnWrites:
         # Growing: RM wins (role_priority 3 vs 5). Construction/Hauling kept.
         assert work[0].parameters == {"Growing": 1, "Hauling": 2, "Construction": 1}
 
+    def test_work_priority_dto_id_is_not_a_work_type(self) -> None:
+        resolver = ActionResolver()
+        plans = [
+            _plan("resource_manager", [
+                Action(action_type="work_priority",
+                       target_colonist_id="col_01",
+                       parameters={"id": 184, "work": "Growing", "priority": 1}),
+            ]),
+        ]
+        result, _stats = resolver.resolve(plans, _make_state())
+        work = [a for a in result.actions if a.action_type == "work_priority"]
+        assert work[0].parameters == {"Growing": 1}
+
     def test_same_type_last_writer_on_equal_priority(self) -> None:
         resolver = ActionResolver()
         plans = [
