@@ -11,8 +11,8 @@ import pytest
 
 from rle.tracking import metadata as metadata_mod
 from rle.tracking.metadata import (
-    SCORING_VERSION,
     _RIMAPI_DLL_RELATIVE,
+    SCORING_VERSION,
     collect_metadata,
     file_sha256,
 )
@@ -94,7 +94,7 @@ def _write_compiled_dll(fork_root: Path, payload: bytes) -> Path:
     return dll
 
 
-def _init_git_repo(path: Path) -> str:
+def _init_git_repo(path: Path, marker: str = "ok") -> str:
     path.mkdir(parents=True, exist_ok=True)
     env = {
         **os.environ,
@@ -119,8 +119,8 @@ def _init_git_repo(path: Path) -> str:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    marker = path / "marker.txt"
-    marker.write_text("ok\n", encoding="utf-8")
+    marker_file = path / "marker.txt"
+    marker_file.write_text(f"{marker}\n", encoding="utf-8")
     subprocess.run(
         ["git", *git_ident, "add", "marker.txt"],
         cwd=path,
@@ -240,8 +240,8 @@ def test_fork_commit_honors_env_over_sibling(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tmp_path = isolated_rimapi_env
-    env_commit = _init_git_repo(tmp_path / "fork-env")
-    sibling_commit = _init_git_repo(tmp_path / "Projects" / "RIMAPI")
+    env_commit = _init_git_repo(tmp_path / "fork-env", marker="env-fork")
+    sibling_commit = _init_git_repo(tmp_path / "Projects" / "RIMAPI", marker="sibling-fork")
     assert env_commit != sibling_commit
     monkeypatch.setenv("RIMAPI_FORK_PATH", str(tmp_path / "fork-env"))
     assert metadata_mod._rimapi_fork_commit() == env_commit
