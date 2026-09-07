@@ -535,15 +535,18 @@ async def main(args: argparse.Namespace) -> None:  # noqa: PLR0912, PLR0915
         # Reconcile estimates against OpenRouter's billed ground truth
         # (token-count estimates diverged up to 4x on the v0.3.0 spread).
         billed_report = None
-        effective_base_url = config.provider_base_url or ""
         openai_key = os.environ.get("OPENAI_API_KEY", "")
         generation_ids = cost_tracker.generation_ids
-        if "openrouter.ai" in effective_base_url and openai_key and generation_ids:
+        # Provider-truth: generation IDs + key are enough. CLI/ACP harnesses
+        # often report localhost as base_url while still billing through OpenRouter.
+        if openai_key and generation_ids:
             print(
                 f"\nReconciling billed cost for {len(generation_ids)} "
                 "generations against OpenRouter...",
             )
             billed_report = await fetch_billed_costs(generation_ids, openai_key)
+            if billed_report is not None:
+                cost_tracker.apply_billed(billed_report.billed_cost_usd)
 
         clean_results = [r for r in results if not r.get("harness_failed")]
         metadata = collect_metadata(random_seed=args.seed)

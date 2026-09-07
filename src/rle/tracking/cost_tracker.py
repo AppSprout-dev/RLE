@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from enum import Enum
+from typing import Any
 
 import httpx
 from pydantic import BaseModel, ConfigDict
@@ -13,6 +15,110 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
 OPENROUTER_GENERATION_URL = "https://openrouter.ai/api/v1/generation"
+
+# Gateway prefixes that wrap an OpenRouter slug (``openrouter/x-ai/…``).
+# Vendor slugs themselves (``openai/``, ``x-ai/``, ``anthropic/``) are left intact.
+_PRICING_GATEWAY_PREFIXES = (
+    "openrouter/",
+    "openrouter.ai/",
+)
+
+
+class CostSource(str, Enum):
+    """Where the authoritative USD figure on a snapshot came from.
+
+    ``billed`` — OpenRouter generation API (or extras marked billed).
+    ``estimated`` — token-count × catalog/override price.
+    ``console`` — provider-reported extras.cost_usd (ACP / coding-agent consoles).
+    ``unknown`` — no trustworthy figure (failed lookup, localhost-only, $0 default).
+    Unknown $0 must never be plotted as a Pareto point.
+    """
+
+    BILLED = "billed"
+    ESTIMATED = "estimated"
+    CONSOLE = "console"
+    UNKNOWN = "unknown"
+
+
+PARETO_COST_SOURCES: frozenset[CostSource] = frozenset(
+    {CostSource.BILLED, CostSource.ESTIMATED, CostSource.CONSOLE},
+)
+
+
+def normalize_pricing_slug(model: str) -> str:
+    """Strip gateway prefixes before OpenRouter ``/models`` lookup.
+
+    Harnesses may report ``openrouter/x-ai/grok-4.6``; the catalog id is
+    ``x-ai/grok-4.6``. Vendor prefixes that *are* the slug (``openai/``,
+    ``x-ai/``) are not stripped.
+    """
+    slug = model.strip()
+    lowered = slug.lower()
+    for prefix in _PRICING_GATEWAY_PREFIXES:
+        if lowered.startswith(prefix):
+            return slug[len(prefix):]
+    return slug
+
+
+def is_pareto_cost_source(source: CostSource | str | None) -> bool:
+    """True when ``source`` is trustworthy enough to plot on a cost Pareto."""
+    if source is None:
+        return False
+    if isinstance(source, CostSource):
+        return source in PARETO_COST_SOURCES
+    try:
+        return CostSource(source) in PARETO_COST_SOURCES
+    except ValueError:
+        return False
+
+
+def infer_cost_source(
+    snapshot: dict[str, Any],
+    billed: dict[str, Any] | None = None,
+) -> CostSource:
+    """Resolve ``cost_source`` from a snapshot plus optional billed_cost block.
+
+    Older summaries lack ``cost_source``: billed_cost → billed; a known
+    pricing_source or a positive estimate → estimated; else unknown.
+    """
+    raw = snapshot.get("cost_source")
+    if raw in {s.value for s in CostSource}:
+        return CostSource(str(raw))
+    if billed or snapshot.get("billed_cost_usd") is not None:
+        return CostSource.BILLED
+    if snapshot.get("console_cost_usd") is not None:
+        return CostSource.CONSOLE
+    if snapshot.get("pricing_source") in ("openrouter_api", "override"):
+        return CostSource.ESTIMATED
+    if float(snapshot.get("estimated_cost_usd") or 0) > 0:
+        return CostSource.ESTIMATED
+    return CostSource.UNKNOWN
+
+
+def authoritative_cost_usd(
+    snapshot: dict[str, Any],
+    billed: dict[str, Any] | None = None,
+) -> float | None:
+    """USD to plot / export, or ``None`` when the source is unknown.
+
+    Billed and console amounts are preferred over the token-count estimate.
+    Estimated is returned only when that is the declared source. Never
+    substitutes unknown $0.
+    """
+    source = infer_cost_source(snapshot, billed)
+    if source == CostSource.BILLED:
+        if billed and billed.get("billed_cost_usd") is not None:
+            return float(billed["billed_cost_usd"])
+        if snapshot.get("billed_cost_usd") is not None:
+            return float(snapshot["billed_cost_usd"])
+        return None
+    if source == CostSource.CONSOLE:
+        if snapshot.get("console_cost_usd") is not None:
+            return float(snapshot["console_cost_usd"])
+        return None
+    if source == CostSource.ESTIMATED:
+        return float(snapshot.get("estimated_cost_usd") or 0.0)
+    return None
 
 
 class TokenUsage(BaseModel):
@@ -44,7 +150,13 @@ class TokenUsage(BaseModel):
 
 
 class CostSnapshot(BaseModel):
-    """Cumulative cost at a point in time."""
+    """Cumulative cost at a point in time.
+
+    ``estimated_cost_usd`` is always the token-count × price figure.
+    ``billed_cost_usd`` / ``console_cost_usd`` persist provider-truth
+    separately and are never overwritten by a later estimate.
+    ``cost_source`` says which figure analyze/export may plot.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -63,6 +175,9 @@ class CostSnapshot(BaseModel):
     """One of: "openrouter_api", "override", "unknown". "unknown" indicates
     the live fetch failed or the model wasn't in /models — in that case the
     estimated_cost_usd will be $0 and should be ignored."""
+    cost_source: CostSource = CostSource.UNKNOWN
+    billed_cost_usd: float | None = None
+    console_cost_usd: float | None = None
 
 
 class BilledCostReport(BaseModel):
@@ -104,6 +219,9 @@ class CostTracker:
         self._num_calls = 0
         self._start_time = time.monotonic()
         self._generation_ids: list[str] = []
+        # Provider-truth totals. Never overwritten by the token-count estimate.
+        self._billed_cost_usd: float | None = None
+        self._console_cost_usd: float | None = None
 
     def record_generation_id(self, generation_id: str | None) -> None:
         """Remember a provider generation ID for billed-cost reconciliation.
@@ -141,6 +259,44 @@ class CostTracker:
             )
         )
 
+    def estimate_call_cost(
+        self,
+        prompt_tokens: int,
+        completion_tokens: int,
+        reasoning_tokens: int = 0,
+    ) -> float:
+        """Token-count × price for one call (0.0 when prices are unknown)."""
+        return round(
+            prompt_tokens * self._prompt_price
+            + (completion_tokens + reasoning_tokens) * self._completion_price,
+            6,
+        )
+
+    def record_provider_cost(
+        self,
+        cost_usd: float,
+        *,
+        source: CostSource = CostSource.CONSOLE,
+        count_call: bool = False,
+    ) -> None:
+        """Accumulate a provider-reported USD charge (extras.cost_usd).
+
+        Billed and console totals are stored separately from the token-count
+        estimate and are never replaced by it. ``count_call`` increments
+        ``num_calls`` for cost-only turns that recorded no tokens.
+        """
+        amount = float(cost_usd)
+        if source == CostSource.BILLED:
+            self._billed_cost_usd = (self._billed_cost_usd or 0.0) + amount
+        else:
+            self._console_cost_usd = (self._console_cost_usd or 0.0) + amount
+        if count_call:
+            self._num_calls += 1
+
+    def apply_billed(self, billed_usd: float) -> None:
+        """Attach OpenRouter billed spend without touching the estimate."""
+        self._billed_cost_usd = float(billed_usd)
+
     def snapshot(self) -> CostSnapshot:
         """Current cumulative cost.
 
@@ -153,6 +309,12 @@ class CostTracker:
             self._total_prompt * self._prompt_price
             + (self._total_completion + self._total_reasoning) * self._completion_price
         )
+        billed = (
+            round(self._billed_cost_usd, 6) if self._billed_cost_usd is not None else None
+        )
+        console = (
+            round(self._console_cost_usd, 6) if self._console_cost_usd is not None else None
+        )
         return CostSnapshot(
             total_prompt_tokens=self._total_prompt,
             total_completion_tokens=self._total_completion,
@@ -164,7 +326,22 @@ class CostTracker:
             prompt_price_per_token=self._prompt_price,
             completion_price_per_token=self._completion_price,
             pricing_source=self._pricing_source,
+            cost_source=self._resolve_cost_source(round(cost, 6)),
+            billed_cost_usd=billed,
+            console_cost_usd=console,
         )
+
+    def _resolve_cost_source(self, estimated: float) -> CostSource:
+        """Billed wins, then console, then a trustworthy estimate, else unknown."""
+        if self._billed_cost_usd is not None:
+            return CostSource.BILLED
+        if self._console_cost_usd is not None:
+            return CostSource.CONSOLE
+        if self._pricing_source in ("openrouter_api", "override") and (
+            self._prompt_price > 0 or self._completion_price > 0 or estimated > 0
+        ):
+            return CostSource.ESTIMATED
+        return CostSource.UNKNOWN
 
 
 async def fetch_pricing(model: str, timeout: float = 10.0) -> tuple[float, float]:
@@ -177,14 +354,19 @@ async def fetch_pricing(model: str, timeout: float = 10.0) -> tuple[float, float
     The API returns pricing like:
     {"pricing": {"prompt": "0.000005", "completion": "0.000025"}}
     These are USD per token (strings).
+
+    ``model`` is normalized (``openrouter/`` gateway prefix stripped) before
+    matching catalog ids.
     """
+    wanted = {model, normalize_pricing_slug(model)}
     try:
         async with httpx.AsyncClient(timeout=timeout) as client:
             resp = await client.get(OPENROUTER_MODELS_URL)
             resp.raise_for_status()
             data = resp.json()
             for m in data.get("data", []):
-                if m.get("id") == model:
+                catalog_id = m.get("id")
+                if catalog_id in wanted or normalize_pricing_slug(str(catalog_id or "")) in wanted:
                     pricing = m.get("pricing", {})
                     prompt = float(pricing.get("prompt", "0"))
                     completion = float(pricing.get("completion", "0"))
@@ -211,12 +393,13 @@ async def create_cost_tracker(
     The actual prices used (and their source) are logged at INFO level so
     operators can spot stale or zero pricing without parsing the run summary.
     """
+    slug = normalize_pricing_slug(model)
     if prompt_price_override is not None and completion_price_override is not None:
         prompt_price = prompt_price_override
         completion_price = completion_price_override
         source = "override"
     else:
-        prompt_price, completion_price = await fetch_pricing(model)
+        prompt_price, completion_price = await fetch_pricing(slug)
         source = (
             "openrouter_api"
             if (prompt_price > 0 or completion_price > 0)
@@ -224,21 +407,23 @@ async def create_cost_tracker(
         )
         if source == "unknown":
             logger.warning(
-                "Cost tracker for %r resolved to $0/token — estimated_cost "
-                "will be $0. Pass --prompt-price-per-mtok / "
+                "Cost tracker for %r (slug %r) resolved to $0/token — "
+                "estimated_cost will be $0. Pass --prompt-price-per-mtok / "
                 "--completion-price-per-mtok to override.",
                 model,
+                slug,
             )
         else:
             logger.info(
-                "Cost tracker for %r: prompt=$%.2f/MTok completion=$%.2f/MTok "
-                "(source=%s)",
+                "Cost tracker for %r (slug %r): prompt=$%.2f/MTok "
+                "completion=$%.2f/MTok (source=%s)",
                 model,
+                slug,
                 prompt_price * 1_000_000,
                 completion_price * 1_000_000,
                 source,
             )
-    return CostTracker(model, prompt_price, completion_price, pricing_source=source)
+    return CostTracker(slug, prompt_price, completion_price, pricing_source=source)
 
 
 async def fetch_billed_costs(
