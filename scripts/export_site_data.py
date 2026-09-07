@@ -22,6 +22,8 @@ import sys
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
+from rle.tracking.cost_tracker import is_pareto_cost_source
+
 # Display name / family / family swatch per model slug, mirroring the palette
 # in AppSprout-Site client/src/rle/data.ts. Unknown slugs fall back to a
 # derived family + neutral color with a warning, so a new model never blocks
@@ -42,6 +44,32 @@ MODEL_REGISTRY: dict[str, tuple[str, str, str]] = {
     "unsloth/nvidia-nemotron-3-nano-4b": ("Nemotron 3 Nano 4B", "NVIDIA", "#76B900"),
 }
 FALLBACK_COLOR = "#B7AC8B"
+
+# Optional published-pack backfill (Site may apply later). Not live-metered
+# here and not fetched from any API — values from the n1-final pack review:
+# CLI coding-agent harness estimated $1.594858 from 796917 tokens; Felix keep
+# billed $0.857296; ACP console ~$7; raw = unknown / omit from cost Pareto.
+PACK_COST_BACKFILL: dict[str, dict[str, object]] = {
+    "cli-agent": {
+        "cost_usd": 1.594858,
+        "cost_source": "estimated",
+        "note": "796917 tokens; pricing slug was openrouter/x-ai/grok-4.6",
+    },
+    "felix": {
+        "cost_usd": 0.857296,
+        "cost_source": "billed",
+    },
+    "acp": {
+        "cost_usd": 7.0,
+        "cost_source": "console",
+        "note": "n1-final console ~$7",
+    },
+    "raw-grok": {
+        "cost_usd": None,
+        "cost_source": "unknown",
+        "note": "omit from cost Pareto",
+    },
+}
 
 GITHUB_URL = "https://github.com/AppSprout-dev/RLE"
 GITHUB_REPO = "AppSprout-dev/RLE"
@@ -69,11 +97,30 @@ def registry_entry(slug: str) -> tuple[str, str, str]:
     return slug, family, FALLBACK_COLOR
 
 
+def _row_cost_source(row: dict) -> str:
+    raw = row.get("cost_source")
+    return str(raw) if raw else "unknown"
+
+
 def build_model(row: dict) -> dict:
     slug = row["model"]
     display, family, color = registry_entry(slug)
-    real = row.get("real_cost_usd")
-    cost = real if real is not None else row["est_cost_usd"]
+    source = _row_cost_source(row)
+    eligible = bool(row.get("pareto_eligible", is_pareto_cost_source(source)))
+    # Prefer the analyze-spread authoritative figure; never fall back to
+    # unknown $0 (that used to land CLI/ACP/raw rows on the Site Pareto).
+    display_cost = row.get("display_cost_usd")
+    if display_cost is None and eligible:
+        real = row.get("real_cost_usd")
+        console = row.get("console_cost_usd")
+        if source == "billed" and real is not None:
+            display_cost = real
+        elif source == "console" and console is not None:
+            display_cost = console
+        elif source == "estimated":
+            display_cost = row.get("est_cost_usd")
+    if not eligible:
+        display_cost = None
     return {
         "slug": slug,
         "key": row["name"],
@@ -89,13 +136,24 @@ def build_model(row: dict) -> dict:
         "exArtifactSuccess": rnd(row["ex_artifact_success"], 2),
         "avgLatencyS": rnd(row["avg_latency_s"], 1),
         "wallMin": rnd(row["wall_min"], 1),
-        "costUsd": rnd(cost, 2),
-        "costEstimated": real is None,
+        "costUsd": rnd(display_cost, 2) if display_cost is not None else None,
+        "costEstimated": source == "estimated",
+        "costSource": source,
+        "paretoEligible": eligible and display_cost is not None,
     }
 
 
 def build_meta(board: dict, rows: list[dict], args: argparse.Namespace) -> dict:
-    metered = [r["real_cost_usd"] for r in board["rows"] if r.get("real_cost_usd") is not None]
+    metered: list[float] = []
+    for r in board["rows"]:
+        source = _row_cost_source(r)
+        if source not in ("billed", "console"):
+            continue
+        amount = r.get("real_cost_usd") if source == "billed" else r.get("console_cost_usd")
+        if amount is None:
+            amount = r.get("display_cost_usd")
+        if amount is not None:
+            metered.append(float(amount))
     ticks = max((len(r.get("trajectory", [])) for r in board["rows"]), default=0)
     return {
         "scenario": args.scenario,
@@ -127,8 +185,8 @@ def emit_ts(meta: dict, models: list[dict], spread_dir: Path) -> str:
         f"  ticks: {meta['ticks']},",
         f"  nRuns: {meta['nRuns']},",
         f'  date: "{meta["date"]}",',
-        "  // OpenRouter spend for the metered models; subscription-billed models",
-        "  // (costEstimated: true) are not included.",
+        "  // Billed + console spend; estimated/unknown rows are not included.",
+        "  // Plot Pareto only when costSource is billed|estimated|console.",
         f"  totalSpendUsd: {fmt(meta['totalSpendUsd'], 2)},",
         f"  baselineMeanTteDays: {meta['baselineMeanTteDays']},",
         f'  githubUrl: "{meta["githubUrl"]}",',
@@ -151,8 +209,10 @@ def emit_ts(meta: dict, models: list[dict], spread_dir: Path) -> str:
             f"    endDay: {m['endDay']}, rawActionSuccess: {fmt(m['rawActionSuccess'], 2)},"
             f" exArtifactSuccess: {fmt(m['exArtifactSuccess'], 2)},"
             f" avgLatencyS: {fmt(m['avgLatencyS'], 1)}, wallMin: {fmt(m['wallMin'], 1)},",
-            f"    costUsd: {fmt(m['costUsd'], 2)},"
-            f" costEstimated: {'true' if m['costEstimated'] else 'false'},",
+            f"    costUsd: {fmt(m['costUsd'], 2) if m['costUsd'] is not None else 'null'},"
+            f" costEstimated: {'true' if m['costEstimated'] else 'false'},"
+            f" costSource: \"{m['costSource']}\","
+            f" paretoEligible: {'true' if m['paretoEligible'] else 'false'},",
             "  },",
         ]
     lines += ["];", ""]
@@ -185,7 +245,10 @@ def main() -> None:
 
     json_path = out / "site_data.json"
     json_path.write_text(
-        json.dumps({"meta": meta, "models": models}, indent=2) + "\n",
+        json.dumps(
+            {"meta": meta, "models": models, "costBackfill": PACK_COST_BACKFILL},
+            indent=2,
+        ) + "\n",
         encoding="utf-8")
 
     print(f"Wrote {ts_path}")

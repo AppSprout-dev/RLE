@@ -77,8 +77,22 @@ def build_dataset_card(board: dict[str, Any], date: str) -> str:
         "|---|---------------|------|-------|-------------|--------------|-----------|------|",
     ]
     for i, r in enumerate(rows, 1):
-        real = r.get("real_cost_usd")
-        cost = f"${real:.2f}" if real is not None else f"~${r.get('est_cost_usd', 0):.2f}"
+        source = r.get("cost_source")
+        if source == "unknown" or (
+            source is None and r.get("real_cost_usd") is None
+            and not r.get("est_cost_usd")
+        ):
+            cost = "—"
+        elif source == "billed" or r.get("real_cost_usd") is not None:
+            amount = r.get("real_cost_usd")
+            if amount is None:
+                amount = r.get("display_cost_usd") or 0
+            cost = f"${amount:.2f}"
+        elif source == "console":
+            amount = r.get("console_cost_usd", r.get("display_cost_usd") or 0)
+            cost = f"${amount:.2f}"
+        else:
+            cost = f"~${r.get('est_cost_usd', 0):.2f}"
         lines.append(
             f"| {i} | {_row_label(r)} | {r['mean_composite']:.3f} "
             f"| {r['final_composite']:.3f} | {r['vs_baseline_mean_delta']:+.3f} "

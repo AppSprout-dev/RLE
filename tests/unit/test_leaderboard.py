@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from rle.tracking.leaderboard import Leaderboard, LeaderboardEntry
 
 
@@ -130,6 +132,35 @@ class TestParetoFrontier:
     def test_empty(self) -> None:
         lb = Leaderboard()
         assert lb.pareto_frontier([]) == []
+
+    def test_unknown_zero_is_not_a_pareto_point(self) -> None:
+        entries = [
+            LeaderboardEntry(
+                model="raw", composite_score=0.9, total_cost_usd=0.0,
+                cost_source="unknown",
+            ),
+            LeaderboardEntry(
+                model="felix", composite_score=0.8, total_cost_usd=0.86,
+                cost_source="billed",
+            ),
+        ]
+        frontier = Leaderboard().pareto_frontier(entries)
+        assert [e.model for e in frontier] == ["felix"]
+
+    def test_from_history_prefers_billed_and_tags_source(self) -> None:
+        run = {
+            **_history_entry("m", [_scenario("S1", 0.5)], cost_usd=3.5, tokens=10),
+        }
+        run["cost_snapshot"] = {
+            "estimated_cost_usd": 3.5,
+            "billed_cost_usd": 0.8,
+            "cost_source": "billed",
+            "total_tokens": 10,
+            "wall_time_s": 10.0,
+        }
+        entry = Leaderboard().from_history([run])[0]
+        assert entry.total_cost_usd == pytest.approx(0.8)
+        assert entry.cost_source == "billed"
 
 
 class TestHarnessKeys:

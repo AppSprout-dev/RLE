@@ -12,11 +12,16 @@ import pytest
 from rle.tracking.cost_tracker import (
     BilledCostReport,
     CostSnapshot,
+    CostSource,
     CostTracker,
     TokenUsage,
+    authoritative_cost_usd,
     create_cost_tracker,
     fetch_billed_costs,
     fetch_pricing,
+    infer_cost_source,
+    is_pareto_cost_source,
+    normalize_pricing_slug,
 )
 
 # ------------------------------------------------------------------
@@ -389,6 +394,7 @@ class TestCreateCostTracker:
         assert snap.estimated_cost_usd == 0.0
         # A9: pricing_source flags this as untrustworthy
         assert snap.pricing_source == "unknown"
+        assert snap.cost_source == CostSource.UNKNOWN
 
     async def test_pricing_source_is_openrouter_when_fetched_nonzero(
         self,
@@ -422,6 +428,7 @@ class TestCreateCostTracker:
         patched.assert_not_awaited()
         snap = tracker.snapshot()
         assert snap.pricing_source == "override"
+        assert snap.cost_source == CostSource.ESTIMATED
         assert snap.prompt_price_per_token == pytest.approx(0.00000009)
         assert snap.completion_price_per_token == pytest.approx(0.00000045)
 
@@ -443,3 +450,93 @@ class TestCreateCostTracker:
         assert snap.prompt_price_per_token == pytest.approx(0.00000009)
         assert snap.completion_price_per_token == pytest.approx(0.00000045)
         assert snap.pricing_source == "openrouter_api"
+        assert snap.cost_source == CostSource.ESTIMATED
+
+
+# ------------------------------------------------------------------
+# Model-id slug normalize + billed vs estimated persistence
+# ------------------------------------------------------------------
+
+
+class TestNormalizePricingSlug:
+    def test_strips_openrouter_gateway_prefix(self) -> None:
+        assert normalize_pricing_slug("openrouter/x-ai/grok-4.6") == "x-ai/grok-4.6"
+
+    def test_strips_openrouter_ai_prefix(self) -> None:
+        assert normalize_pricing_slug("openrouter.ai/x-ai/grok-4.6") == "x-ai/grok-4.6"
+
+    def test_leaves_vendor_slug_intact(self) -> None:
+        assert normalize_pricing_slug("x-ai/grok-4.6") == "x-ai/grok-4.6"
+        assert normalize_pricing_slug("openai/gpt-4o") == "openai/gpt-4o"
+
+    def test_case_insensitive_prefix(self) -> None:
+        assert normalize_pricing_slug("OpenRouter/x-ai/grok-4.6") == "x-ai/grok-4.6"
+
+
+class TestFetchPricingSlugNormalize:
+    async def test_matches_catalog_after_openrouter_prefix(self) -> None:
+        models = [
+            {
+                "id": "x-ai/grok-4.6",
+                "pricing": {"prompt": "0.000002", "completion": "0.000010"},
+            }
+        ]
+        transport = _make_transport_with_response(_make_openrouter_response(models))
+        with mock.patch("httpx.AsyncClient", return_value=_mock_async_client(transport)):
+            result = await fetch_pricing("openrouter/x-ai/grok-4.6")
+
+        assert result == (0.000002, 0.000010)
+
+
+class TestCostSourcePersistence:
+    def test_estimate_does_not_overwrite_billed(self) -> None:
+        tracker = CostTracker(
+            "x-ai/grok-4.6",
+            prompt_price=0.000001,
+            completion_price=0.000002,
+            pricing_source="openrouter_api",
+        )
+        tracker.record_raw(1000, 500)
+        tracker.apply_billed(0.42)
+        snap = tracker.snapshot()
+        assert snap.cost_source == CostSource.BILLED
+        assert snap.billed_cost_usd == pytest.approx(0.42)
+        assert snap.estimated_cost_usd == pytest.approx(0.002)
+        tracker.record_raw(1000, 500)
+        snap2 = tracker.snapshot()
+        assert snap2.cost_source == CostSource.BILLED
+        assert snap2.billed_cost_usd == pytest.approx(0.42)
+        assert snap2.estimated_cost_usd == pytest.approx(0.004)
+
+    def test_console_cost_without_tokens(self) -> None:
+        tracker = CostTracker("acp-model")
+        tracker.record_provider_cost(7.0, source=CostSource.CONSOLE, count_call=True)
+        snap = tracker.snapshot()
+        assert snap.cost_source == CostSource.CONSOLE
+        assert snap.console_cost_usd == pytest.approx(7.0)
+        assert snap.estimated_cost_usd == 0.0
+        assert snap.billed_cost_usd is None
+        assert snap.num_calls == 1
+
+    def test_unknown_when_pricing_failed(self) -> None:
+        tracker = CostTracker("openrouter/x-ai/grok-4.6")
+        tracker.record_raw(1000, 100)
+        snap = tracker.snapshot()
+        assert snap.cost_source == CostSource.UNKNOWN
+        assert snap.estimated_cost_usd == 0.0
+        assert not is_pareto_cost_source(snap.cost_source)
+
+    def test_infer_and_authoritative_helpers(self) -> None:
+        billed_snap = {
+            "estimated_cost_usd": 1.2,
+            "billed_cost_usd": 0.8,
+            "cost_source": "billed",
+            "pricing_source": "openrouter_api",
+        }
+        assert infer_cost_source(billed_snap) == CostSource.BILLED
+        assert authoritative_cost_usd(billed_snap) == pytest.approx(0.8)
+        unknown_snap = {"estimated_cost_usd": 0.0, "pricing_source": "unknown"}
+        assert infer_cost_source(unknown_snap) == CostSource.UNKNOWN
+        assert authoritative_cost_usd(unknown_snap) is None
+        assert not is_pareto_cost_source("unknown")
+        assert is_pareto_cost_source("estimated")

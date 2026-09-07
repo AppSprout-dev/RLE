@@ -429,8 +429,10 @@ class FelixHarness(BaseHarness):
             if not isinstance(rt, int):
                 rt = 0
             if isinstance(pt, int) and isinstance(ct, int):
+                estimated_cost = 0.0
                 if self.ctx.cost_tracker:
                     self.ctx.cost_tracker.record_raw(pt, ct, rt)
+                    estimated_cost = self.ctx.cost_tracker.estimate_call_cost(pt, ct, rt)
                 raw_output = agent._last_raw_output
                 raw_output_truncated = (
                     raw_output[:_RAW_OUTPUT_CHARS] if raw_output else None
@@ -442,6 +444,7 @@ class FelixHarness(BaseHarness):
                     EventType.PROVIDER_CALL, tick, agent=plan.role,
                     prompt_tokens=pt, completion_tokens=ct,
                     reasoning_tokens=rt,
+                    estimated_cost=estimated_cost,
                     raw_output=raw_output_truncated,
                     raw_output_truncated=was_truncated,
                 )

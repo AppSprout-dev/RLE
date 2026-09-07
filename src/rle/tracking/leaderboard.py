@@ -13,6 +13,12 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 from rle.scoring.bootstrap import bootstrap_ci
+from rle.tracking.cost_tracker import (
+    CostSource,
+    authoritative_cost_usd,
+    infer_cost_source,
+    is_pareto_cost_source,
+)
 
 # History entries written before the harness layer existed were all Felix runs.
 LEGACY_HARNESS = "felix"
@@ -28,6 +34,7 @@ class LeaderboardEntry(BaseModel):
     composite_score: float
     composite_ci: tuple[float, float] | None = None
     total_cost_usd: float = 0.0
+    cost_source: str = CostSource.ESTIMATED.value
     cost_per_scenario: float = 0.0
     total_tokens: int = 0
     total_wall_time_s: float = 0.0
@@ -126,7 +133,13 @@ class Leaderboard:
                 ci = (bci.ci_lower, bci.ci_upper)
 
             cost_block = _cost_block(latest)
-            cost = float(cost_block.get("estimated_cost_usd", 0.0))
+            billed = latest.get("billed_cost")
+            billed_dict = billed if isinstance(billed, dict) else None
+            source = infer_cost_source(cost_block, billed_dict)
+            display = authoritative_cost_usd(cost_block, billed_dict)
+            # Keep a numeric axis for the table; unknown stays 0 but is
+            # excluded from pareto_frontier via cost_source.
+            cost = float(display) if display is not None else 0.0
             tokens = int(cost_block.get("total_tokens", 0))
             wall = float(cost_block.get("wall_time_s", 0.0))
             n_scenarios = max(len(scenario_means), 1)
@@ -137,6 +150,7 @@ class Leaderboard:
                 composite_score=round(composite, 4),
                 composite_ci=ci,
                 total_cost_usd=cost,
+                cost_source=source.value,
                 cost_per_scenario=round(cost / n_scenarios, 4),
                 total_tokens=tokens,
                 total_wall_time_s=wall,
@@ -215,11 +229,15 @@ class Leaderboard:
     ) -> list[LeaderboardEntry]:
         """Return entries on the cost-accuracy Pareto frontier.
 
-        An entry is Pareto-optimal if no other entry has both
+        An entry is Pareto-optimal if no other *metered* entry has both
         higher composite_score AND lower total_cost_usd.
+
+        Rows whose ``cost_source`` is not billed/estimated/console (unknown
+        $0) are omitted — they must never appear as a cheap Pareto point.
         """
+        metered = [e for e in entries if is_pareto_cost_source(e.cost_source)]
         frontier: list[LeaderboardEntry] = []
-        for entry in entries:
+        for entry in metered:
             dominated = any(
                 other.composite_score >= entry.composite_score
                 and other.total_cost_usd <= entry.total_cost_usd
@@ -227,7 +245,7 @@ class Leaderboard:
                     other.composite_score > entry.composite_score
                     or other.total_cost_usd < entry.total_cost_usd
                 )
-                for other in entries
+                for other in metered
                 if other is not entry
             )
             if not dominated:

@@ -32,6 +32,7 @@ from rle.mcp.session import McpSession
 from rle.orchestration.action_executor import ActionExecutor
 from rle.rimapi.schemas import GameState
 from rle.rimapi.sse_client import RimAPIEvent
+from rle.tracking.cost_tracker import CostSource, CostTracker
 from rle.tracking.event_log import EventType
 
 logger = logging.getLogger(__name__)
@@ -121,13 +122,97 @@ class HeadlessCliOptions(BaseModel):
 
 @dataclass
 class TurnResult:
-    """What the agent produced for one prompt."""
+    """What the agent produced for one prompt.
+
+    ``extras`` may carry provider-truth metering that is independent of
+    token counts: ``cost_usd``, ``cost_source`` (``billed`` / ``console`` /
+    ``estimated``), and ``generation_id`` / ``generation_ids``.
+    """
 
     text: str = ""
     prompt_tokens: int = 0
     completion_tokens: int = 0
     reasoning_tokens: int = 0
     extras: dict[str, Any] = field(default_factory=dict)
+
+
+def _extras_generation_ids(extras: dict[str, Any]) -> list[str]:
+    """Collect generation IDs from extras (singular, plural, or nested)."""
+    ids: list[str] = []
+    raw = extras.get("generation_ids", extras.get("generation_id"))
+    if raw is None:
+        raw = extras.get("generationId")
+    if isinstance(raw, str):
+        if raw:
+            ids.append(raw)
+    elif isinstance(raw, (list, tuple)):
+        ids.extend(str(item) for item in raw if item)
+    return ids
+
+
+def _extras_cost_usd(extras: dict[str, Any]) -> float | None:
+    raw = extras.get("cost_usd", extras.get("costUsd"))
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _extras_cost_source(extras: dict[str, Any]) -> CostSource:
+    raw = extras.get("cost_source", extras.get("costSource", "console"))
+    try:
+        return CostSource(str(raw))
+    except ValueError:
+        return CostSource.CONSOLE
+
+
+def apply_turn_metering(tracker: CostTracker | None, turn: TurnResult) -> dict[str, Any]:
+    """Record tokens, extras.cost_usd, and generation IDs on ``tracker``.
+
+    Cost-only turns (tokens=0 but ``cost_usd`` / generation IDs present) are
+    first-class — nothing here is gated on a non-zero token count. Returns
+    the kwargs for a ``provider_call`` event, or ``{}`` when there is
+    nothing to emit.
+    """
+    extras = turn.extras
+    cost_usd = _extras_cost_usd(extras)
+    gen_ids = _extras_generation_ids(extras)
+    has_tokens = bool(turn.prompt_tokens or turn.completion_tokens or turn.reasoning_tokens)
+    if tracker is not None:
+        for gen_id in gen_ids:
+            tracker.record_generation_id(gen_id)
+        if cost_usd is not None:
+            tracker.record_provider_cost(
+                cost_usd,
+                source=_extras_cost_source(extras),
+                count_call=not has_tokens,
+            )
+        if has_tokens:
+            tracker.record_raw(
+                turn.prompt_tokens, turn.completion_tokens, turn.reasoning_tokens,
+            )
+    estimated = 0.0
+    if tracker is not None:
+        estimated = tracker.estimate_call_cost(
+            turn.prompt_tokens, turn.completion_tokens, turn.reasoning_tokens,
+        )
+    if not (has_tokens or cost_usd is not None or gen_ids):
+        return {}
+    payload: dict[str, Any] = {
+        "prompt_tokens": turn.prompt_tokens,
+        "completion_tokens": turn.completion_tokens,
+        "reasoning_tokens": turn.reasoning_tokens,
+        "estimated_cost": estimated,
+        "raw_output": turn.text[:_RAW_OUTPUT_CHARS],
+        "raw_output_truncated": len(turn.text) > _RAW_OUTPUT_CHARS,
+    }
+    if cost_usd is not None:
+        payload["cost_usd"] = cost_usd
+    if gen_ids:
+        payload["generation_ids"] = gen_ids
+    return payload
 
 
 class HeadlessCliHarness(BaseHarness, ABC):
@@ -280,18 +365,9 @@ class HeadlessCliHarness(BaseHarness, ABC):
             agent=self.name, latency_ms=latency_ms, num_actions=n_actions,
             summary=step.plan.summary, error_type=None if status == "success" else status,
         )
-        if turn.prompt_tokens or turn.completion_tokens:
-            if self.ctx.cost_tracker:
-                self.ctx.cost_tracker.record_raw(
-                    turn.prompt_tokens, turn.completion_tokens, turn.reasoning_tokens,
-                )
-            self.ctx.emit(
-                EventType.PROVIDER_CALL, tick, agent=self.name,
-                prompt_tokens=turn.prompt_tokens, completion_tokens=turn.completion_tokens,
-                reasoning_tokens=turn.reasoning_tokens,
-                raw_output=turn.text[:_RAW_OUTPUT_CHARS],
-                raw_output_truncated=len(turn.text) > _RAW_OUTPUT_CHARS,
-            )
+        metering = apply_turn_metering(self.ctx.cost_tracker, turn)
+        if metering:
+            self.ctx.emit(EventType.PROVIDER_CALL, tick, agent=self.name, **metering)
 
         extras = {**step.extras, "status": status, "latency_ms": latency_ms, **turn.extras}
         return StepResult(

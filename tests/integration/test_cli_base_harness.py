@@ -16,6 +16,7 @@ from rle.orchestration.game_loop import RLEGameLoop
 from rle.rimapi.client import RimAPIClient
 from rle.scoring.composite import CompositeScorer
 from rle.testing import MockRimAPI
+from rle.tracking.cost_tracker import CostSource, CostTracker
 from rle.tracking.event_log import EventLog, EventType
 
 cli_base = pytest.importorskip("rle.harness.cli_base")
@@ -126,6 +127,19 @@ class _Crashes(scripted.ScriptedMcpHarness):  # type: ignore[misc]
         raise HarnessStepError("binary exited 1")
 
 
+class _CostOnlyTurn(scripted.ScriptedMcpHarness):  # type: ignore[misc]
+    name: ClassVar[str] = "cost-only"
+
+    async def send_turn(self, prompt: str) -> Any:
+        result = await super().send_turn(prompt)
+        return cli_base.TurnResult(
+            text=result.text,
+            prompt_tokens=0,
+            completion_tokens=0,
+            extras={"cost_usd": 1.25, "generation_id": "gen-xyz"},
+        )
+
+
 class TestTurnFailures:
     async def test_turn_timeout_scores_empty_tick(self) -> None:
         harness = _NeverEndsTurn(
@@ -145,3 +159,33 @@ class TestTurnFailures:
             result = await loop.run(max_ticks=1)
         assert result[0].extras["status"] == "agent_error"
         assert harness.parse_failures == 1
+
+
+class TestCostOnlyTurn:
+    async def test_tokens_zero_but_cost_usd_is_recorded(self, tmp_path: Path) -> None:
+        log = EventLog(tmp_path / "events.jsonl")
+        tracker = CostTracker("openrouter/x-ai/grok-4.6")
+        harness = _CostOnlyTurn(cli_base.HeadlessCliOptions(idle_grace_s=0.05))
+        async with _env() as (client, _mock):
+            ctx = HarnessContext(
+                config=RLEConfig(tick_interval=0.0),
+                client=client,
+                event_log=log,
+                cost_tracker=tracker,
+            )
+            loop = RLEGameLoop(
+                RLEConfig(tick_interval=0.0), client, harness=harness,
+                harness_context=ctx, event_log=log, cost_tracker=tracker,
+            )
+            await loop.run(max_ticks=1)
+
+        snap = tracker.snapshot()
+        assert snap.cost_source == CostSource.CONSOLE
+        assert snap.console_cost_usd == pytest.approx(1.25)
+        assert snap.num_calls == 1
+        assert tracker.generation_ids == ["gen-xyz"]
+        calls = [e for e in log.events if e.event_type == EventType.PROVIDER_CALL]
+        assert calls
+        assert calls[0].data.get("cost_usd") == pytest.approx(1.25)
+        assert calls[0].data.get("estimated_cost") == 0.0
+        assert calls[0].data.get("generation_ids") == ["gen-xyz"]
