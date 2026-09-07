@@ -88,6 +88,8 @@ uv pip install git+https://github.com/AppSprout-dev/rle-harness-opencode
 python scripts/run_scenario.py crashlanded_survival --harness opencode --model openai/gpt-4o --ticks 10
 ```
 
+AppSprout live runs set `RIMAPI_DLL_PATH` and `RIMAPI_FORK_PATH` to the compiled RIMAPI checkout (not Workshop). Summaries record that path, the DLL SHA, and the fork commit — see [CLAUDE.md](CLAUDE.md) and [docs/2026-09-07-rimapi-path-probe.md](docs/2026-09-07-rimapi-path-probe.md).
+
 ### Testing a harness plugin
 
 External plugins depend on RLE core and use `rle.testing`:

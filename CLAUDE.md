@@ -32,6 +32,15 @@ cp ../../1.6/Assemblies/RIMAPI.dll \
 
 The upstream Workshop DLL is backed up as `RIMAPI.dll.upstream-backup` in the same folder.
 
+**AppSprout runs pin the compiled checkout, not Workshop.** Set both:
+
+```bash
+RIMAPI_DLL_PATH=/path/to/RIMAPI/1.6/Assemblies/RIMAPI.dll
+RIMAPI_FORK_PATH=/path/to/RIMAPI
+```
+
+`collect_metadata()` probes `RIMAPI_DLL_PATH` → `{RIMAPI_FORK_PATH}/1.6/Assemblies/RIMAPI.dll` → sibling `../RIMAPI/1.6/Assemblies/RIMAPI.dll` → Workshop last. Workshop is not source of truth. Run summaries record `rimapi_dll_path`, `rimapi_dll_sha256`, and `rimapi_fork_commit` (compiled pin: `BFC9DD53…` @ `b6c5003`; Workshop `73E659E8…` is Flash drift). See [docs/2026-09-07-rimapi-path-probe.md](docs/2026-09-07-rimapi-path-probe.md).
+
 ### RIMAPI gotchas
 
 - RIMAPI only starts serving **after the map loads** (not on the main menu)
@@ -81,6 +90,8 @@ The `.env` file controls which LLM provider is used. Key fields:
 | `MODEL` | Model name as the provider expects it | `unsloth/nvidia-nemotron-3-nano-4b` |
 | `PROVIDER_BASE_URL` | API base URL (required for LM Studio and OpenRouter) | `http://localhost:1234/v1` |
 | `RIMAPI_URL` | RIMAPI mod URL | `http://localhost:8765` |
+| `RIMAPI_DLL_PATH` | Compiled `RIMAPI.dll` for run metadata (preferred over Workshop) | `../RIMAPI/1.6/Assemblies/RIMAPI.dll` |
+| `RIMAPI_FORK_PATH` | RIMAPI fork checkout (DLL probe + `rimapi_fork_commit`) | `../RIMAPI` |
 | `MCP_CONTAINER_REACHABLE` | Bind MCP on `0.0.0.0:8766`, advertise `http://host.docker.internal:8766/mcp` for Docker agents (host RimWorld). Not `--docker`. | `true` |
 | `MCP_BIND_HOST` / `MCP_ADVERTISE_HOST` / `MCP_PORT` | Optional MCP listen overrides (also `--harness-opt mcp_*`) | `0.0.0.0` / `host.docker.internal` / `8766` |
 
