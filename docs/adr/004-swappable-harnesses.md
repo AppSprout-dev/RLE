@@ -91,9 +91,10 @@ plugin CI exercises the full round trip without the binary.
 
 ### Repo boundary rule
 
-RLE core ships only RLE-authored harnesses (`baseline`, `felix`). Harnesses
-wrapping third-party tools are separate `AppSprout-dev/rle-harness-*`
-packages (template, OpenCode, Grok Build). RLE CI installs the template from
+RLE core ships only RLE-authored harnesses (`baseline`, `felix`, and the
+`raw-grok` / `raw-openrouter` model baselines). Harnesses wrapping
+third-party tools are separate `AppSprout-dev/rle-harness-*` packages
+(template, OpenCode, Grok Build). RLE CI installs the template from
 GitHub as the plugin-API contract test.
 
 ### Scoring 1.2 (#51)

@@ -48,6 +48,7 @@ class TestBuiltinRegistration:
         assert "baseline" in names
         assert "felix" in names
         assert "raw-grok" in names
+        assert "raw-openrouter" in names
 
     def test_list_reports_package_and_availability(self) -> None:
         infos = {i.name: i for i in list_harnesses()}
