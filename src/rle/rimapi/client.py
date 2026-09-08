@@ -30,9 +30,35 @@ from rle.rimapi.schemas import (
     ThreatData,
     WeatherData,
     ZoneData,
+    is_research_bench_def,
 )
 
 logger = logging.getLogger(__name__)
+
+# GameState.structures is a prompt-sized sample. Research benches must stay
+# in that sample even when the map has 400+ ruin walls, or the brief flag
+# research_bench_present is a false negative.
+_STRUCTURE_SAMPLE_LIMIT = 50
+
+
+def _building_def_name(building: dict[str, Any]) -> str:
+    return str(building.get("def_name", building.get("label", "Unknown")))
+
+
+def _select_buildings_for_state(buildings: Any) -> list[Any]:
+    """Research benches first, then other buildings, capped for the snapshot."""
+    if not isinstance(buildings, list):
+        return []
+    benches: list[Any] = []
+    rest: list[Any] = []
+    for raw in buildings:
+        if not isinstance(raw, dict):
+            continue
+        if is_research_bench_def(_building_def_name(raw)):
+            benches.append(raw)
+        else:
+            rest.append(raw)
+    return benches + rest
 
 
 class RimAPIError(Exception):
@@ -586,7 +612,7 @@ class RimAPIClient:
         except (RimAPIResponseError, RimAPIConnectionError):
             temperature = 15.0
         structures = []
-        for b in buildings[:50]:
+        for b in _select_buildings_for_state(buildings)[:_STRUCTURE_SAMPLE_LIMIT]:
             pos = b.get("position", [0, 0])
             if isinstance(pos, dict):
                 pos = (pos.get("x", 0), pos.get("z", 0))
@@ -596,7 +622,7 @@ class RimAPIClient:
                 pos = (0, 0)
             structures.append(StructureData(
                 structure_id=str(b.get("id", b.get("thing_id", ""))),
-                def_name=b.get("def_name", b.get("label", "Unknown")),
+                def_name=_building_def_name(b),
                 position=pos,
                 hit_points=float(b.get("hit_points", 100)),
                 max_hit_points=float(b.get("max_hit_points", 100)),

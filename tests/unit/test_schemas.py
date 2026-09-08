@@ -15,6 +15,7 @@ from rle.rimapi.schemas import (
     StructureData,
     ThreatData,
     WeatherData,
+    is_research_bench_def,
 )
 
 
@@ -91,6 +92,13 @@ class TestStructureData:
     def test_valid_construction(self, sample_structure: StructureData) -> None:
         assert sample_structure.def_name == "Wall"
         assert sample_structure.hit_points == 300.0
+
+    def test_research_bench_def_names(self) -> None:
+        assert is_research_bench_def("SimpleResearchBench")
+        assert is_research_bench_def("HiTechResearchBench")
+        assert is_research_bench_def("research_bench")
+        assert not is_research_bench_def("Wall")
+        assert not is_research_bench_def("Table2x2c")
 
 
 class TestMapData:

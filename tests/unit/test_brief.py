@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from rle.harness.brief import action_catalog, build_brief, build_map_summary
+from rle.harness.brief import (
+    action_catalog,
+    build_brief,
+    build_map_summary,
+    research_bench_present,
+)
 from rle.rimapi.schemas import (
     AreaRect,
     ColonyData,
@@ -10,6 +15,7 @@ from rle.rimapi.schemas import (
     MapData,
     ResearchData,
     ResourceData,
+    StructureData,
     TerrainSummary,
     WeatherData,
 )
@@ -17,7 +23,10 @@ from rle.rimapi.sse_client import RimAPIEvent
 from rle.scenarios.loader import list_scenarios
 
 
-def _state(with_terrain: bool = True) -> GameState:
+def _state(
+    with_terrain: bool = True,
+    structures: list[StructureData] | None = None,
+) -> GameState:
     terrain = TerrainSummary(
         colony_center=(50, 50),
         recommended_shelter=AreaRect(x1=40, z1=40, x2=46, z2=46),
@@ -36,7 +45,7 @@ def _state(with_terrain: bool = True) -> GameState:
         ),
         map=MapData(
             size=(250, 250), biome="temperate_forest", season="spring",
-            temperature=15.0, structures=[], terrain=terrain,
+            temperature=15.0, structures=list(structures or []), terrain=terrain,
         ),
         research=ResearchData(current_project=None, progress=0.0, completed=[], available=["a"]),
         threats=[],
@@ -57,6 +66,23 @@ class TestMapSummary:
         assert "STOCKPILE SITE" in text
         assert "WATER (do NOT build here)" in text
         assert "Zones: NONE" in text and "Rooms: NONE" in text
+        assert "RESEARCH: no research bench" in text
+
+    def test_research_cue_omitted_when_bench_present(self) -> None:
+        bench = StructureData(
+            structure_id="SimpleResearchBench37771",
+            def_name="SimpleResearchBench",
+            position=(128, 136),
+            hit_points=180.0,
+            max_hit_points=180.0,
+        )
+        state = _state(structures=[bench])
+        text = build_map_summary(state)
+        assert text is not None
+        assert "RESEARCH: no research bench" not in text
+        assert research_bench_present(state) is True
+        brief = build_brief(state, tick=0, macro_time=0.0)
+        assert brief.state["research_bench_present"] is True
 
 
 class TestActionCatalog:
@@ -81,6 +107,7 @@ class TestBrief:
         assert brief.goals["name"] == scenario.name
         assert brief.goals["victory"]
         assert brief.state["colony"]["population"] == 3
+        assert brief.state["research_bench_present"] is False
         assert brief.recent_events[0]["event_type"] == "raid"
         assert brief.map_summary and "SHELTER SITE" in brief.map_summary
         text = brief.to_text()

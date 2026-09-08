@@ -15,7 +15,7 @@ from typing import Any, cast
 from pydantic import BaseModel, ConfigDict
 
 from rle.rimapi.api_catalog import visible_write_catalog
-from rle.rimapi.schemas import GameState
+from rle.rimapi.schemas import GameState, is_research_bench_def
 from rle.rimapi.sse_client import RimAPIEvent
 from rle.scenarios.schema import ScenarioConfig
 
@@ -24,6 +24,17 @@ _COLONIST_FIELDS = (
     "colonist_id", "name", "health", "mood", "current_job", "is_drafted", "position",
 )
 _MAX_EVENTS = 12
+
+_MISSING_BENCH_CUE = (
+    "RESEARCH: no research bench on the map — colonists cannot finish tech "
+    "(research score stays at the seed floor). Blueprint SimpleResearchBench "
+    "before research_target, or the write fails with bench/prereqs missing."
+)
+
+
+def research_bench_present(state: GameState) -> bool:
+    """True when GameState.structures includes a research bench."""
+    return any(is_research_bench_def(s.def_name) for s in state.map.structures)
 
 
 def build_map_summary(state: GameState) -> str | None:
@@ -102,6 +113,9 @@ def build_map_summary(state: GameState) -> str | None:
             f"{fs.harvestable_cells} harvestable."
         )
 
+    if not research_bench_present(state):
+        lines.append(_MISSING_BENCH_CUE)
+
     return "\n".join(lines)
 
 
@@ -143,6 +157,7 @@ def state_snapshot(state: GameState) -> dict[str, Any]:
         ],
         "resources": state.resources.model_dump(),
         "research": state.research.model_dump(),
+        "research_bench_present": research_bench_present(state),
         "threats": [t.model_dump() for t in state.threats],
         "weather": state.weather.model_dump(),
         "map": {

@@ -301,6 +301,36 @@ class TestReadEndpoints:
         assert isinstance(result, MapData)
         assert result.biome == "temperate_forest"
 
+    async def test_get_map_keeps_research_bench_when_many_buildings(
+        self, all_routes: dict,
+    ) -> None:
+        walls = [
+            {
+                "id": i,
+                "def_name": "Wall",
+                "position": [i, 0],
+                "hit_points": 100,
+                "max_hit_points": 100,
+            }
+            for i in range(60)
+        ]
+        walls.append({
+            "id": 37771,
+            "def_name": "SimpleResearchBench",
+            "position": [128, 136],
+            "hit_points": 180,
+            "max_hit_points": 180,
+        })
+        routes = dict(all_routes)
+        routes["/api/v1/map/buildings?map_id=0"] = walls
+        transport = _make_transport(routes, _WRITE_ROUTES)
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
+            result = await client.get_map()
+        assert len(result.structures) == 50
+        assert result.structures[0].def_name == "SimpleResearchBench"
+        assert result.structures[0].position == (128, 136)
+
     async def test_get_research(self, mock_client: RimAPIClient) -> None:
         result = await mock_client.get_research()
         assert isinstance(result, ResearchData)
