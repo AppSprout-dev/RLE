@@ -339,6 +339,32 @@ class TestReadEndpoints:
         result = await mock_client.get_research()
         assert isinstance(result, ResearchData)
 
+    async def test_get_threats(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_threats()
+        assert len(result) == 1
+        assert isinstance(result[0], ThreatData)
+
+    async def test_get_colony(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_colony()
+        assert isinstance(result, ColonyData)
+        assert result.name == "New Hope"
+
+    async def test_get_weather(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_weather()
+        assert isinstance(result, WeatherData)
+
+    async def test_get_game_state(self, mock_client: RimAPIClient) -> None:
+        result = await mock_client.get_game_state()
+        assert isinstance(result, GameState)
+        assert result.colony.name == "New Hope"
+        assert len(result.colonists) == 1
+        assert result.timestamp > 0
+        # Phase 1: power and factions included in game state
+        assert result.power is not None
+        assert result.power.current_power == 1800.0
+        assert len(result.factions) == 2
+        assert result.factions[0].name == "Pirate Band"
+
 
 class TestResearchUnblockAdapters:
     """Post-#76 RCA: live BuildingDto ``def`` + research progress merge."""
@@ -443,32 +469,6 @@ class TestResearchUnblockAdapters:
         assert research_target_status("Smithing", result) == "current"
         assert research_target_status("ComplexClothing", result) == "available"
         assert research_target_status("Fabrication", result) == "locked"
-
-    async def test_get_threats(self, mock_client: RimAPIClient) -> None:
-        result = await mock_client.get_threats()
-        assert len(result) == 1
-        assert isinstance(result[0], ThreatData)
-
-    async def test_get_colony(self, mock_client: RimAPIClient) -> None:
-        result = await mock_client.get_colony()
-        assert isinstance(result, ColonyData)
-        assert result.name == "New Hope"
-
-    async def test_get_weather(self, mock_client: RimAPIClient) -> None:
-        result = await mock_client.get_weather()
-        assert isinstance(result, WeatherData)
-
-    async def test_get_game_state(self, mock_client: RimAPIClient) -> None:
-        result = await mock_client.get_game_state()
-        assert isinstance(result, GameState)
-        assert result.colony.name == "New Hope"
-        assert len(result.colonists) == 1
-        assert result.timestamp > 0
-        # Phase 1: power and factions included in game state
-        assert result.power is not None
-        assert result.power.current_power == 1800.0
-        assert len(result.factions) == 2
-        assert result.factions[0].name == "Pirate Band"
 
 
 class TestErrorHandling:
