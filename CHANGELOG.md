@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.7.1...rimworld-learning-environment-v0.7.2) (2026-09-08)
+
+
+### Documentation
+
+* retarget live board cite to spread-2026-09-07 ([#78](https://github.com/AppSprout-dev/RLE/issues/78)) ([304151b](https://github.com/AppSprout-dev/RLE/commit/304151bdf5e3e6ad896c50e8890d487446ba78ea))
+
 ## [0.7.1](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.7.0...rimworld-learning-environment-v0.7.1) (2026-09-08)
 
 
