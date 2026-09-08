@@ -7,6 +7,7 @@ RIMAPI, then saves each scenario as a new save file.
 Prerequisites:
   - RimWorld running with RIMAPI mod loaded
   - Base save `rle_crashlanded_v1` exists and loads cleanly
+    (seeded SimpleResearchBench + currentProj=Smithing)
 
 Usage:
   python scripts/create_scenario_saves.py                    # build all
@@ -83,6 +84,8 @@ DEFAULT_MAX_STACK = 75
 
 # Per-scenario setup recipe. Each scenario is a sequence of API calls.
 # `items` entries are (def_name, amount[, stuff_def]) tuples.
+# The Crashlanded base save seeds a built SimpleResearchBench and queues
+# currentProj=Smithing so research can leave the 7/31 starting floor.
 # NOTE on "day advancement": the plan (and issue #7) originally called for
 # building saves at day 30 / 60 / etc with shelter, food, and research
 # progress. RIMAPI does not currently expose an endpoint to fast-forward

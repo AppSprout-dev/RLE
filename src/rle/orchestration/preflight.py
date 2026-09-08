@@ -6,7 +6,8 @@ harness benefits:
 
 * growing-zone cells already covered → success-by-state
 * work_priority payloads aligned with WorkTypeDef / ``/api/v1/work-list``
-* research_target only when the project is available (prereqs / bench)
+* research_target only when the project is available (prereqs / bench);
+  current project is already-satisfied (no rewrite)
 * tend requires a living doctor + patient pair
 * stockpile_delete is quarantined when the endpoint is missing
 """

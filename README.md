@@ -101,7 +101,7 @@ You need four things set up:
 1. **RimWorld** (Steam) with **Harmony** and **[RIMAPI](https://github.com/IlyaChichkov/RIMAPI)** mods subscribed and **enabled** in the Mods menu. Load order: Harmony → Core → (DLCs) → RIMAPI.
 2. **LLM provider** — [LM Studio](https://lmstudio.ai/) (local, free) or [OpenRouter](https://openrouter.ai/) (cloud)
 3. **Python 3.14+** with [uv](https://docs.astral.sh/uv/)
-4. **Save file** — `rle_crashlanded_v1` in RimWorld's save folder (the scenario auto-loads it)
+4. **Save file** — `rle_crashlanded_v1` in RimWorld's save folder (the scenario auto-loads it). The Crashlanded seed includes a built `SimpleResearchBench` so research can leave the 7/31 starting floor.
 
 > **RIMAPI note:** The Workshop version may not have our contributed endpoints yet. See [CLAUDE.md](CLAUDE.md) for instructions on building and deploying our fork DLL. AppSprout runs set `RIMAPI_DLL_PATH` and `RIMAPI_FORK_PATH` to the compiled checkout; summaries record that path, the DLL SHA, and the fork commit. Workshop is not source of truth.
 

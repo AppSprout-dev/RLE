@@ -208,6 +208,19 @@ class TestResearch:
         s = _state(completed_research=[], available_research=[])
         assert research(s, _ctx()) == pytest.approx(1.0)
 
+    def test_crashlanded_seed_floor_is_seven_of_thirty_one(self) -> None:
+        """Crashlanded starts at 7 finished / 24 available = 7/31 ≈ 0.2258.
+
+        That ratio is the save's starting tree, not model variance. Do not
+        treat the floor as σ. Completing a project requires a research bench.
+        """
+        s = _state(
+            completed_research=[f"done_{i}" for i in range(7)],
+            available_research=[f"open_{i}" for i in range(24)],
+        )
+        assert research(s, _ctx()) == pytest.approx(7 / 31)
+        assert research(s, _ctx()) == pytest.approx(0.2258, abs=5e-5)
+
 
 class TestSelfSufficiency:
     def test_all_good(self) -> None:

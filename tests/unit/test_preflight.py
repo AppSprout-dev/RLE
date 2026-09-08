@@ -236,8 +236,8 @@ class TestResearchAvailability:
         assert result.executed == 1
         client.set_research_target.assert_awaited_once_with("Smithing", force=False)
 
-    async def test_current_project_is_still_queued(self) -> None:
-        """Re-targeting the current project is allowed; it is available."""
+    async def test_current_project_is_already_satisfied(self) -> None:
+        """Re-targeting the current project is success-by-state; no rewrite."""
         client = AsyncMock()
         executor = ActionExecutor(client)
         result = await executor.execute(
@@ -245,7 +245,8 @@ class TestResearchAvailability:
             state=_state(),
         )
         assert result.executed == 1
-        client.set_research_target.assert_awaited_once_with("Electricity", force=False)
+        assert result.failed == 0
+        client.set_research_target.assert_not_awaited()
 
 
 # -- 4. Doctor + patient preflight -------------------------------------------

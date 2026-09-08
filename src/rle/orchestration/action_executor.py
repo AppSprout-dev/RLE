@@ -362,6 +362,9 @@ class ActionExecutor:
         research = None if self._tick_state is None else self._tick_state.research
         if research is not None and not force:
             status = research_target_status(project, research)
+            if status == "current":
+                # Already queued — same success-by-state as a covered growing zone.
+                return
             if status == "finished":
                 raise ValueError(
                     f"Research project '{project}' is already finished."

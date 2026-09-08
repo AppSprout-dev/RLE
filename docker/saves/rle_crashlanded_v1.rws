@@ -185,6 +185,7 @@
 			<letterQueue />
 		</letterStack>
 		<researchManager>
+			<currentProj>Smithing</currentProj>
 			<progress>
 				<keys>
 					<li>CataphractArmor</li>
@@ -2652,7 +2653,7 @@ AAAAAA==
 			<lastSeason>Spring</lastSeason>
 		</dateNotifier>
 		<uniqueIDsManager>
-			<nextThingID>37771</nextThingID>
+			<nextThingID>37772</nextThingID>
 			<nextFactionID>12</nextFactionID>
 			<nextTaleID>4</nextTaleID>
 			<nextWorldObjectID>93</nextWorldObjectID>
@@ -458686,6 +458687,22 @@ Hw==
 						<creepjoiner IsNull="True" />
 						<duplicate IsNull="True" />
 						<flight />
+					</thing>
+					<thing Class="Building_ResearchBench">
+						<def>SimpleResearchBench</def>
+						<id>SimpleResearchBench37771</id>
+						<map>0</map>
+						<pos>(128, 0, 136)</pos>
+						<health>180</health>
+						<stuff>WoodLog</stuff>
+						<faction>Faction_11</faction>
+						<questTags IsNull="True" />
+						<spawnedTick>0</spawnedTick>
+						<despawnedTick>-1</despawnedTick>
+						<beenRevealed>True</beenRevealed>
+						<billStack>
+							<bills />
+						</billStack>
 					</thing>
 				</things>
 			</li>

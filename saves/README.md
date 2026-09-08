@@ -2,6 +2,14 @@
 
 Compressed RimWorld save files used by the benchmark scenarios.
 
+`rle_crashlanded_v1` seeds a built, player-owned `SimpleResearchBench`
+(wood, `(128, 0, 136)`, no power required) and queues `currentProj=Smithing`.
+Without the bench, scoring 1.2 research floors at **7/31 ≈ 0.2258** — the
+starting finished/available ratio — because colonists cannot finish tech and
+`research_target` is rejected as bench/prereqs missing. That floor is not σ.
+The other five scenario saves are derived from this base; rebuild them via
+`scripts/create_scenario_saves.py` if they need the same bench.
+
 ## Install
 
 Extract to your RimWorld saves folder:
