@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.7.1](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.7.0...rimworld-learning-environment-v0.7.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* preflight gates so keeper Crashlanded failures are not model noise ([#72](https://github.com/AppSprout-dev/RLE/issues/72)) ([e7eb120](https://github.com/AppSprout-dev/RLE/commit/e7eb120ddcfeabc02a64f89a1a502cd502838b0d))
+* probe compiled RIMAPI DLL before Workshop ([#70](https://github.com/AppSprout-dev/RLE/issues/70)) ([e940ef8](https://github.com/AppSprout-dev/RLE/commit/e940ef89b6de7fdec98d2d3211baec12ac93b1dd))
+* research unblock adapters after [#75](https://github.com/AppSprout-dev/RLE/issues/75)/[#76](https://github.com/AppSprout-dev/RLE/issues/76) (bench def + progress merge) ([#77](https://github.com/AppSprout-dev/RLE/issues/77)) ([d0de6c6](https://github.com/AppSprout-dev/RLE/commit/d0de6c61cb515ef2515edc8b2dd049d8ed839102))
+* stage pinned docker/saves into AppData before native game/load ([#76](https://github.com/AppSprout-dev/RLE/issues/76)) ([c9b5147](https://github.com/AppSprout-dev/RLE/commit/c9b51474ce16b4b9c2a449b5bca0e9d0bd8dbe22))
+* unblock Crashlanded research scoring (seed bench + brief observability) ([#75](https://github.com/AppSprout-dev/RLE/issues/75)) ([fa5b43f](https://github.com/AppSprout-dev/RLE/commit/fa5b43f2ea995b687f20deaa773540e7c82e05e2))
+
+
+### Documentation
+
+* lock 25-tick as default short horizon ([#74](https://github.com/AppSprout-dev/RLE/issues/74)) ([07d6f43](https://github.com/AppSprout-dev/RLE/commit/07d6f4349c599b3a5106420af03d949773b3b21a))
+* N × ticks sequence for harness QA → stats ([#73](https://github.com/AppSprout-dev/RLE/issues/73)) ([14c8ba0](https://github.com/AppSprout-dev/RLE/commit/14c8ba0fb4b8dc43f3ff80ba3c9410424099ca2e))
+* opt-in W&B/Weave runbook for AppSprout Crashlanded benchmarks ([#68](https://github.com/AppSprout-dev/RLE/issues/68)) ([8bea8f6](https://github.com/AppSprout-dev/RLE/commit/8bea8f65e8f9ab862a26fa169661fb60fec589ba))
+
 ## [0.7.0](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.6.0...rimworld-learning-environment-v0.7.0) (2026-09-07)
 
 
