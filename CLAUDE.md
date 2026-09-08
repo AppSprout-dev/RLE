@@ -272,7 +272,7 @@ Tick-specific priorities injected into all Felix agents (other harnesses get no 
 ### Save Loading + Item Setup
 
 `run_scenario.py` automatically:
-1. Loads the scenario's save file (`rle_crashlanded_v1`, etc.)
+1. Loads the scenario's save file (`rle_crashlanded_v1` seeds a built `SimpleResearchBench` at (128,136) and queues `Smithing`; the other five saves are derived from this base)
 2. Polls until game is ready (colonist_count > 0)
 3. Unforbids all starting items (via `POST /api/v1/things/set-forbidden`)
 4. Runs any `setup_commands` declared in the scenario YAML (spawn_pawn, spawn_item, change_weather, drop_pod)

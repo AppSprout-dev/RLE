@@ -1,5 +1,5 @@
 name: Crashlanded Survival
-description: Three colonists crash-land with minimal supplies. Survive 30 days.
+description: Three colonists crash-land with minimal supplies and a seeded simple research bench. Survive 30 days.
 difficulty: easy
 expected_duration_days: 30
 initial_population: 3
@@ -26,4 +26,4 @@ scoring_weights:
   self_sufficiency: 0.16
   efficiency: 0.04
   plan_coherence: 0.08
-save_sha256: 29530cd8e5f373b50f9ee51617bc0b036de97f95c9fd3264a2bbd5939a133d4e
+save_sha256: 17835b77622ca633228b00f7616af2cc45198b51fbb5169adc8233370e0d4bbf
