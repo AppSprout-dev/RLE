@@ -17,7 +17,10 @@ from rle.harness.cli_base import HeadlessCliHarness, HeadlessCliOptions, TurnRes
 
 DEFAULT_SCRIPT: tuple[tuple[str, dict[str, Any]], ...] = (
     ("get_brief", {}),
-    ("research_target", {"parameters": {"project": "Electricity"}, "reason": "smoke"}),
+    # Mock / live snapshots often already have Electricity queued. Targeting
+    # the current project is success-by-state and would skip the RIMAPI write
+    # this script exists to exercise. Smithing is available, not current.
+    ("research_target", {"parameters": {"project": "Smithing"}, "reason": "smoke"}),
     ("end_turn", {"summary": "scripted smoke turn"}),
 )
 
