@@ -97,6 +97,8 @@ class TestStructureData:
         assert is_research_bench_def("SimpleResearchBench")
         assert is_research_bench_def("HiTechResearchBench")
         assert is_research_bench_def("research_bench")
+        assert is_research_bench_def("simple research bench")
+        assert is_research_bench_def("Simple Research Bench")
         assert not is_research_bench_def("Wall")
         assert not is_research_bench_def("Table2x2c")
 

@@ -21,10 +21,11 @@ def is_research_bench_def(def_name: str) -> bool:
     """True for vanilla research benches and close aliases.
 
     SimpleResearchBench does not need power. HiTechResearchBench does.
-    Matching is case-insensitive and ignores underscores so ``Research_Bench``
-    still counts.
+    Matching is case-insensitive and ignores underscores and spaces so
+    ``Research_Bench`` and ``simple research bench`` still count.
     """
-    return "researchbench" in def_name.lower().replace("_", "")
+    normalized = def_name.lower().replace("_", "").replace(" ", "")
+    return "researchbench" in normalized
 
 
 class ColonistData(BaseModel):

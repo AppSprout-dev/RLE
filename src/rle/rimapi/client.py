@@ -42,7 +42,59 @@ _STRUCTURE_SAMPLE_LIMIT = 50
 
 
 def _building_def_name(building: dict[str, Any]) -> str:
-    return str(building.get("def_name", building.get("label", "Unknown")))
+    """RIMAPI BuildingDto serializes the defName as snake_case ``def``.
+
+    Fall back to ``def_name`` (mocks / older shapes) then ``label``.
+    """
+    for key in ("def", "def_name", "label"):
+        if key in building and building[key] not in (None, ""):
+            return str(building[key])
+    return "Unknown"
+
+
+def _research_project_name(item: Any) -> str:
+    if isinstance(item, str) and item:
+        return item
+    if isinstance(item, dict):
+        for key in ("name", "def_name", "label"):
+            if key in item and item[key] not in (None, ""):
+                return str(item[key])
+    return ""
+
+
+def _finished_project_names(finished: Any) -> list[str]:
+    if isinstance(finished, list):
+        return [str(item) for item in finished if item]
+    if not isinstance(finished, dict):
+        return []
+    raw = finished.get("finished_projects", finished.get("FinishedProjects", []))
+    if not isinstance(raw, list):
+        return []
+    return [str(item) for item in raw if item]
+
+
+def _tree_completed_and_available(tree: Any) -> tuple[list[str], list[str]]:
+    """Split ``/research/tree`` into finished vs ``can_start_now`` names."""
+    if isinstance(tree, list):
+        projects = tree
+    elif isinstance(tree, dict):
+        raw = tree.get("projects", tree.get("Projects", []))
+        projects = raw if isinstance(raw, list) else []
+    else:
+        return [], []
+    completed: list[str] = []
+    available: list[str] = []
+    for item in projects:
+        if not isinstance(item, dict):
+            continue
+        name = _research_project_name(item)
+        if not name:
+            continue
+        if item.get("is_finished", item.get("IsFinished", False)):
+            completed.append(name)
+        elif item.get("can_start_now", item.get("CanStartNow", False)):
+            available.append(name)
+    return completed, available
 
 
 def _select_buildings_for_state(buildings: Any) -> list[Any]:
@@ -159,6 +211,13 @@ class RimAPIClient:
         if resp.status_code != 200:
             raise RimAPIResponseError(resp.status_code, resp.text)
         return self._unwrap_envelope(resp.json())
+
+    async def _optional_get(self, path: str) -> Any:
+        """GET that returns None when the endpoint is missing or unreachable."""
+        try:
+            return await self._get(path)
+        except (RimAPIResponseError, RimAPIConnectionError):
+            return None
 
     async def call(
         self, method: str, path: str, json: dict[str, Any] | None = None,
@@ -288,24 +347,58 @@ class RimAPIClient:
         }
 
     @staticmethod
-    def _adapt_research(raw: dict[str, Any]) -> dict[str, Any]:
-        """Map upstream ResearchSummaryDto → ResearchData fields."""
+    def _adapt_research(
+        raw: dict[str, Any],
+        *,
+        progress: Any = None,
+        finished: Any = None,
+        tree: Any = None,
+    ) -> dict[str, Any]:
+        """Map RIMAPI research endpoints → ResearchData fields.
+
+        ``/research/summary`` has counts and by-tech-level project bags, not
+        ``current_project``. Treating a tech level with ``finished > 0`` as
+        entirely completed dumps Medieval (incl. Smithing) into
+        ``completed``, then ``[:finished_projects_count]`` drops it from
+        ``available`` — the validator then reports ``locked``.
+
+        Overlay ``/research/progress`` for the queued project and
+        ``/research/finished`` + ``/research/tree`` for honest lists.
+        """
+        completed_raw = raw.get("completed")
+        available_raw = raw.get("available")
         if "current_project" in raw:
-            return raw
-        completed = []
-        available = []
-        for _level, cat in raw.get("by_tech_level", {}).items():
-            for proj in cat.get("projects", []):
-                if cat.get("finished", 0) > 0:
-                    completed.append(proj)
-                else:
-                    available.append(proj)
-        return {
-            "current_project": None,
-            "progress": 0.0,
-            "completed": completed[:raw.get("finished_projects_count", 0)],
-            "available": available,
-        }
+            adapted: dict[str, Any] = {
+                "current_project": raw.get("current_project"),
+                "progress": float(raw.get("progress", 0.0) or 0.0),
+                "completed": list(completed_raw) if isinstance(completed_raw, list) else [],
+                "available": list(available_raw) if isinstance(available_raw, list) else [],
+            }
+        else:
+            adapted = {
+                "current_project": None,
+                "progress": 0.0,
+                "completed": [],
+                "available": [],
+            }
+
+        finished_names = _finished_project_names(finished)
+        tree_completed, tree_available = _tree_completed_and_available(tree)
+        if finished_names:
+            adapted["completed"] = finished_names
+        elif tree is not None:
+            adapted["completed"] = tree_completed
+        if tree is not None:
+            adapted["available"] = tree_available
+
+        if isinstance(progress, dict):
+            name = progress.get("name", progress.get("current_project"))
+            if name:
+                adapted["current_project"] = str(name)
+            if progress.get("progress_percent") is not None:
+                adapted["progress"] = float(progress["progress_percent"])
+
+        return adapted
 
     # ------------------------------------------------------------------
     # Read endpoints
@@ -912,7 +1005,14 @@ class RimAPIClient:
 
     async def get_research(self) -> ResearchData:
         data = await self._get("/api/v1/research/summary")
-        return ResearchData.model_validate(self._adapt_research(data))
+        if not isinstance(data, dict):
+            data = {}
+        progress = await self._optional_get("/api/v1/research/progress")
+        finished = await self._optional_get("/api/v1/research/finished")
+        tree = await self._optional_get("/api/v1/research/tree")
+        return ResearchData.model_validate(
+            self._adapt_research(data, progress=progress, finished=finished, tree=tree),
+        )
 
     async def get_work_list(self) -> list[str]:
         """WorkTypeDef defNames from ``GET /api/v1/work-list``."""
