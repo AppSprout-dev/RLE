@@ -21,36 +21,16 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
 import shutil
 import sys
 from pathlib import Path
 from typing import Any
 
 from rle.rimapi.client import RimAPIClient
+from rle.scenarios.loader import default_rimworld_saves_dir
 
 DOCKER_SAVES_DIR = Path(__file__).resolve().parent.parent / "docker" / "saves"
 BASE_SAVE = "rle_crashlanded_v1"
-
-
-def _default_rimworld_save_dir() -> Path:
-    """Return RimWorld's default save directory for the current OS."""
-    if sys.platform == "win32":
-        user_profile = Path(os.environ.get("USERPROFILE", ""))
-        return (
-            user_profile / "AppData" / "LocalLow" / "Ludeon Studios"
-            / "RimWorld by Ludeon Studios" / "Saves"
-        )
-    if sys.platform == "darwin":
-        return (
-            Path.home() / "Library" / "Application Support"
-            / "RimWorld" / "Saves"
-        )
-    # Linux/other
-    return (
-        Path.home() / ".config" / "unity3d" / "Ludeon Studios"
-        / "RimWorld by Ludeon Studios" / "Saves"
-    )
 
 # Colony center (from the base save)
 COLONY_X, COLONY_Z = 132, 137
@@ -576,7 +556,7 @@ def main() -> None:
 
     save_dir = (
         Path(args.save_dir) if args.save_dir
-        else _default_rimworld_save_dir()
+        else default_rimworld_saves_dir()
     )
     if not save_dir.exists():
         print(

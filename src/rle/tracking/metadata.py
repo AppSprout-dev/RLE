@@ -40,6 +40,8 @@ _RIMAPI_DLL_WORKSHOP_FALLBACK = Path(
 def collect_metadata(
     random_seed: int | None = None,
     harness_describe: dict[str, str] | None = None,
+    live_save_sha256: str | None = None,
+    live_save_copied: bool | None = None,
 ) -> dict[str, object]:
     """Gather reproducibility metadata for a benchmark run.
 
@@ -52,6 +54,10 @@ def collect_metadata(
     (``BaseHarness.describe()``): SDK versions, agent roster, external tool
     versions. Recorded as ``harness_versions`` so a leaderboard row can be
     traced to the exact harness build, whichever framework it used.
+
+    ``live_save_sha256`` / ``live_save_copied`` record whether the native
+    AppData save was already at the scenario pin or had to be copied from
+    ``docker/saves/`` before ``POST /game/load``.
     """
     dll_path = _rimapi_dll_path()
     return {
@@ -69,6 +75,8 @@ def collect_metadata(
         "rimapi_dll_path": str(dll_path) if dll_path else None,
         "rimapi_dll_sha256": file_sha256(dll_path) if dll_path else None,
         "rimapi_fork_commit": _rimapi_fork_commit(),
+        "live_save_sha256": live_save_sha256,
+        "live_save_copied": live_save_copied,
     }
 
 

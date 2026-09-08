@@ -30,7 +30,7 @@ from rle.orchestration.save_loader import load_save_and_settle
 from rle.rimapi.client import RimAPIClient
 from rle.rimapi.sse_client import RimAPISSEClient
 from rle.scenarios.evaluator import ScenarioEvaluator
-from rle.scenarios.loader import list_scenarios, load_scenario
+from rle.scenarios.loader import LiveSavePinError, list_scenarios, load_scenario
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.recorder import TimeSeriesRecorder
 from rle.tracking.cost_tracker import create_cost_tracker, fetch_billed_costs
@@ -83,10 +83,17 @@ def _build_run_summary(  # noqa: PLR0913
     cost_snapshot_dict: dict[str, object],
     event_summary_dict: dict[str, object] | None,
     billed_cost_dict: dict[str, object] | None = None,
+    live_save_sha256: str | None = None,
+    live_save_copied: bool | None = None,
 ) -> dict[str, object]:
     """Compose the per-scenario summary JSON (metadata + config + result)."""
     summary: dict[str, object] = {
-        **collect_metadata(random_seed=args.seed, harness_describe=harness_describe),
+        **collect_metadata(
+            random_seed=args.seed,
+            harness_describe=harness_describe,
+            live_save_sha256=live_save_sha256,
+            live_save_copied=live_save_copied,
+        ),
         "scenario": scenario_name,
         "scenario_save_name": scenario_save_name,
         "harness": harness_name,
@@ -210,17 +217,33 @@ async def main(args: argparse.Namespace) -> None:
     sse = RimAPISSEClient(config.rimapi_url)
     sse_task = asyncio.create_task(sse.listen())
 
+    live_save_sha256: str | None = None
+    live_save_copied: bool | None = None
     async with RimAPIClient(config.rimapi_url) as client:
-        # Load the scenario's save file for a consistent starting state
+        # Load the scenario's save file for a consistent starting state.
+        # Native path: stage docker/saves → AppData when the live hash ≠ pin
+        # (Docker entrypoint already symlinks /opt/saves; this CLI is native).
         if scenario.save_name:
             print(f"Loading save: {scenario.save_name}")
             try:
-                unforbid_count = await load_save_and_settle(
+                loaded = await load_save_and_settle(
                     client, config.rimapi_url, scenario.save_name,
+                    save_sha256=scenario.save_sha256,
+                    stage_live=True,
                 )
-                if unforbid_count:
-                    print(f"Unforbid {unforbid_count} items.")
+                if loaded.live_save is not None:
+                    live_save_sha256 = loaded.live_save.live_save_sha256
+                    live_save_copied = loaded.live_save.copied
+                    print(
+                        f"Live save sha256={live_save_sha256} "
+                        f"copied={live_save_copied}",
+                    )
+                if loaded.unforbid_count:
+                    print(f"Unforbid {loaded.unforbid_count} items.")
                 print("Save loaded, game ready.")
+            except LiveSavePinError as e:
+                print(f"ERROR: Refusing to load save '{scenario.save_name}': {e}")
+                raise SystemExit(1) from e
             except Exception as e:
                 print(f"Warning: Could not load save '{scenario.save_name}': {e}")
                 print("Continuing with current game state...")
@@ -353,6 +376,8 @@ async def main(args: argparse.Namespace) -> None:
             billed_cost_dict=(
                 billed_report.model_dump() if billed_report else None
             ),
+            live_save_sha256=live_save_sha256,
+            live_save_copied=live_save_copied,
         )
         summary_path = output_dir / f"{scenario_path.stem}_summary.json"
         summary_path.write_text(json.dumps(summary, indent=2, default=str))

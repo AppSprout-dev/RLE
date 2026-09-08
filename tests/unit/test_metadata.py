@@ -58,6 +58,8 @@ def test_collect_metadata_includes_scoring_version_and_seed() -> None:
         "rimapi_dll_path",
         "rimapi_dll_sha256",
         "rimapi_fork_commit",
+        "live_save_sha256",
+        "live_save_copied",
     ):
         assert key in md, f"missing metadata field: {key}"
 
@@ -71,6 +73,17 @@ def test_collect_metadata_records_harness_describe() -> None:
 def test_collect_metadata_default_seed_is_none() -> None:
     md = collect_metadata()
     assert md["random_seed"] is None
+    assert md["live_save_sha256"] is None
+    assert md["live_save_copied"] is None
+
+
+def test_collect_metadata_records_live_save_staging() -> None:
+    md = collect_metadata(
+        live_save_sha256="a" * 64,
+        live_save_copied=True,
+    )
+    assert md["live_save_sha256"] == "a" * 64
+    assert md["live_save_copied"] is True
 
 
 def test_collect_metadata_dll_path_and_hash_pair_consistently() -> None:
