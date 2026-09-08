@@ -18,9 +18,10 @@ A gate score is not σ. A 10-tick leaderboard is not a horizon. N=4 without
 
 ## Current fact (scoring 1.2)
 
-Almost every published scoring-1.2 cell is **seed 42, N=1** (see
-`spread-2026-09-06`). One observation per cell ⇒ **no within-cell σ**.
-Declaring “significance” without σ is theater.
+Almost every published scoring-1.2 cell is **seed 42, N=1** (live
+`spread-2026-09-07`; prior snapshot `spread-2026-09-06`). One
+observation per cell ⇒ **no within-cell σ**. Declaring “significance”
+without σ is theater.
 
 The live board already labels N=1 as content-first / not statistically
 valid. “Winners advance to N=4” is still not a substitute for measuring

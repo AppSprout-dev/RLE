@@ -2,7 +2,7 @@
 
 ## ELI5
 
-RLE is a public research benchmark — not a product — where AI agent setups try to keep a RimWorld colony alive. The live published board is [spread-2026-09-06](https://huggingface.co/datasets/AppSprout/rle-benchmarks) on [rle.appsprout.dev](https://rle.appsprout.dev): scoring 1.2, harness × model, Crashlanded, N=1, seed 42, 10 ticks. Grok Build (ACP) leads at mean composite 0.811 (final 0.833). N=1 is content-first and not statistically valid. Winners advance to N=4; N=4 is not published. The June 2026 scoring 1.1 `felix` 11-model table is historical and **not comparable** (different scoring era). Full table: [Benchmark Results](#benchmark-results).
+RLE is a public research benchmark — not a product — where AI agent setups try to keep a RimWorld colony alive. The live published board is [spread-2026-09-07](https://huggingface.co/datasets/AppSprout/rle-benchmarks) on [rle.appsprout.dev](https://rle.appsprout.dev): scoring 1.2, harness × model, Crashlanded, N=1, seed 42, 10 ticks, 12 rows (Sep 6 grok-4.6 four + Flash 8-cell). Grok Build (ACP) leads at mean composite 0.811 (final 0.833). N=1 is content-first and not statistically valid. Winners advance to N=4; N=4 is not published. `spread-2026-09-06` is a prior 4-row snapshot. The June 2026 scoring 1.1 `felix` 11-model table is historical and **not comparable** (different scoring era). Full table: [Benchmark Results](#benchmark-results).
 
 A **harness × model** benchmark: swappable agent harnesses manage a RimWorld colony under uncertainty and are scored on the same footing against an unmanaged baseline. Think [FLE](https://github.com/chenhao-wang/FLE) (Factorio Learning Environment) but stochastic, multi-agent-capable, and with the *harness* — not just the model — as a first-class variable.
 
@@ -260,9 +260,32 @@ python scripts/run_benchmark.py \
 
 ## Benchmark Results
 
-**Live board — `spread-2026-09-06`, scoring 1.2, harness × model** — Crashlanded, 10 ticks, seed 42, N=1. **Content-first — not statistically valid (no confidence intervals). Winners advance to N=4; N=4 is not published.** Ranked by mean composite across the run. Featured numbers live on [rle.appsprout.dev](https://rle.appsprout.dev) and the [HF card](https://huggingface.co/datasets/AppSprout/rle-benchmarks) (`runs/spread-2026-09-06`). N×ticks sequence (QA → σ → **25-tick** short horizon → size): [docs/bench-design-n-ticks.md](docs/bench-design-n-ticks.md).
+**Live board — `spread-2026-09-07`, scoring 1.2, harness × model** — Crashlanded, 10 ticks, seed 42, N=1, 12 rows (Sep 6 grok-4.6 four + Flash 8-cell). **Content-first — not statistically valid (no confidence intervals). Winners advance to N=4; N=4 is not published.** Ranked by mean composite across the run. Featured numbers live on [rle.appsprout.dev](https://rle.appsprout.dev) and the [HF card](https://huggingface.co/datasets/AppSprout/rle-benchmarks) (`runs/spread-2026-09-07`). N×ticks sequence (QA → σ → **25-tick** short horizon → size): [docs/bench-design-n-ticks.md](docs/bench-design-n-ticks.md).
 
 `felix` here is a technical harness name (the original 7-agent stack), not a product.
+
+| # | Harness / model | Mean | Final | vs baseline | Cost |
+|---|-----------------|------|-------|-------------|------|
+| 1 | Grok Build (ACP) / grok-4.6 | **0.811** | 0.833 | −0.021 | $7.00* |
+| 2 | Felix / gemini-3.8-flash | 0.808 | 0.800 | −0.024 | $0.78 |
+| 3 | OpenCode / grok-4.6 | 0.801 | 0.821 | −0.005 | $1.59* |
+| 4 | OpenCode / deepseek-v4-flash | 0.794 | 0.810 | −0.049 | $0.08* |
+| 5 | raw-openrouter / deepseek-v4-flash | 0.789 | 0.762 | −0.039 | $0.03 |
+| 6 | OpenCode / gemini-3.8-flash | 0.776 | 0.576 | −0.021 | $0.14* |
+| 7 | raw-openrouter / gemini-3.8-flash | 0.769 | 0.751 | −0.059 | $0.82 |
+| 8 | Grok Build / gemini-3.8-flash | 0.759 | 0.714 | −0.066 | $0.87 |
+| 9 | Felix / deepseek-v4-flash | 0.757 | 0.662 | −0.052 | $0.02 |
+| 10 | Grok Build / deepseek-v4-flash | 0.754 | 0.659 | −0.045 | $0.17 |
+| 11 | Felix / grok-4.6 | 0.707 | 0.372 | −0.083 | $0.86 |
+| 12 | raw-grok / grok-4.6 | 0.665 | 0.380 | −0.095 | — |
+
+Measured against a pinned no-agent baseline (4 seeds, mean time-to-end 8.0 days). **0 of 12 harness/model rows beat the unmanaged baseline.** Highest mean composite is not the same as beating baseline.
+
+Costs match the live site: unmarked costs are OpenRouter billed; `*` = estimated / console. Grok Build ACP $7.00* is console; OpenCode grok-4.6 $1.59* (796917 tokens) and the Flash OpenCode cells are estimated. raw-grok cost is unknown and omitted from the cost frontier. Total spend $10.54.
+
+### Prior snapshot — `spread-2026-09-06` (not the live cite)
+
+**4-row grok-4.6 slice, scoring 1.2** — Crashlanded, 10 ticks, seed 42, N=1 (`runs/spread-2026-09-06`). Same content-first caveat as the live board. Kept as the prior published snapshot; the live cite is the 12-row `spread-2026-09-07` board above.
 
 | # | Harness / model | Mean | Final | vs baseline | Cost |
 |---|-----------------|------|-------|-------------|------|
@@ -271,13 +294,11 @@ python scripts/run_benchmark.py \
 | 3 | Felix / grok-4.6 | 0.707 | 0.372 | −0.083 | $0.86 |
 | 4 | raw-grok / grok-4.6 | 0.665 | 0.380 | −0.095 | — |
 
-Measured against a pinned no-agent baseline (4 seeds, mean time-to-end 8.0 days). **0 of 4 harness/model rows beat the unmanaged baseline.** Highest mean composite is not the same as beating baseline.
-
-Costs match the live site: Felix $0.86 is OpenRouter billed; OpenCode $1.59* is estimated from OpenRouter grok-4.6 tokens×rates (796917 tokens; OSS harness still billed via OpenRouter); Grok Build ACP $7.00* is console. raw-grok cost is unknown and omitted from the cost frontier. `*` = estimated / console. Total spend $9.45.
+**0 of 4 harness/model rows beat the unmanaged baseline.** Costs as published on that snapshot: Felix $0.86 billed; OpenCode $1.59* estimated; Grok Build ACP $7.00* console; raw-grok unknown. Total spend $9.45.
 
 ### Historical — scoring 1.1 (non-comparable)
 
-**11-model spread, `felix` harness, scoring 1.1** — Crashlanded, 10 ticks, seed 42, 2026-06-11 (`spread-2026-06-11`). **N=1, content-first — not statistically valid.** These rows predate the harness axis and scoring 1.2: they were all produced by the Felix harness and include the since-removed `coordination` / `communication_efficiency` metrics, so they are **not comparable** to the 1.2 board above.
+**11-model spread, `felix` harness, scoring 1.1** — Crashlanded, 10 ticks, seed 42, 2026-06-11 (`spread-2026-06-11`). **N=1, content-first — not statistically valid.** These rows predate the harness axis and scoring 1.2: they were all produced by the Felix harness and include the since-removed `coordination` / `communication_efficiency` metrics, so they are **not comparable** to the scoring 1.2 boards above.
 
 | # | Model | Mean | Final | vs baseline | Cost |
 |---|-------|------|-------|-------------|------|
