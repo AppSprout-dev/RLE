@@ -8,10 +8,13 @@ from collections.abc import AsyncGenerator
 import httpx
 import pytest
 
+from rle.orchestration.preflight import research_target_status
 from rle.rimapi.client import (
     RimAPIClient,
     RimAPIConnectionError,
     RimAPIResponseError,
+    _building_def_name,
+    _select_buildings_for_state,
 )
 from rle.rimapi.schemas import (
     AlertData,
@@ -26,6 +29,7 @@ from rle.rimapi.schemas import (
     ScreenshotResponse,
     ThreatData,
     WeatherData,
+    is_research_bench_def,
 )
 
 # ------------------------------------------------------------------
@@ -360,6 +364,111 @@ class TestReadEndpoints:
         assert result.power.current_power == 1800.0
         assert len(result.factions) == 2
         assert result.factions[0].name == "Pirate Band"
+
+
+class TestResearchUnblockAdapters:
+    """Post-#76 RCA: live BuildingDto ``def`` + research progress merge."""
+
+    def test_building_def_field_marks_bench(self) -> None:
+        name = _building_def_name({
+            "def": "SimpleResearchBench",
+            "label": "simple research bench",
+        })
+        assert name == "SimpleResearchBench"
+        assert is_research_bench_def(name)
+        selected = _select_buildings_for_state([
+            {"def": "Wall", "label": "wall"},
+            {"def": "SimpleResearchBench", "label": "simple research bench"},
+        ])
+        assert _building_def_name(selected[0]) == "SimpleResearchBench"
+
+    async def test_get_map_reads_live_def_field(self, all_routes: dict) -> None:
+        walls = [
+            {"id": i, "def": "Wall", "label": "wall", "position": [i, 0]}
+            for i in range(60)
+        ]
+        walls.append({
+            "id": 37771,
+            "def": "SimpleResearchBench",
+            "label": "simple research bench",
+            "position": {"x": 128, "y": 0, "z": 136},
+        })
+        routes = dict(all_routes)
+        routes["/api/v1/map/buildings?map_id=0"] = walls
+        transport = _make_transport(routes, _WRITE_ROUTES)
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
+            result = await client.get_map()
+        assert result.structures[0].def_name == "SimpleResearchBench"
+        assert is_research_bench_def(result.structures[0].def_name)
+
+    def test_spacey_label_matches_research_bench(self) -> None:
+        assert is_research_bench_def("simple research bench")
+        assert is_research_bench_def(_building_def_name({"label": "simple research bench"}))
+        selected = _select_buildings_for_state([
+            {"label": "wall"},
+            {"label": "simple research bench"},
+        ])
+        assert is_research_bench_def(_building_def_name(selected[0]))
+
+    async def test_progress_merge_exposes_current_smithing(
+        self, all_routes: dict,
+    ) -> None:
+        routes = dict(all_routes)
+        # Live summary has no current_project. Medieval finished>0 used to
+        # dump Smithing into completed, then truncate it out of available.
+        routes["/api/v1/research/summary"] = {
+            "finished_projects_count": 2,
+            "total_projects_count": 6,
+            "available_projects_count": 2,
+            "by_tech_level": {
+                "Neolithic": {
+                    "finished": 1,
+                    "total": 2,
+                    "projects": ["PsychoidBrewing", "Devouring"],
+                },
+                "Medieval": {
+                    "finished": 1,
+                    "total": 3,
+                    "projects": ["Stonecutting", "Smithing", "ComplexClothing"],
+                },
+            },
+        }
+        routes["/api/v1/research/progress"] = {
+            "name": "Smithing",
+            "label": "smithing",
+            "progress": 0,
+            "research_points": 700,
+            "is_finished": False,
+            "can_start_now": True,
+            "progress_percent": 0.0,
+        }
+        routes["/api/v1/research/finished"] = {
+            "finished_projects": ["PsychoidBrewing", "Stonecutting"],
+        }
+        routes["/api/v1/research/tree"] = {
+            "projects": [
+                {"name": "PsychoidBrewing", "is_finished": True, "can_start_now": False},
+                {"name": "Stonecutting", "is_finished": True, "can_start_now": False},
+                {"name": "Smithing", "is_finished": False, "can_start_now": True},
+                {"name": "ComplexClothing", "is_finished": False, "can_start_now": True},
+                {"name": "Fabrication", "is_finished": False, "can_start_now": False},
+                {"name": "Devouring", "is_finished": False, "can_start_now": False},
+            ],
+        }
+        transport = _make_transport(routes, _WRITE_ROUTES)
+        async with RimAPIClient("http://test") as client:
+            client._client = httpx.AsyncClient(transport=transport, base_url="http://test")
+            result = await client.get_research()
+        assert result.current_project == "Smithing"
+        assert "Smithing" not in result.completed
+        assert result.completed == ["PsychoidBrewing", "Stonecutting"]
+        assert "Smithing" in result.available
+        assert "ComplexClothing" in result.available
+        assert "Fabrication" not in result.available
+        assert research_target_status("Smithing", result) == "current"
+        assert research_target_status("ComplexClothing", result) == "available"
+        assert research_target_status("Fabrication", result) == "locked"
 
 
 class TestErrorHandling:
