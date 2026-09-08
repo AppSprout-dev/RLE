@@ -260,7 +260,7 @@ python scripts/run_benchmark.py \
 
 ## Benchmark Results
 
-**Live board — `spread-2026-09-06`, scoring 1.2, harness × model** — Crashlanded, 10 ticks, seed 42, N=1. **Content-first — not statistically valid (no confidence intervals). Winners advance to N=4; N=4 is not published.** Ranked by mean composite across the run. Featured numbers live on [rle.appsprout.dev](https://rle.appsprout.dev) and the [HF card](https://huggingface.co/datasets/AppSprout/rle-benchmarks) (`runs/spread-2026-09-06`). N×ticks sequence (QA → σ → horizon → size): [docs/bench-design-n-ticks.md](docs/bench-design-n-ticks.md).
+**Live board — `spread-2026-09-06`, scoring 1.2, harness × model** — Crashlanded, 10 ticks, seed 42, N=1. **Content-first — not statistically valid (no confidence intervals). Winners advance to N=4; N=4 is not published.** Ranked by mean composite across the run. Featured numbers live on [rle.appsprout.dev](https://rle.appsprout.dev) and the [HF card](https://huggingface.co/datasets/AppSprout/rle-benchmarks) (`runs/spread-2026-09-06`). N×ticks sequence (QA → σ → **25-tick** short horizon → size): [docs/bench-design-n-ticks.md](docs/bench-design-n-ticks.md).
 
 `felix` here is a technical harness name (the original 7-agent stack), not a product.
 
