@@ -30,4 +30,8 @@ gunzip -k rle_crashlanded_v1.rws.gz
 cp rle_crashlanded_v1.rws ~/.config/unity3d/Ludeon\ Studios/RimWorld\ by\ Ludeon\ Studios/Saves/
 ```
 
-`run_scenario.py` auto-loads the save by name — just make sure the `.rws` file exists in the saves folder.
+`run_scenario.py` auto-loads the save by name. Native (non-docker) runs
+stage `docker/saves/<name>.rws` into RimWorld's AppData Saves folder when
+the live file's SHA-256 does not match the scenario YAML pin, then fail
+closed if the copy cannot satisfy the pin. Docker entrypoint already
+symlinks `/opt/saves` into the container Saves folder.

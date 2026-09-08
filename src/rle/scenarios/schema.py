@@ -64,8 +64,10 @@ class ScenarioConfig(BaseModel):
     save_name: str = ""
     save_sha256: str | None = None
     """Pinned SHA-256 of the docker/saves/<save_name>.rws file. When set, the
-    loader compares it against the on-disk save and refuses to start on
-    mismatch unless allow_unpinned=True. Generate via scripts/hash_saves.py."""
+    loader compares it against the canonical mirror and refuses to start on
+    mismatch unless allow_unpinned=True. Native loads also stage that file
+    into RimWorld AppData Saves before POST /game/load. Generate via
+    scripts/hash_saves.py."""
     triggered_incidents: list[TriggeredIncident] = []
     setup_commands: list[SetupCommand] = []
 

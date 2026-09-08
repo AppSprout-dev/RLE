@@ -30,7 +30,7 @@ from rle.orchestration.game_loop import RLEGameLoop
 from rle.orchestration.save_loader import load_save_and_settle
 from rle.rimapi.client import RimAPIClient
 from rle.scenarios.evaluator import ScenarioEvaluator
-from rle.scenarios.loader import list_scenarios
+from rle.scenarios.loader import LiveSavePinError, LiveSaveStatus, list_scenarios
 from rle.scenarios.schema import ScenarioConfig
 from rle.scoring.composite import CompositeScorer
 from rle.scoring.delta import PairedResult, print_paired_leaderboard
@@ -67,16 +67,44 @@ class RunError(RuntimeError):
     """A harness could not be constructed for this run."""
 
 
-async def _load_save(client: RimAPIClient, config: RLEConfig, scenario: ScenarioConfig) -> bool:
-    """Load + settle the scenario save. Returns False when the run must be skipped."""
+async def _load_save(
+    client: RimAPIClient,
+    config: RLEConfig,
+    scenario: ScenarioConfig,
+    *,
+    stage_live: bool = False,
+) -> tuple[bool, LiveSaveStatus | None]:
+    """Load + settle the scenario save.
+
+    Returns ``(ok, live_save)``. ``ok`` is False when the run must be skipped
+    for a transient load failure. ``LiveSavePinError`` is not caught — a
+    native pin miss fails closed instead of loading a stale AppData file.
+    """
     if not scenario.save_name:
-        return True
+        return True, None
     try:
-        await load_save_and_settle(client, config.rimapi_url, scenario.save_name)
+        loaded = await load_save_and_settle(
+            client, config.rimapi_url, scenario.save_name,
+            save_sha256=scenario.save_sha256,
+            stage_live=stage_live,
+        )
+    except LiveSavePinError:
+        raise
     except Exception as e:
         logger.warning("Could not load save %s: %s", scenario.save_name, e)
-        return False
-    return True
+        return False, None
+    if loaded.live_save is not None:
+        logger.info(
+            "live_save_sha256=%s copied=%s",
+            loaded.live_save.live_save_sha256,
+            loaded.live_save.copied,
+        )
+        print(
+            f"  live save {scenario.save_name}: "
+            f"sha256={loaded.live_save.live_save_sha256} "
+            f"copied={loaded.live_save.copied}",
+        )
+    return True, loaded.live_save
 
 
 def _harness_failed(event_log: EventLog | None, start_index: int) -> bool:
@@ -287,9 +315,17 @@ async def _run_ablation(  # noqa: PLR0913
             for scenario in scenarios:
                 for run_id in range(num_runs):
                     run_label = f" (run {run_id + 1}/{num_runs})" if num_runs > 1 else ""
-                    if not use_mock_rimapi and not await _load_save(client, config, scenario):
-                        print(f"    SKIP {scenario.name}{run_label} ({tag}): save load failed")
-                        continue
+                    if not use_mock_rimapi:
+                        loaded_ok, _live = await _load_save(
+                            client, config, scenario,
+                            stage_live=not args.docker,
+                        )
+                        if not loaded_ok:
+                            print(
+                                f"    SKIP {scenario.name}{run_label} "
+                                f"({tag}): save load failed",
+                            )
+                            continue
 
                     print(f"  {scenario.name}{run_label} ({tag})...")
                     options = {**harness_options, "exclude_agent": exclude}
@@ -477,9 +513,15 @@ async def main(args: argparse.Namespace) -> None:  # noqa: PLR0912, PLR0915
                     for run_id in range(num_runs):
                         run_label = f" (run {run_id + 1}/{num_runs})" if num_runs > 1 else ""
 
-                        if not use_mock_rimapi and not await _load_save(client, config, scenario):
-                            print(f"  SKIP {scenario.name}{run_label}: save load failed")
-                            continue
+                        live_save: LiveSaveStatus | None = None
+                        if not use_mock_rimapi:
+                            loaded_ok, live_save = await _load_save(
+                                client, config, scenario,
+                                stage_live=not args.docker,
+                            )
+                            if not loaded_ok:
+                                print(f"  SKIP {scenario.name}{run_label}: save load failed")
+                                continue
 
                         print(
                             f"\nRunning: {scenario.name} ({scenario.difficulty}) "
@@ -499,6 +541,9 @@ async def main(args: argparse.Namespace) -> None:  # noqa: PLR0912, PLR0915
                         except RunError as exc:
                             exit_with_harness_error(exc)
                             return
+                        if live_save is not None:
+                            result["live_save_sha256"] = live_save.live_save_sha256
+                            result["live_save_copied"] = live_save.copied
                         results.append(result)
                         if paired:
                             paired.agent_scores.append(result["score"])
@@ -512,7 +557,11 @@ async def main(args: argparse.Namespace) -> None:  # noqa: PLR0912, PLR0915
 
                         # Baseline run (reload same save, unmanaged colony)
                         if paired is not None:
-                            if not await _load_save(client, config, scenario):
+                            reload_ok, _live = await _load_save(
+                                client, config, scenario,
+                                stage_live=not args.docker,
+                            )
+                            if not reload_ok:
                                 logger.warning("Could not reload save for baseline")
                             print(f"  baseline{run_label}...")
                             baseline = await _run_scenario(

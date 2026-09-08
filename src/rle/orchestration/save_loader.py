@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 
 from rle.docker import wait_for_rimapi
 from rle.rimapi.client import RimAPIClient
+from rle.scenarios.loader import LiveSaveStatus, ensure_live_save
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +27,14 @@ POLL_INTERVAL_S = 2.0
 MAX_POLLS = 30
 
 
+@dataclass(frozen=True)
+class LoadSettleResult:
+    """Outcome of ``load_save_and_settle`` (unforbid count + optional staging)."""
+
+    unforbid_count: int
+    live_save: LiveSaveStatus | None = None
+
+
 async def load_save_and_settle(
     client: RimAPIClient,
     rimapi_url: str,
@@ -32,13 +42,30 @@ async def load_save_and_settle(
     *,
     unforbid_items: bool = True,
     rimapi_timeout_s: float = 30.0,
-) -> int:
+    save_sha256: str | None = None,
+    stage_live: bool = False,
+) -> LoadSettleResult:
     """Load ``save_name`` and block until the colony is stable.
 
-    Returns the number of starting items unforbidden (0 when disabled).
-    Raises whatever ``load_game`` / ``wait_for_rimapi`` raise so callers can
-    decide whether to skip the run.
+    When ``stage_live`` is True and ``save_sha256`` is set (native path),
+    copy ``docker/saves/<name>.rws`` into RimWorld AppData Saves if the live
+    file does not already match the pin. Docker skips this — the entrypoint
+    already symlinks ``/opt/saves``. Staging failures raise
+    ``LiveSavePinError`` (fail closed) before ``game/load``.
+
+    Returns ``LoadSettleResult`` (unforbid count + live-save status).
+    Raises whatever ``load_game`` / ``wait_for_rimapi`` / staging raise so
+    callers can decide whether to skip the run.
     """
+    live_save: LiveSaveStatus | None = None
+    if stage_live and save_sha256:
+        live_save = ensure_live_save(save_name, save_sha256)
+        logger.info(
+            "live_save_sha256=%s copied=%s path=%s",
+            live_save.live_save_sha256,
+            live_save.copied,
+            live_save.live_path,
+        )
     await client.load_game(save_name)
     await wait_for_rimapi(rimapi_url, timeout=rimapi_timeout_s)
     stable_count = 0
@@ -60,6 +87,6 @@ async def load_save_and_settle(
     else:
         logger.warning("Save %s never reported a stable population; continuing", save_name)
     if not unforbid_items:
-        return 0
+        return LoadSettleResult(unforbid_count=0, live_save=live_save)
     count = await client.unforbid_all_items()
-    return int(count or 0)
+    return LoadSettleResult(unforbid_count=int(count or 0), live_save=live_save)

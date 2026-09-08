@@ -9,7 +9,7 @@ Four things must be set up before RLE can run against a live game:
 1. **RimWorld** — Steam install at `C:\Steam\steamapps\common\RimWorld\` (or wherever Steam is)
 2. **Harmony + RIMAPI mods** — Subscribe on Steam Workshop, then **enable both** in the in-game Mods menu. Load order: Harmony → Core → Royalty → RIMAPI. RIMAPI exposes REST API on `:8765` + SSE events.
 3. **LLM provider** — [LM Studio](https://lmstudio.ai/) (local, port 1234) or [OpenRouter](https://openrouter.ai/) (cloud)
-4. **Save file** — `rle_crashlanded_v1` save must exist in RimWorld's save folder (`C:\Users\<you>\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves\`). The scenario auto-loads it.
+4. **Save file** — `rle_crashlanded_v1` is pinned in `docker/saves/` (YAML `save_sha256`). Native runs stage that file into RimWorld AppData Saves (`C:\Users\<you>\AppData\LocalLow\Ludeon Studios\RimWorld by Ludeon Studios\Saves\`) when the live hash diverges, then `POST /game/load` by name. Docker entrypoint already symlinks `/opt/saves`.
 
 ### RIMAPI mod setup (critical)
 
@@ -272,11 +272,12 @@ Tick-specific priorities injected into all Felix agents (other harnesses get no 
 ### Save Loading + Item Setup
 
 `run_scenario.py` automatically:
-1. Loads the scenario's save file (`rle_crashlanded_v1` seeds a built `SimpleResearchBench` at (128,136) and queues `Smithing`; the other five saves are derived from this base)
-2. Polls until game is ready (colonist_count > 0)
-3. Unforbids all starting items (via `POST /api/v1/things/set-forbidden`)
-4. Runs any `setup_commands` declared in the scenario YAML (spawn_pawn, spawn_item, change_weather, drop_pod)
-5. Unpauses game at speed 3 (if `--no-pause`)
+1. Native only: `ensure_live_save()` copies `docker/saves/<name>.rws` into RimWorld AppData Saves when the live SHA ≠ YAML `save_sha256` (fail closed). Docker already symlinks `/opt/saves`. Summaries record `live_save_sha256` + `live_save_copied`.
+2. Loads the scenario's save file (`rle_crashlanded_v1` seeds a built `SimpleResearchBench` at (128,136) and queues `Smithing`; the other five saves are derived from this base)
+3. Polls until game is ready (colonist_count > 0)
+4. Unforbids all starting items (via `POST /api/v1/things/set-forbidden`)
+5. Runs any `setup_commands` declared in the scenario YAML (spawn_pawn, spawn_item, change_weather, drop_pod)
+6. Unpauses game at speed 3 (if `--no-pause`)
 
 ### Regenerating scenario saves
 
