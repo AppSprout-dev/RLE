@@ -1,10 +1,24 @@
 name: CI
 
+# Diet: one full run per change in the common case.
+# - pull_request covers contributor and feature-branch work (required job names unchanged).
+# - push is master-only so a feature/** tip is not also tested via push while a PR is open.
+# - concurrency cancels obsolete runs on the same PR or the same push ref.
+# Benchmark and release-please are separate workflows and are not in this group.
 on:
   push:
-    branches: [master, "feature/**"]
+    branches: [master]
+    # Safe on push only: docs-only master commits skip CI. Not applied to
+    # pull_request so required checks always report for contributors.
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
   pull_request:
     branches: [master, "feature/**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
