@@ -1242,7 +1242,7 @@ wheels = [
 
 [[package]]
 name = "rimworld-learning-environment"
-version = "0.4.1"
+version = "0.7.2"
 source = { editable = "." }
 dependencies = [
     { name = "httpx" },
