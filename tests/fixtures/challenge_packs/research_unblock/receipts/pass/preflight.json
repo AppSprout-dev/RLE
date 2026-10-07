@@ -1,0 +1,17 @@
+{
+  "research_bench_present": true,
+  "structures": [
+    {
+      "def_name": "SimpleResearchBench",
+      "position": [128, 136]
+    }
+  ],
+  "adapter": "_adapt_research",
+  "research": {
+    "current_project": "Smithing",
+    "progress": 0.0,
+    "completed": [],
+    "available": ["Smithing"]
+  },
+  "research_target_status": "current"
+}

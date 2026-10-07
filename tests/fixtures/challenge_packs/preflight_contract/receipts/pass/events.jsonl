@@ -1,0 +1,1 @@
+{"timestamp": 0.0, "tick": 1, "event_type": "action_exec", "agent": null, "data": {"action_type": "stockpile_delete", "target": null, "success": false, "error": "stockpile_delete is quarantined — the endpoint is missing on this RIMAPI build. Do not advertise or call it.", "parameters": {"zone_id": 3}}}

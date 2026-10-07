@@ -1,0 +1,7 @@
+{
+  "growing_zone_already_covers": true,
+  "work_priority": {"Growing": 1},
+  "research_target_status": "available",
+  "tend_pair_resolved": true,
+  "stockpile_delete_quarantined": true
+}

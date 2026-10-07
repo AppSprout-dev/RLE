@@ -1,0 +1,13 @@
+{
+  "scoring_version": "1.1",
+  "scenario": "Crashlanded Survival",
+  "random_seed": 42,
+  "harness": "fixture",
+  "model": "fixture",
+  "ticks_run": 10,
+  "outcome": "timeout",
+  "final_score": "narrative",
+  "n_runs": 2,
+  "pass_rate": true,
+  "reasoning_traces": [{"summary": "abridged"}]
+}

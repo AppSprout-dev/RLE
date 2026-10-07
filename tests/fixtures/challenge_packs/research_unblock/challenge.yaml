@@ -1,0 +1,41 @@
+schema_version: 1
+id: research_unblock
+scenario: Crashlanded Survival
+seed: 42
+tick_budget: 10
+mode: fixture
+harness: fixture
+model: fixture
+scoring_version: "1.2"
+expected:
+  - research_bench_present
+  - research_adapters
+pass_fail:
+  - judgment: research_bench_present
+    receipt: preflight.json
+    match: object
+    all:
+      - path: research_bench_present
+        eq: true
+      - path: structures.0.def_name
+        eq: SimpleResearchBench
+    absent:
+      - reasoning_trace
+      - reasoning_traces
+  - judgment: research_adapters
+    receipt: preflight.json
+    match: object
+    all:
+      - path: adapter
+        eq: _adapt_research
+      - path: research.current_project
+        eq: Smithing
+      - path: research_target_status
+        eq: current
+      - path: research.completed
+        not_contains: Medieval
+      - path: research.available
+        type: list
+    absent:
+      - reasoning_trace
+      - reasoning_traces

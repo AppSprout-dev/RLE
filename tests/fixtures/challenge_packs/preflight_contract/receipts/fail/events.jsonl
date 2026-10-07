@@ -1,0 +1,1 @@
+{"timestamp": 0.0, "tick": 1, "event_type": "action_exec", "agent": null, "data": {"action_type": "stockpile_delete", "target": null, "success": true, "error": null, "parameters": {"zone_id": 3}}}
