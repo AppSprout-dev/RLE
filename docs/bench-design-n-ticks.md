@@ -103,3 +103,12 @@ Val proved check-zone + work-priority schema. Gates2 proved work-priority
 repeats and tend; research rejects were **no bench / prereqs**, not a
 schema miss. Stockpile-delete and the farm already-covered branch are
 still open QA.
+
+## Public proof
+
+Replay a claim with a challenge pack: challenge file, expected judgment
+name, and pass/fail over `summary.json`, events, and preflight adapters.
+Rules and judgment names: [public-proof-challenge-packs.md](public-proof-challenge-packs.md).
+Chain-of-thought and abridged reasoning traces are not receipts. The
+figures in this memo are unchanged. The live board remains
+`spread-2026-09-07`, N=1.
