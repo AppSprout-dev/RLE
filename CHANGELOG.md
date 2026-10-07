@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.3](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.7.2...rimworld-learning-environment-v0.7.3) (2026-10-07)
+
+
+### Documentation
+
+* define public-proof challenge packs ([7f3390b](https://github.com/AppSprout-dev/RLE/commit/7f3390b2a34ef73b195bed4b4956f1bb1ce95eea))
+* public-proof challenge packs and CoT refusal ([c444f4d](https://github.com/AppSprout-dev/RLE/commit/c444f4d92e2dbea0e28c77fcf94a19bda9f5b5e6))
+
 ## [0.7.2](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.7.1...rimworld-learning-environment-v0.7.2) (2026-09-08)
 
 
