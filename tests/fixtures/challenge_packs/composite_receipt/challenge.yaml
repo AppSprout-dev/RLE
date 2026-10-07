@@ -1,0 +1,39 @@
+schema_version: 1
+id: composite_receipt
+scenario: Crashlanded Survival
+seed: 42
+tick_budget: 10
+mode: fixture
+harness: fixture
+model: fixture
+scoring_version: "1.2"
+expected:
+  - composite_receipt
+pass_fail:
+  - judgment: composite_receipt
+    receipt: summary.json
+    match: object
+    all:
+      - path: scoring_version
+        eq: "1.2"
+      - path: scenario
+        eq: Crashlanded Survival
+      - path: random_seed
+        eq: 42
+      - path: harness
+        eq: fixture
+      - path: model
+        eq: fixture
+      - path: ticks_run
+        gte: 1
+      - path: ticks_run
+        lte: 10
+      - path: final_score
+        type: number
+      - path: outcome
+        type: string
+    absent:
+      - reasoning_trace
+      - reasoning_traces
+      - pass_rate
+      - n_runs

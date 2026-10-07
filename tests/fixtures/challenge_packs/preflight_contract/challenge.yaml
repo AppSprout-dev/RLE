@@ -1,0 +1,45 @@
+schema_version: 1
+id: preflight_contract
+scenario: Crashlanded Survival
+seed: 42
+tick_budget: 10
+mode: fixture
+harness: fixture
+model: fixture
+scoring_version: "1.2"
+expected:
+  - stockpile_delete_quarantine
+  - preflight_contract
+pass_fail:
+  - judgment: stockpile_delete_quarantine
+    receipt: events.jsonl
+    match: any
+    where:
+      event_type: action_exec
+    all:
+      - path: data.action_type
+        eq: stockpile_delete
+      - path: data.success
+        eq: false
+      - path: data.error
+        contains: quarantined
+    absent:
+      - reasoning_trace
+      - reasoning_traces
+  - judgment: preflight_contract
+    receipt: preflight.json
+    match: object
+    all:
+      - path: growing_zone_already_covers
+        eq: true
+      - path: work_priority.Growing
+        eq: 1
+      - path: research_target_status
+        eq: available
+      - path: tend_pair_resolved
+        eq: true
+      - path: stockpile_delete_quarantined
+        eq: true
+    absent:
+      - reasoning_trace
+      - reasoning_traces

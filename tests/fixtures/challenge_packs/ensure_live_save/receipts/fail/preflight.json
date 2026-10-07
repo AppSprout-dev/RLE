@@ -1,0 +1,7 @@
+{
+  "save_name": "rle_crashlanded_v1",
+  "pinned_sha256": "pin-match",
+  "live_save_sha256": "stale-appdata",
+  "copied": false,
+  "error": "LiveSavePinError"
+}

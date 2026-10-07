@@ -1,0 +1,17 @@
+{
+  "research_bench_present": false,
+  "structures": [
+    {
+      "def_name": "Wall",
+      "position": [0, 0]
+    }
+  ],
+  "adapter": "_adapt_research",
+  "research": {
+    "current_project": null,
+    "progress": 0.0,
+    "completed": ["Medieval"],
+    "available": []
+  },
+  "research_target_status": "locked"
+}

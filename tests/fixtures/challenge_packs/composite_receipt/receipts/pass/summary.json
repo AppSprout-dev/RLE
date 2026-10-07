@@ -1,0 +1,14 @@
+{
+  "scoring_version": "1.2",
+  "scenario": "Crashlanded Survival",
+  "scenario_save_name": "rle_crashlanded_v1",
+  "random_seed": 42,
+  "harness": "fixture",
+  "model": "fixture",
+  "ticks_run": 10,
+  "max_ticks": 10,
+  "outcome": "timeout",
+  "final_score": 0.0,
+  "live_save_sha256": "pin-match",
+  "live_save_copied": false
+}

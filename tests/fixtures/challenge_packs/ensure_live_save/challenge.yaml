@@ -1,0 +1,27 @@
+schema_version: 1
+id: ensure_live_save
+scenario: Crashlanded Survival
+seed: 42
+tick_budget: 10
+mode: fixture
+harness: fixture
+model: fixture
+scoring_version: "1.2"
+expected:
+  - ensure_live_save
+pass_fail:
+  - judgment: ensure_live_save
+    receipt: preflight.json
+    match: object
+    all:
+      - path: save_name
+        eq: rle_crashlanded_v1
+      - path: live_save_sha256
+        eq_path: pinned_sha256
+      - path: error
+        absent: true
+      - path: copied
+        type: bool
+    absent:
+      - reasoning_trace
+      - reasoning_traces
