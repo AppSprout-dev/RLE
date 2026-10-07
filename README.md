@@ -264,6 +264,8 @@ python scripts/run_benchmark.py \
 
 `felix` here is a technical harness name (the original 7-agent stack), not a product.
 
+Public proof of a cell is a replayable pack: challenge file, expected judgment name, and pass/fail over printed receipts (`summary.json`, events, preflight adapters). Chain-of-thought and abridged reasoning traces do not count. Packing rules: [docs/public-proof-challenge-packs.md](docs/public-proof-challenge-packs.md). This board stays the N=1 `spread-2026-09-07` cite.
+
 | # | Harness / model | Mean | Final | vs baseline | Cost |
 |---|-----------------|------|-------|-------------|------|
 | 1 | Grok Build (ACP) / grok-4.6 | **0.811** | 0.833 | −0.021 | $7.00* |
