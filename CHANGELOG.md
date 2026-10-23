@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.4](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.7.3...rimworld-learning-environment-v0.7.4) (2026-10-21)
+
+
+### Bug Fixes
+
+* bump certifi to 2026.10.19 after eMudhra CA compromise ([2d7a1e0](https://github.com/AppSprout-dev/RLE/commit/2d7a1e02a81ea5d1fb21ff16e065a9ba7423de1b))
+
 ## [0.7.3](https://github.com/AppSprout-dev/RLE/compare/rimworld-learning-environment-v0.7.2...rimworld-learning-environment-v0.7.3) (2026-10-07)
 
 
